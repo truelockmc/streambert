@@ -10,23 +10,24 @@ import HomePage from './pages/HomePage'
 import MoviePage from './pages/MoviePage'
 import TVPage from './pages/TVPage'
 import LibraryPage from './pages/LibraryPage'
+import SettingsPage from './pages/SettingsPage'
 
 export default function App() {
-  const [apiKey, setApiKey]   = useState(() => storage.get('apikey'))
-  const [page, setPage]       = useState('home')
-  const [selected, setSelected] = useState(null)
+  const [apiKey, setApiKey]         = useState(() => storage.get('apikey'))
+  const [page, setPage]             = useState('home')
+  const [selected, setSelected]     = useState(null)
   const [showSearch, setShowSearch] = useState(false)
 
-  const [saved, setSaved]         = useState(() => storage.get('saved') || {})
-  const [progress, setProgress]   = useState(() => storage.get('progress') || {})
-  const [history, setHistory]     = useState(() => storage.get('history') || [])
-  const [toast, setToast]         = useState(null)
+  const [saved, setSaved]       = useState(() => storage.get('saved') || {})
+  const [progress, setProgress] = useState(() => storage.get('progress') || {})
+  const [history, setHistory]   = useState(() => storage.get('history') || [])
+  const [toast, setToast]       = useState(null)
 
-  const [trending, setTrending]     = useState([])
-  const [trendingTV, setTrendingTV] = useState([])
+  const [trending, setTrending]       = useState([])
+  const [trendingTV, setTrendingTV]   = useState([])
   const [loadingHome, setLoadingHome] = useState(false)
 
-  // ── Load trending on startup ───────────────────────────────────────────────
+  // ── Load trending on startup ─────────────────────────────────────────────
   useEffect(() => {
     if (!apiKey) return
     setLoadingHome(true)
@@ -39,7 +40,7 @@ export default function App() {
       .finally(() => setLoadingHome(false))
   }, [apiKey])
 
-  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  // ── Keyboard shortcuts ───────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setShowSearch(true) }
@@ -49,7 +50,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  // ── Helpers ──────────────────────────────────────────────────────────────
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500) }
 
   const navigate = (pg, data = null) => {
@@ -65,6 +66,13 @@ export default function App() {
   const saveApiKey = (key) => {
     storage.set('apikey', key)
     setApiKey(key)
+  }
+
+  const changeApiKey = () => {
+    if (confirm('TMDB API Key zurücksetzen?')) {
+      storage.remove('apikey')
+      setApiKey(null)
+    }
   }
 
   const toggleSave = useCallback((item) => {
@@ -118,7 +126,7 @@ export default function App() {
     storage.set('progress', next)
   }, [progress])
 
-  // ── Derived: in-progress items ────────────────────────────────────────────
+  // ── Derived ──────────────────────────────────────────────────────────────
   const inProgress = history.filter(h => {
     const pk = h.media_type === 'movie'
       ? `movie_${h.id}`
@@ -129,7 +137,7 @@ export default function App() {
 
   const savedList = Object.values(saved)
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ───────────────────────────────────────────────────────────────
   if (!apiKey) return <SetupScreen onSave={saveApiKey} />
 
   return (
@@ -162,6 +170,7 @@ export default function App() {
             progress={progress}
             saveProgress={saveProgress}
             onBack={() => navigate('home')}
+            onSettings={() => navigate('settings')}
           />
         )}
         {page === 'tv' && selected && (
@@ -174,6 +183,7 @@ export default function App() {
             progress={progress}
             saveProgress={saveProgress}
             onBack={() => navigate('home')}
+            onSettings={() => navigate('settings')}
           />
         )}
         {page === 'history' && (
@@ -183,6 +193,12 @@ export default function App() {
             saved={savedList}
             progress={progress}
             onSelect={handleSelectResult}
+          />
+        )}
+        {page === 'settings' && (
+          <SettingsPage
+            apiKey={apiKey}
+            onChangeApiKey={changeApiKey}
           />
         )}
       </div>

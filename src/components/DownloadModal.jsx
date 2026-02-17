@@ -1,31 +1,33 @@
 import { useState, useEffect } from 'react'
-import { CloseIcon, DownloadIcon } from './Icons'
+import { CloseIcon, DownloadIcon, SettingsIcon } from './Icons'
+import { storage } from '../utils/storage'
 
 export default function DownloadModal({
   onClose,
   m3u8Url,
   mediaName,
-  downloadPath,
   downloaderFolder,
   setDownloaderFolder,
+  onOpenSettings,   // called when user wants to go to Settings page
 }) {
-  const [downloader, setDownloader] = useState(null)
-  const [checking, setChecking] = useState(false)
+  const [downloadPath, setDownloadPath] = useState(() => storage.get('downloadPath') || '')
+  const [settingPath, setSettingPath]   = useState(false)
+  const [downloader, setDownloader]     = useState(null)
+  const [checking, setChecking]         = useState(false)
   const [downloadStatus, setDownloadStatus] = useState(null)
 
-  const isElectron = !!window.electron
+  const isElectron = typeof window !== 'undefined' && !!window.electron
 
   const ua = navigator.userAgent.toLowerCase()
-  const isWin = ua.includes('win')
-  const isMac = ua.includes('mac')
-  const binaryHint = isWin
+  const binaryHint = ua.includes('win')
     ? 'Video Downloader.exe  (Windows)'
-    : isMac
+    : ua.includes('mac')
     ? 'Video Downloader  (macOS)'
     : 'Video Downloader  (Linux)'
 
   const releaseUrl = 'https://github.com/truelockmc/video-downloader/releases/latest'
 
+  // Re-check binary whenever folder changes
   useEffect(() => {
     if (!downloaderFolder || !isElectron) return
     setChecking(true)
@@ -35,9 +37,18 @@ export default function DownloadModal({
     })
   }, [downloaderFolder])
 
-  const pickFolder = async () => {
+  const pickBinaryFolder = async () => {
     const folder = await window.electron.pickFolder()
     if (folder) setDownloaderFolder(folder)
+  }
+
+  const pickDownloadFolder = async () => {
+    const folder = await window.electron.pickFolder()
+    if (folder) {
+      setDownloadPath(folder)
+      storage.set('downloadPath', folder)
+      setSettingPath(false)
+    }
   }
 
   const handleDownload = async () => {
@@ -52,10 +63,83 @@ export default function DownloadModal({
     setDownloadStatus(result.ok ? 'ok' : result.error)
   }
 
+  // ── No download path → force user to set one first ──────────────────────
+  if (!downloadPath || settingPath) {
+    return (
+      <div className="modal-backdrop" onClick={onClose}>
+        <div className="download-modal" onClick={e => e.stopPropagation()}>
+          <div className="download-modal-header">
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <DownloadIcon /> Set Download Folder
+            </span>
+            <button className="icon-btn" onClick={onClose}><CloseIcon /></button>
+          </div>
+
+          <div style={{ padding: 24 }}>
+            <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 20, lineHeight: 1.6 }}>
+              {settingPath
+                ? 'Choose where downloaded videos should be saved:'
+                : <><span style={{ color: 'var(--red)', fontWeight: 600 }}>No download folder set.</span><br />Choose a folder to save downloaded videos:</>
+              }
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
+              <input
+                className="apikey-input"
+                style={{ flex: 1, minWidth: 200, marginBottom: 0 }}
+                placeholder="/home/you/Movies"
+                value={downloadPath}
+                onChange={e => setDownloadPath(e.target.value)}
+              />
+              {isElectron && (
+                <button className="btn btn-secondary" onClick={pickDownloadFolder}>
+                  Browse …
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1, justifyContent: 'center' }}
+                disabled={!downloadPath.trim()}
+                onClick={() => {
+                  storage.set('downloadPath', downloadPath.trim())
+                  setDownloadPath(downloadPath.trim())
+                  setSettingPath(false)
+                }}
+              >
+                Confirm
+              </button>
+              {settingPath && (
+                <button className="btn btn-ghost" onClick={() => setSettingPath(false)}>
+                  Cancel
+                </button>
+              )}
+            </div>
+
+            {onOpenSettings && (
+              <div style={{ marginTop: 14, textAlign: 'center' }}>
+                <button
+                  className="btn btn-ghost"
+                  style={{ fontSize: 12, color: 'var(--text3)' }}
+                  onClick={() => { onClose(); onOpenSettings() }}
+                >
+                  <SettingsIcon /> Open Settings
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Main download modal ─────────────────────────────────────────────────
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="download-modal" onClick={e => e.stopPropagation()}>
-        {/* Header */}
+
         <div className="download-modal-header">
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <DownloadIcon /> Download
@@ -63,7 +147,7 @@ export default function DownloadModal({
           <button className="icon-btn" onClick={onClose}><CloseIcon /></button>
         </div>
 
-        {/* No m3u8 yet */}
+        {/* Waiting for stream */}
         {!m3u8Url && (
           <div className="download-waiting">
             <div className="spinner" style={{ width: 24, height: 24, borderWidth: 2 }} />
@@ -71,7 +155,6 @@ export default function DownloadModal({
           </div>
         )}
 
-        {/* m3u8 found */}
         {m3u8Url && (
           <>
             <div className="download-url-block">
@@ -79,28 +162,28 @@ export default function DownloadModal({
               <code className="download-url-code">{m3u8Url}</code>
             </div>
 
-            {/* Step 1 — downloader not present yet */}
+            {/* Binary not set up yet */}
             {!downloader?.exists && (
               <div className="download-instructions">
-                <p className="download-instructions-title">Set up Video Downloader</p>
+                <div className="download-instructions-title">Set up Video Downloader</div>
                 <ol className="download-steps">
                   <li>
                     Download the latest release from{' '}
                     <a
                       className="download-link"
                       href="#"
-                      onClick={e => { e.preventDefault(); window.electron?.openExternal(releaseUrl) }}
+                      onClick={e => { e.preventDefault(); isElectron && window.electron.openExternal(releaseUrl) }}
                     >
                       github.com/truelockmc/video-downloader
                     </a>
                     {' '}— for your OS: <code>{binaryHint}</code>
                   </li>
                   <li>Extract the release into a folder of your choice</li>
-                  <li>Select that folder below (it must contain a <code>_internal</code> folder and the binary)</li>
+                  <li>Select that folder below — it must contain a <code>_internal</code> folder and the binary</li>
                 </ol>
 
                 <div className="download-folder-row">
-                  <button className="btn btn-secondary" onClick={pickFolder}>
+                  <button className="btn btn-secondary" onClick={pickBinaryFolder}>
                     Choose folder …
                   </button>
                   {downloaderFolder && (
@@ -117,33 +200,35 @@ export default function DownloadModal({
 
                 {!checking && downloader && !downloader.exists && downloaderFolder && (
                   <div className="download-error">
-                    No Video Downloader binary found in that folder. Make sure the <code>_internal</code> folder and the binary are both present inside the chosen folder.
+                    No binary found. Make sure the <code>_internal</code> folder and the binary are both inside the chosen folder.
                   </div>
                 )}
               </div>
             )}
 
-            {/* Step 2 — downloader found */}
+            {/* Binary found — ready to download */}
             {downloader?.exists && (
               <div className="download-ready">
                 <div className="download-found-badge">✓ Video Downloader found</div>
 
-                {!downloadPath && (
-                  <div className="download-error" style={{ marginBottom: 12 }}>
-                    No download folder configured. Please set one in Settings.
+                {/* Download path row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text3)', flex: 1 }}>
+                    Save to: <code>{downloadPath}</code>
                   </div>
-                )}
-
-                {downloadPath && (
-                  <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>
-                    Destination: <code>{downloadPath}</code>
-                  </div>
-                )}
+                  <button
+                    className="btn btn-ghost"
+                    style={{ fontSize: 12, padding: '4px 10px' }}
+                    onClick={() => setSettingPath(true)}
+                  >
+                    Change
+                  </button>
+                </div>
 
                 <button
                   className="btn btn-primary"
                   onClick={handleDownload}
-                  disabled={!downloadPath || downloadStatus === 'starting'}
+                  disabled={downloadStatus === 'starting'}
                   style={{ width: '100%', justifyContent: 'center' }}
                 >
                   <DownloadIcon />
@@ -157,9 +242,9 @@ export default function DownloadModal({
                   <div className="download-error">{downloadStatus}</div>
                 )}
 
-                <div className="download-folder-row" style={{ marginTop: 16 }}>
-                  <span style={{ fontSize: 12, color: 'var(--text3)' }}>Change binary folder:</span>
-                  <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={pickFolder}>
+                <div style={{ marginTop: 16, display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text3)' }}>Wrong binary folder?</span>
+                  <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={pickBinaryFolder}>
                     Change
                   </button>
                 </div>

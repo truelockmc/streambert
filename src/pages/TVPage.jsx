@@ -8,7 +8,7 @@ import DownloadModal from '../components/DownloadModal'
 import { storage } from '../utils/storage'
 
 export default function TVPage({
-  item, apiKey, onSave, isSaved, onHistory, progress, saveProgress, onBack,
+  item, apiKey, onSave, isSaved, onHistory, progress, saveProgress, onBack, onSettings,
 }) {
   const [details, setDetails]           = useState(null)
   const [seasonData, setSeasonData]     = useState(null)
@@ -22,8 +22,6 @@ export default function TVPage({
   const [downloaderFolder, setDownloaderFolder] = useState(
     () => storage.get('downloaderFolder') || ''
   )
-
-  const downloadPath = storage.get('downloadPath') || ''
 
   useEffect(() => {
     setLoading(true)
@@ -48,7 +46,6 @@ export default function TVPage({
       .finally(() => setLoadingSeason(false))
   }, [item.id, selectedSeason, apiKey])
 
-  // Listen for m3u8 URLs from main process
   useEffect(() => {
     if (!window.electron) return
     const handler = window.electron.onM3u8Found((url) => {
@@ -70,12 +67,7 @@ export default function TVPage({
     setM3u8Url(null)
     setSelectedEp(ep)
     setPlaying(true)
-    onHistory({
-      ...d, media_type: 'tv',
-      season: selectedSeason,
-      episode: ep.episode_number,
-      episodeName: ep.name,
-    })
+    onHistory({ ...d, media_type:'tv', season:selectedSeason, episode:ep.episode_number, episodeName:ep.name })
   }
 
   const handleSetDownloaderFolder = (folder) => {
@@ -83,7 +75,6 @@ export default function TVPage({
     storage.set('downloaderFolder', folder)
   }
 
-  // Build media name for download: "Series (year) S01 E02"
   const mediaName = selectedEp
     ? `${title} (${year}) S${String(selectedSeason).padStart(2,'0')} E${String(selectedEp.episode_number).padStart(2,'0')}`
     : title
@@ -94,7 +85,7 @@ export default function TVPage({
       {!loading && (
         <>
           <div className="detail-hero">
-            <div className="detail-bg" style={{ backgroundImage: `url(${imgUrl(d.backdrop_path,'original')})` }} />
+            <div className="detail-bg" style={{ backgroundImage:`url(${imgUrl(d.backdrop_path,'original')})` }} />
             <div className="detail-gradient" />
             <div className="detail-content">
               <div className="detail-poster">
@@ -107,31 +98,28 @@ export default function TVPage({
                 <div className="detail-type">Series</div>
                 <div className="detail-title">{title}</div>
                 <div className="genres">
-                  {(d.genres || []).map(g => <span key={g.id} className="genre-tag">{g.name}</span>)}
+                  {(d.genres||[]).map(g=><span key={g.id} className="genre-tag">{g.name}</span>)}
                 </div>
                 <div className="detail-meta">
-                  {d.vote_average > 0 && (
-                    <span className="detail-rating"><StarIcon /> {d.vote_average?.toFixed(1)}</span>
-                  )}
-                  {year && <span>{year}</span>}
-                  {d.number_of_seasons && <span>{d.number_of_seasons} Seasons</span>}
-                  {d.number_of_episodes && <span>{d.number_of_episodes} Episodes</span>}
+                  {d.vote_average>0&&<span className="detail-rating"><StarIcon/> {d.vote_average?.toFixed(1)}</span>}
+                  {year&&<span>{year}</span>}
+                  {d.number_of_seasons&&<span>{d.number_of_seasons} Seasons</span>}
+                  {d.number_of_episodes&&<span>{d.number_of_episodes} Episodes</span>}
                 </div>
                 <p className="detail-overview">{d.overview}</p>
                 <div className="detail-actions">
                   <button className="btn btn-secondary" onClick={onSave}>
-                    {isSaved ? <BookmarkFillIcon /> : <BookmarkIcon />}
-                    {isSaved ? 'Saved' : 'Save'}
+                    {isSaved?<BookmarkFillIcon/>:<BookmarkIcon/>}
+                    {isSaved?'Saved':'Save'}
                   </button>
                   <button className="btn btn-ghost" onClick={onBack}>
-                    <BackIcon /> Back
+                    <BackIcon/> Back
                   </button>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Player */}
           {playing && selectedEp && (
             <div className="section">
               <div style={{ marginBottom:12,display:'flex',alignItems:'center',gap:12 }}>
@@ -145,11 +133,7 @@ export default function TVPage({
                   allowpopups="true"
                   style={{ position:'absolute',inset:0,width:'100%',height:'100%',border:'none' }}
                 />
-                <button
-                  className="player-overlay-btn"
-                  onClick={() => setShowDownload(true)}
-                  title="Download"
-                >
+                <button className="player-overlay-btn" onClick={() => setShowDownload(true)} title="Download">
                   <DownloadIcon />
                   {m3u8Url && <span className="player-overlay-dot" />}
                 </button>
@@ -157,53 +141,46 @@ export default function TVPage({
               {currentProgressKey && (
                 <div className="progress-mark-row">
                   <span style={{ fontSize:12,color:'var(--text3)',marginRight:4 }}>Mark progress:</span>
-                  {[25,50,75,100].map(p => (
+                  {[25,50,75,100].map(p=>(
                     <button key={p} className="btn btn-ghost" style={{ padding:'5px 14px',fontSize:12 }}
-                      onClick={() => saveProgress(currentProgressKey, p)}>{p}%</button>
+                      onClick={()=>saveProgress(currentProgressKey,p)}>{p}%</button>
                   ))}
                 </div>
               )}
             </div>
           )}
 
-          {/* Season + Episodes */}
           <div className="section">
             <div className="section-title">Episodes</div>
-            {seasons.length > 0 && (
+            {seasons.length>0&&(
               <div className="season-selector">
-                {seasons.map(s => (
-                  <button
-                    key={s.season_number}
-                    className={`season-btn ${selectedSeason === s.season_number ? 'active' : ''}`}
-                    onClick={() => setSelectedSeason(s.season_number)}
-                  >
+                {seasons.map(s=>(
+                  <button key={s.season_number}
+                    className={`season-btn ${selectedSeason===s.season_number?'active':''}`}
+                    onClick={()=>setSelectedSeason(s.season_number)}>
                     Season {s.season_number}
                   </button>
                 ))}
               </div>
             )}
-            {loadingSeason && <div className="loader"><div className="spinner" /></div>}
-            {!loadingSeason && seasonData?.episodes && (
+            {loadingSeason&&<div className="loader"><div className="spinner"/></div>}
+            {!loadingSeason&&seasonData?.episodes&&(
               <div className="episodes-grid">
-                {seasonData.episodes.map(ep => {
-                  const pk = `tv_${item.id}_s${selectedSeason}e${ep.episode_number}`
-                  const epPct = progress[pk] || 0
-                  const isPlaying = playing && selectedEp?.episode_number === ep.episode_number
+                {seasonData.episodes.map(ep=>{
+                  const pk=`tv_${item.id}_s${selectedSeason}e${ep.episode_number}`
+                  const epPct=progress[pk]||0
+                  const isPlaying=playing&&selectedEp?.episode_number===ep.episode_number
                   return (
-                    <div
-                      key={ep.episode_number}
-                      className={`episode-card ${isPlaying ? 'playing' : ''}`}
-                      onClick={() => playEpisode(ep)}
-                    >
+                    <div key={ep.episode_number} className={`episode-card ${isPlaying?'playing':''}`} onClick={()=>playEpisode(ep)}>
                       <div className="episode-thumb">
                         {ep.still_path
-                          ? <img src={imgUrl(ep.still_path,'w300')} alt={ep.name} loading="lazy" />
-                          : <div style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text3)' }}><PlayIcon /></div>
+                          ?<img src={imgUrl(ep.still_path,'w300')} alt={ep.name} loading="lazy"/>
+                          :<div style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text3)' }}><PlayIcon/></div>
                         }
-                        <div className="episode-thumb-play"><PlayIcon /></div>
-                        {epPct > 0 && (
+                        <div className="episode-thumb-play"><PlayIcon/></div>
+                        {epPct>0&&(
                           <div style={{ position:'absolute',bottom:0,left:0,right:0,height:3,background:'rgba(255,255,255,0.1)' }}>
-                            <div style={{ width:`${Math.min(epPct,100)}%`,height:'100%',background:'var(--red)' }} />
+                            <div style={{ width:`${Math.min(epPct,100)}%`,height:'100%',background:'var(--red)' }}/>
                           </div>
                         )}
                       </div>
@@ -211,9 +188,9 @@ export default function TVPage({
                         <div className="episode-num">E{ep.episode_number}</div>
                         <div className="episode-name">{ep.name}</div>
                         <div className="episode-desc">{ep.overview}</div>
-                        {epPct > 0 && (
+                        {epPct>0&&(
                           <div className="episode-progress-bar">
-                            <div className="episode-progress-fill" style={{ width:`${Math.min(epPct,100)}%` }} />
+                            <div className="episode-progress-fill" style={{ width:`${Math.min(epPct,100)}%` }}/>
                           </div>
                         )}
                       </div>
@@ -231,9 +208,9 @@ export default function TVPage({
           onClose={() => setShowDownload(false)}
           m3u8Url={m3u8Url}
           mediaName={mediaName}
-          downloadPath={downloadPath}
           downloaderFolder={downloaderFolder}
           setDownloaderFolder={handleSetDownloaderFolder}
+          onOpenSettings={onSettings}
         />
       )}
     </div>

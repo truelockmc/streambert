@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { tmdbFetch, imgUrl, videasyMovieUrl } from '../utils/api'
 import {
   PlayIcon, BookmarkIcon, BookmarkFillIcon, BackIcon,
@@ -8,7 +8,7 @@ import DownloadModal from '../components/DownloadModal'
 import { storage } from '../utils/storage'
 
 export default function MoviePage({
-  item, apiKey, onSave, isSaved, onHistory, progress, saveProgress, onBack,
+  item, apiKey, onSave, isSaved, onHistory, progress, saveProgress, onBack, onSettings,
 }) {
   const [details, setDetails]           = useState(null)
   const [playing, setPlaying]           = useState(false)
@@ -20,7 +20,6 @@ export default function MoviePage({
 
   const progressKey = `movie_${item.id}`
   const pct = progress[progressKey] || 0
-  const downloadPath = storage.get('downloadPath') || ''
 
   useEffect(() => {
     tmdbFetch(`/movie/${item.id}`, apiKey)
@@ -28,7 +27,6 @@ export default function MoviePage({
       .catch(() => setDetails(item))
   }, [item.id, apiKey])
 
-  // Listen for m3u8 URLs forwarded by the main process
   useEffect(() => {
     if (!window.electron) return
     const handler = window.electron.onM3u8Found((url) => {
@@ -56,10 +54,7 @@ export default function MoviePage({
   return (
     <div className="fade-in">
       <div className="detail-hero">
-        <div
-          className="detail-bg"
-          style={{ backgroundImage: `url(${imgUrl(d.backdrop_path, 'original')})` }}
-        />
+        <div className="detail-bg" style={{ backgroundImage: `url(${imgUrl(d.backdrop_path, 'original')})` }} />
         <div className="detail-gradient" />
         <div className="detail-content">
           <div className="detail-poster">
@@ -75,9 +70,7 @@ export default function MoviePage({
               {(d.genres || []).map(g => <span key={g.id} className="genre-tag">{g.name}</span>)}
             </div>
             <div className="detail-meta">
-              {d.vote_average > 0 && (
-                <span className="detail-rating"><StarIcon /> {d.vote_average?.toFixed(1)}</span>
-              )}
+              {d.vote_average > 0 && <span className="detail-rating"><StarIcon /> {d.vote_average?.toFixed(1)}</span>}
               {year && <span>{year}</span>}
               {d.runtime && <span>{d.runtime} min</span>}
               {d.original_language && <span>{d.original_language?.toUpperCase()}</span>}
@@ -108,11 +101,7 @@ export default function MoviePage({
               allowpopups="true"
               style={{ position:'absolute',inset:0,width:'100%',height:'100%',border:'none' }}
             />
-            <button
-              className="player-overlay-btn"
-              onClick={() => setShowDownload(true)}
-              title="Download"
-            >
+            <button className="player-overlay-btn" onClick={() => setShowDownload(true)} title="Download">
               <DownloadIcon />
               {m3u8Url && <span className="player-overlay-dot" />}
             </button>
@@ -141,9 +130,9 @@ export default function MoviePage({
           onClose={() => setShowDownload(false)}
           m3u8Url={m3u8Url}
           mediaName={mediaName}
-          downloadPath={downloadPath}
           downloaderFolder={downloaderFolder}
           setDownloaderFolder={handleSetDownloaderFolder}
+          onOpenSettings={onSettings}
         />
       )}
     </div>
