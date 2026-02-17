@@ -1,25 +1,56 @@
 {
   "name": "streambert",
-  "version": "2.0.0",
-  "private": true,
+  "version": "0.2.0",
+  "description": "Streambert Desktop App",
+  "author": "truelockmc",
+  "license": "GPL-3.0",
   "main": "main.js",
+  "private": false,
+
   "scripts": {
     "dev": "vite",
     "electron:dev": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
     "start": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && npm run electron:dev\"",
     "build": "vite build",
-    "electron:prod": "electron ."
+    "dist": "npm run build && electron-builder"
   },
+
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
+
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.2.1",
-    "concurrently": "^9.0.0",
-    "cross-env": "^7.0.3",
-    "electron": "^40.4.1",
     "vite": "^7.3.1",
-    "wait-on": "^8.0.0"
+    "@vitejs/plugin-react": "^4.7.0",
+    "electron": "^40.4.1",
+    "electron-builder": "^26.7.0",
+    "concurrently": "^9.2.0",
+    "cross-env": "^7.0.3",
+    "wait-on": "^8.0.1"
+  },
+
+  "overrides": {
+    "tar": "^7.5.7",
+    "ajv": "^8.18.0"
+  },
+
+  "build": {
+    "appId": "com.truelockmc.streambert",
+    "productName": "Streambert",
+    "directories": {
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Utility",
+      "icon": "public/icon.png"
+    }
   }
 }
