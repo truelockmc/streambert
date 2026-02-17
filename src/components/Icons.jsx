@@ -1,15 +1,9 @@
-export const StreambertLogo = ({ className = "w-16 h-auto" }) => (
-  <svg
-    viewBox="0 0 249 211"
-    xmlns="http://www.w3.org/2000/svg"
-    className={className}
-  >
-    <image
-      width="249"
-      height="211"
-      href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPkAAADTCAYAAABDeLXAAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAELXSURBVHja7b15mCRXdSf6u2tsmVnd1VUqqWlMg9qSwGJzgY2wYBpvmAEZg90GA56RscGGmecZewDbDAPyY/yw32fzPPPwjLHZDHxmkTHGPBswNggQGAkEYhFaEEKyRUOrWt3VVZlZmRnLfX9UnOibUZmVkRlZldXd8fu+++UacU+ce89dzj0LQ0EYYzhjLBn025EjR5wHHnggWFtbS+bm5tiZM2dY+hOr1+ubbxgz9H/7/STYv39/qesvBJw+fZqVv8tkKNo+s6Rxr2AUr1qtVvTAAw+0yshMYSbPzc3tf9ihy66+9PsP/58bGxuPu++++6Jma62zunpqo9Vqmf379zutVot5nmeSJEkAmDiOTRzHJifgyL3vo4Ftfpn93xgDY4Y/n32/ghjFrDw9Y/NqHBo2WbUNMWwQe8ZG/qLteFC0M+2WgI7buadKF/W9Cfhe6IJt+rbBpgx1hRDrcRwfj+P4C5zzj3Q6nS8CaE3zOQHw/+R59TsBbgBptPKNFK7Z/MyN67oGgOGcG865AUCCXZWqVKVEkVJueXVd99sA3uB53qEi0jt0tHn6058+77re+2666eYfP3HiRDbiSKEhhEAYhgBLICVHr9cDAGit0ev1oLUGYwzd..."
-    />
-  </svg>
+export const StreambertLogo = ({ style }) => (
+  <img
+    src="./logo.svg"
+    alt="Streambert"
+    style={{ width: '100%', height: 'auto', display: 'block', ...style }}
+  />
 )
 
 export const SearchIcon = () => (
@@ -81,5 +75,13 @@ export const EyeIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
     <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
+export const DownloadIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 )

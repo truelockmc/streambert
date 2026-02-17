@@ -312,3 +312,89 @@ html, body, #root {
 a { color: inherit; text-decoration: none; }
 input, button { font-family: var(--font-body); }
 kbd { background: var(--surface3); padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+
+/* ── Webview player ─────────────────────────────────────────────────────── */
+.player-wrap webview { position: absolute; inset: 0; width: 100%; height: 100%; border: none; }
+
+/* ── Player download overlay button ────────────────────────────────────── */
+.player-overlay-btn {
+  position: absolute; top: 12px; right: 12px; z-index: 10;
+  background: rgba(0,0,0,0.72); border: 1px solid rgba(255,255,255,0.15);
+  color: white; border-radius: 8px; padding: 7px 12px; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; font-size: 12px;
+  backdrop-filter: blur(6px); transition: background 0.2s;
+}
+.player-overlay-btn:hover { background: rgba(229,9,20,0.85); border-color: var(--red); }
+.player-overlay-btn svg { width: 16px; height: 16px; }
+.player-overlay-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: #4caf50;
+  box-shadow: 0 0 6px #4caf50; flex-shrink: 0;
+}
+
+/* ── Download modal ─────────────────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 400;
+  background: rgba(0,0,0,0.75); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.download-modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; width: 560px; max-width: 100%;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.8); overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.download-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px; border-bottom: 1px solid var(--border);
+  font-size: 15px; font-weight: 600;
+}
+.download-modal-header svg { width: 18px; height: 18px; color: var(--red); }
+.icon-btn {
+  background: none; border: none; color: var(--text3); cursor: pointer;
+  padding: 4px; border-radius: 6px; display: flex; transition: color 0.15s;
+}
+.icon-btn:hover { color: var(--text); }
+.icon-btn svg { width: 18px; height: 18px; }
+
+.download-waiting {
+  display: flex; align-items: center; gap: 12px;
+  padding: 40px 24px; color: var(--text3); font-size: 14px;
+  justify-content: center;
+}
+
+.download-url-block { padding: 18px 22px; border-bottom: 1px solid var(--border); }
+.download-url-label { font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--red); margin-bottom: 8px; }
+.download-url-code {
+  display: block; font-size: 11px; color: var(--text2);
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 12px; word-break: break-all; line-height: 1.5;
+}
+
+.download-instructions { padding: 22px; }
+.download-instructions-title { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+.download-steps {
+  padding-left: 20px; font-size: 13px; color: var(--text2);
+  line-height: 1.8; margin-bottom: 18px;
+}
+.download-steps li { margin-bottom: 4px; }
+.download-link { color: var(--red); text-decoration: underline; cursor: pointer; }
+.download-folder-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.download-folder-path { font-size: 12px; color: var(--text3); word-break: break-all; flex: 1; }
+.download-checking { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text3); margin-top: 12px; }
+.download-error { font-size: 12px; color: var(--red); margin-top: 8px; line-height: 1.5; }
+
+.download-ready { padding: 22px; }
+.download-found-badge {
+  font-size: 13px; color: #4caf50; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 6px;
+}
+.download-success { font-size: 13px; color: #4caf50; margin-top: 10px; }
+
+/* ── Settings page ──────────────────────────────────────────────────────── */
+.settings-section { margin-bottom: 36px; }
+.settings-section-title {
+  font-size: 12px; font-weight: 700; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--text3); margin-bottom: 14px;
+}
+.settings-sep { border: none; border-top: 1px solid var(--border); margin: 0 0 36px; }

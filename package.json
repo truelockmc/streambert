@@ -1,11 +1,14 @@
 {
   "name": "streambert",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
+  "main": "main.js",
   "scripts": {
     "dev": "vite",
+    "electron:dev": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "start": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && npm run electron:dev\"",
     "build": "vite build",
-    "preview": "vite preview"
+    "electron:prod": "electron ."
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -13,6 +16,10 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^7.3.1"
+    "concurrently": "^9.0.0",
+    "cross-env": "^7.0.3",
+    "electron": "^40.4.1",
+    "vite": "^7.3.1",
+    "wait-on": "^8.0.0"
   }
 }

@@ -1,7 +1,7 @@
 import { imgUrl } from '../utils/api'
 import {
   StreambertLogo, HomeIcon, SearchIcon, HistoryIcon,
-  FilmIcon, SettingsIcon
+  FilmIcon, SettingsIcon,
 } from './Icons'
 
 export default function Sidebar({ page, onNavigate, onSearch, savedList }) {
@@ -50,14 +50,10 @@ export default function Sidebar({ page, onNavigate, onSearch, savedList }) {
 
       <div className="sidebar-bottom">
         <SideBtn
-          onClick={() => {
-            if (confirm('Reset your TMDB API key?')) {
-              localStorage.removeItem('streambert_apikey')
-              window.location.reload()
-            }
-          }}
+          active={page === 'settings'}
+          onClick={() => onNavigate('settings')}
           icon={<SettingsIcon />}
-          label="Change API Key"
+          label="Settings"
         />
       </div>
     </div>
