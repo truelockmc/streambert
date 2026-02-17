@@ -11,6 +11,7 @@ import MoviePage from './pages/MoviePage'
 import TVPage from './pages/TVPage'
 import LibraryPage from './pages/LibraryPage'
 import SettingsPage from './pages/SettingsPage'
+import DownloadsPage from './pages/DownloadsPage'
 
 export default function App() {
   const [apiKey, setApiKey]         = useState(() => storage.get('apikey'))
@@ -27,7 +28,44 @@ export default function App() {
   const [trendingTV, setTrendingTV]   = useState([])
   const [loadingHome, setLoadingHome] = useState(false)
 
-  // ── Load trending on startup ─────────────────────────────────────────────
+  // ── Downloads state ──────────────────────────────────────────────────────
+  const [downloads, setDownloads] = useState([])
+
+  // Load persisted downloads on startup
+  useEffect(() => {
+    if (!window.electron) return
+    window.electron.getDownloads().then(list => {
+      if (Array.isArray(list)) setDownloads(list)
+    })
+  }, [])
+
+  // Listen for live progress events from main process
+  useEffect(() => {
+    if (!window.electron) return
+    const handler = window.electron.onDownloadProgress((update) => {
+      setDownloads(prev => {
+        const idx = prev.findIndex(d => d.id === update.id)
+        if (idx === -1) return prev   // new download added by runDownload handler below
+        const updated = [...prev]
+        updated[idx] = { ...updated[idx], ...update }
+        return updated
+      })
+    })
+    return () => window.electron.offDownloadProgress(handler)
+  }, [])
+
+  const handleDownloadStarted = useCallback((newEntry) => {
+    setDownloads(prev => [newEntry, ...prev])
+  }, [])
+
+  const handleDeleteDownload = useCallback((id) => {
+    setDownloads(prev => prev.filter(d => d.id !== id))
+  }, [])
+
+  // Active download count for sidebar badge
+  const activeDownloadCount = downloads.filter(d => d.status === 'downloading').length
+
+  // ── Trending ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!apiKey) return
     setLoadingHome(true)
@@ -40,7 +78,7 @@ export default function App() {
       .finally(() => setLoadingHome(false))
   }, [apiKey])
 
-  // ── Keyboard shortcuts ───────────────────────────────────────────────────
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setShowSearch(true) }
@@ -50,7 +88,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  // ── Helpers ──────────────────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500) }
 
   const navigate = (pg, data = null) => {
@@ -63,37 +101,26 @@ export default function App() {
     navigate(item.media_type === 'tv' ? 'tv' : 'movie', item)
   }
 
-  const saveApiKey = (key) => {
-    storage.set('apikey', key)
-    setApiKey(key)
-  }
+  const saveApiKey = (key) => { storage.set('apikey', key); setApiKey(key) }
 
   const changeApiKey = () => {
-    if (confirm('TMDB API Key zurücksetzen?')) {
-      storage.remove('apikey')
-      setApiKey(null)
-    }
+    if (confirm('Reset TMDB API key?')) { storage.remove('apikey'); setApiKey(null) }
   }
 
   const toggleSave = useCallback((item) => {
     const id = `${item.media_type || (item.first_air_date ? 'tv' : 'movie')}_${item.id}`
     const next = { ...saved }
-    if (next[id]) {
-      delete next[id]
-      showToast('Removed from watchlist')
-    } else {
+    if (next[id]) { delete next[id]; showToast('Removed from watchlist') }
+    else {
       next[id] = {
-        id: item.id,
-        title: item.title || item.name,
-        poster_path: item.poster_path,
+        id: item.id, title: item.title || item.name, poster_path: item.poster_path,
         media_type: item.media_type || (item.first_air_date ? 'tv' : 'movie'),
         vote_average: item.vote_average,
         year: (item.release_date || item.first_air_date || '').slice(0, 4),
       }
       showToast('Added to watchlist')
     }
-    setSaved(next)
-    storage.set('saved', next)
+    setSaved(next); storage.set('saved', next)
   }, [saved])
 
   const isSaved = (item) => {
@@ -103,41 +130,27 @@ export default function App() {
 
   const addHistory = useCallback((item) => {
     const entry = {
-      id: item.id,
-      title: item.title || item.name,
-      poster_path: item.poster_path,
+      id: item.id, title: item.title || item.name, poster_path: item.poster_path,
       media_type: item.media_type || (item.first_air_date ? 'tv' : 'movie'),
-      watchedAt: Date.now(),
-      season: item.season,
-      episode: item.episode,
-      episodeName: item.episodeName,
+      watchedAt: Date.now(), season: item.season, episode: item.episode, episodeName: item.episodeName,
     }
-    const filtered = history.filter(
-      h => !(h.id === item.id && h.media_type === entry.media_type)
-    )
+    const filtered = history.filter(h => !(h.id === item.id && h.media_type === entry.media_type))
     const next = [entry, ...filtered].slice(0, 50)
-    setHistory(next)
-    storage.set('history', next)
+    setHistory(next); storage.set('history', next)
   }, [history])
 
   const saveProgress = useCallback((key, pct) => {
     const next = { ...progress, [key]: pct }
-    setProgress(next)
-    storage.set('progress', next)
+    setProgress(next); storage.set('progress', next)
   }, [progress])
 
-  // ── Derived ──────────────────────────────────────────────────────────────
   const inProgress = history.filter(h => {
-    const pk = h.media_type === 'movie'
-      ? `movie_${h.id}`
-      : `tv_${h.id}_s${h.season}e${h.episode}`
+    const pk = h.media_type === 'movie' ? `movie_${h.id}` : `tv_${h.id}_s${h.season}e${h.episode}`
     const pct = progress[pk]
     return pct && pct > 2 && pct < 95
   })
-
   const savedList = Object.values(saved)
 
-  // ── Render ───────────────────────────────────────────────────────────────
   if (!apiKey) return <SetupScreen onSave={saveApiKey} />
 
   return (
@@ -147,70 +160,51 @@ export default function App() {
         onNavigate={navigate}
         onSearch={() => setShowSearch(true)}
         savedList={savedList}
+        activeDownloads={activeDownloadCount}
       />
 
       <div className="main">
         {page === 'home' && (
-          <HomePage
-            trending={trending}
-            trendingTV={trendingTV}
-            loading={loadingHome}
-            onSelect={handleSelectResult}
-            progress={progress}
-            inProgress={inProgress}
-          />
+          <HomePage trending={trending} trendingTV={trendingTV} loading={loadingHome}
+            onSelect={handleSelectResult} progress={progress} inProgress={inProgress} />
         )}
         {page === 'movie' && selected && (
-          <MoviePage
-            item={selected}
-            apiKey={apiKey}
-            onSave={() => toggleSave(selected)}
-            isSaved={isSaved(selected)}
-            onHistory={addHistory}
-            progress={progress}
-            saveProgress={saveProgress}
-            onBack={() => navigate('home')}
-            onSettings={() => navigate('settings')}
+          <MoviePage item={selected} apiKey={apiKey}
+            onSave={() => toggleSave(selected)} isSaved={isSaved(selected)}
+            onHistory={addHistory} progress={progress} saveProgress={saveProgress}
+            onBack={() => navigate('home')} onSettings={() => navigate('settings')}
+            onDownloadStarted={handleDownloadStarted}
           />
         )}
         {page === 'tv' && selected && (
-          <TVPage
-            item={selected}
-            apiKey={apiKey}
-            onSave={() => toggleSave(selected)}
-            isSaved={isSaved(selected)}
-            onHistory={addHistory}
-            progress={progress}
-            saveProgress={saveProgress}
-            onBack={() => navigate('home')}
-            onSettings={() => navigate('settings')}
+          <TVPage item={selected} apiKey={apiKey}
+            onSave={() => toggleSave(selected)} isSaved={isSaved(selected)}
+            onHistory={addHistory} progress={progress} saveProgress={saveProgress}
+            onBack={() => navigate('home')} onSettings={() => navigate('settings')}
+            onDownloadStarted={handleDownloadStarted}
           />
         )}
         {page === 'history' && (
-          <LibraryPage
-            history={history}
-            inProgress={inProgress}
-            saved={savedList}
-            progress={progress}
-            onSelect={handleSelectResult}
-          />
+          <LibraryPage history={history} inProgress={inProgress} saved={savedList}
+            progress={progress} onSelect={handleSelectResult} />
         )}
         {page === 'settings' && (
-          <SettingsPage
-            apiKey={apiKey}
-            onChangeApiKey={changeApiKey}
+          <SettingsPage apiKey={apiKey} onChangeApiKey={changeApiKey} />
+        )}
+        {page === 'downloads' && (
+          <DownloadsPage
+            downloads={downloads}
+            onDeleteDownload={handleDeleteDownload}
+            onHistory={addHistory}
+            onSaveProgress={saveProgress}
+            progress={progress}
           />
         )}
       </div>
 
       {showSearch && (
-        <SearchModal
-          apiKey={apiKey}
-          onSelect={handleSelectResult}
-          onClose={() => setShowSearch(false)}
-        />
+        <SearchModal apiKey={apiKey} onSelect={handleSelectResult} onClose={() => setShowSearch(false)} />
       )}
-
       {toast && <div className="toast">{toast}</div>}
     </>
   )

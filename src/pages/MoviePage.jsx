@@ -8,7 +8,7 @@ import DownloadModal from '../components/DownloadModal'
 import { storage } from '../utils/storage'
 
 export default function MoviePage({
-  item, apiKey, onSave, isSaved, onHistory, progress, saveProgress, onBack, onSettings,
+  item, apiKey, onSave, isSaved, onHistory, progress, saveProgress, onBack, onSettings, onDownloadStarted,
 }) {
   const [details, setDetails]           = useState(null)
   const [playing, setPlaying]           = useState(false)
@@ -133,6 +133,9 @@ export default function MoviePage({
           downloaderFolder={downloaderFolder}
           setDownloaderFolder={handleSetDownloaderFolder}
           onOpenSettings={onSettings}
+          onDownloadStarted={onDownloadStarted}
+          mediaId={item.id}
+          mediaType="movie"
         />
       )}
     </div>

@@ -8,7 +8,7 @@ import DownloadModal from '../components/DownloadModal'
 import { storage } from '../utils/storage'
 
 export default function TVPage({
-  item, apiKey, onSave, isSaved, onHistory, progress, saveProgress, onBack, onSettings,
+  item, apiKey, onSave, isSaved, onHistory, progress, saveProgress, onBack, onSettings, onDownloadStarted,
 }) {
   const [details, setDetails]           = useState(null)
   const [seasonData, setSeasonData]     = useState(null)
@@ -211,6 +211,11 @@ export default function TVPage({
           downloaderFolder={downloaderFolder}
           setDownloaderFolder={handleSetDownloaderFolder}
           onOpenSettings={onSettings}
+          onDownloadStarted={onDownloadStarted}
+          mediaId={item.id}
+          mediaType="tv"
+          season={selectedSeason}
+          episode={selectedEp?.episode_number}
         />
       )}
     </div>
