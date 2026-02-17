@@ -1,3 +1,4 @@
 node_modules/
 temp/
 download_config.ini
+package-lock.json
