@@ -37,4 +37,40 @@ npm run preview
 ---
 
 ## Project Structure
-
+.
+├── download_config.ini
+├── index.html
+├── main.js
+├── package.json
+├── package-lock.json
+├── preload.js
+├── public
+│   └── logo.svg
+├── README.md
+├── screenshots
+│   ├── download.png
+│   └── series.png
+├── src
+│   ├── App.jsx
+│   ├── components
+│   │   ├── DownloadModal.jsx
+│   │   ├── Icons.jsx
+│   │   ├── MediaCard.jsx
+│   │   ├── SearchModal.jsx
+│   │   ├── SetupScreen.jsx
+│   │   └── Sidebar.jsx
+│   ├── main.jsx
+│   ├── pages
+│   │   ├── DownloadsPage.jsx
+│   │   ├── HomePage.jsx
+│   │   ├── LibraryPage.jsx
+│   │   ├── MoviePage.jsx
+│   │   ├── SettingsPage.jsx
+│   │   └── TVPage.jsx
+│   ├── styles
+│   │   └── global.css
+│   └── utils
+│       ├── api.js
+│       └── storage.js
+├── temp
+└── vite.config.js
