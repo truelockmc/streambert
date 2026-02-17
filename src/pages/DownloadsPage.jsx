@@ -313,9 +313,11 @@ function ActiveCard({ dl, onDelete }) {
             {dl.name}
           </div>
           <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--text3)', flexWrap: 'wrap' }}>
-            {dl.speed && <span>↑ {dl.speed}</span>}
+            {dl.speed && <span>↓ {dl.speed}</span>}
             {dl.size && <span>{dl.size}</span>}
-            {dl.totalFragments > 0 && <span>{Math.round((pct / 100) * dl.totalFragments)}/{dl.totalFragments} fragments</span>}
+            {dl.totalFragments > 0 && (
+              <span>{dl.completedFragments || 0}/{dl.totalFragments} fragments</span>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>

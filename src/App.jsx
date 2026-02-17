@@ -45,7 +45,10 @@ export default function App() {
     const handler = window.electron.onDownloadProgress((update) => {
       setDownloads(prev => {
         const idx = prev.findIndex(d => d.id === update.id)
-        if (idx === -1) return prev   // new download added by runDownload handler below
+        if (idx === -1) {
+          // Entry not yet added by handleDownloadStarted (race on first event) — add it now
+          return [update, ...prev]
+        }
         const updated = [...prev]
         updated[idx] = { ...updated[idx], ...update }
         return updated
@@ -55,7 +58,16 @@ export default function App() {
   }, [])
 
   const handleDownloadStarted = useCallback((newEntry) => {
-    setDownloads(prev => [newEntry, ...prev])
+    setDownloads(prev => {
+      // Guard: if a progress event already added this id (race), just update it
+      const idx = prev.findIndex(d => d.id === newEntry.id)
+      if (idx !== -1) {
+        const updated = [...prev]
+        updated[idx] = { ...updated[idx], ...newEntry }
+        return updated
+      }
+      return [newEntry, ...prev]
+    })
   }, [])
 
   const handleDeleteDownload = useCallback((id) => {

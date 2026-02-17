@@ -29,53 +29,6 @@ function sendProgress(update) {
   }
 }
 
-// Parse a single line of yt-dlp / binary output
-function parseLine(line) {
-  // "[download]   X.X% of ~ Y.YY ZiB at    W.W ZiB/s ETA HH:MM:SS"
-  const dlMatch = line.match(/\[download\]\s+([\d.]+)%\s+of\s+~?\s*([\d.]+\s*\S+)\s+at\s+([\d.]+\s*\S+\/s)/)
-  if (dlMatch) return { progress: parseFloat(dlMatch[1]), size: dlMatch[2].trim(), speed: dlMatch[3].trim() }
-
-  // "[download] X.X% of Y.YMiB" (no speed yet)
-  const dlSimple = line.match(/\[download\]\s+([\d.]+)%\s+of\s+~?\s*([\d.]+\s*\S+)/)
-  if (dlSimple) return { progress: parseFloat(dlSimple[1]), size: dlSimple[2].trim() }
-
-  // "Downloading: X.XX% (bytes/total bytes)"
-  const customMatch = line.match(/^Downloading:\s+([\d.]+)%/)
-  if (customMatch) return { progress: parseFloat(customMatch[1]) }
-
-  // HLS fragment progress: "[download] fragment X of Y" or "[hlsnative] Downloading fragment X of Y"
-  const fragMatch = line.match(/fragment\s+(\d+)\s+(?:of\s+|\/\s*)(\d+)/i)
-  if (fragMatch) {
-    const current = parseInt(fragMatch[1])
-    const total = parseInt(fragMatch[2])
-    const progress = total > 0 ? Math.round((current / total) * 100) : 0
-    return { progress, totalFragments: total, lastMessage: line.trim() }
-  }
-
-  // "[hlsnative] Total fragments: N"
-  const fragTotalMatch = line.match(/Total fragments:\s+(\d+)/)
-  if (fragTotalMatch) return { totalFragments: parseInt(fragTotalMatch[1]) }
-
-  // "[download] Destination: /path/to/file"
-  const destMatch = line.match(/\[download\] Destination:\s+(.+)/)
-  if (destMatch) return { filePath: destMatch[1].trim() }
-
-  // Merging / post-processing destination
-  const mergeMatch = line.match(/\[Merger\] Merging formats into "(.+)"/)
-  if (mergeMatch) return { filePath: mergeMatch[1].trim() }
-
-  // "[download] 100% of ..."
-  const fullMatch = line.match(/\[download\]\s+100%/)
-  if (fullMatch) return { progress: 100 }
-
-  // Status messages — informational only, never mark as error
-  if (line.trim().length > 0) {
-    return { lastMessage: line.trim() }
-  }
-
-  return null
-}
-
 // ── Window ────────────────────────────────────────────────────────────────────
 function createWindow() {
   loadDownloads()
@@ -102,7 +55,6 @@ function createWindow() {
       const stat = fs.statSync(filePath)
       const total = stat.size
 
-      // Detect MIME type by extension
       const ext = path.extname(filePath).toLowerCase()
       const mime = ext === '.mkv' ? 'video/x-matroska'
         : ext === '.webm' ? 'video/webm'
@@ -135,7 +87,7 @@ function createWindow() {
           'Content-Length': String(total),
         },
       })
-    } catch (e) {
+    } catch {
       return new Response('Not found', { status: 404 })
     }
   })
@@ -199,7 +151,7 @@ ipcMain.handle('run-download', (_, { binaryPath, m3u8Url, name, downloadPath, me
     const entry = {
       id, name, m3u8Url, downloadPath,
       filePath: null, status: 'downloading',
-      progress: 0, speed: '', size: '', totalFragments: 0,
+      progress: 0, speed: '', size: '', totalFragments: 0, completedFragments: 0,
       lastMessage: 'Starting…', startedAt: Date.now(), completedAt: null,
       mediaId: mediaId || null, mediaType: mediaType || null,
       season: season || null, episode: episode || null,
@@ -207,7 +159,11 @@ ipcMain.handle('run-download', (_, { binaryPath, m3u8Url, name, downloadPath, me
       tmdbId: tmdbId || mediaId || null,
     }
     downloads.push(entry)
-    sendProgress({ ...entry })
+    // Do NOT call sendProgress here. The renderer adds the initial entry via
+    // handleDownloadStarted() after invoke() resolves. Calling sendProgress()
+    // synchronously inside the handler causes the event to arrive at the renderer
+    // BEFORE invoke() resolves, so the renderer adds it via onDownloadProgress
+    // AND again via handleDownloadStarted — resulting in two cards.
 
     const args = [
       '--cli', m3u8Url,
@@ -220,64 +176,137 @@ ipcMain.handle('run-download', (_, { binaryPath, m3u8Url, name, downloadPath, me
 
     const proc = spawn(binaryPath, args, { stdio: ['ignore', 'pipe', 'pipe'] })
 
+    // ── Per-download line parser ───────────────────────────────────────────
+    //
+    // Actual binary output (uses \r between updates, we split on \r|\n):
+    //
+    //   [hlsnative] Total fragments: 672
+    //   [download] Destination: /home/user/aW5k….mp4
+    //   [download] /home/user/file.part-Frag4 has already been downloaded
+    //   Downloading: 0.31% (2939944/938676480.0 bytes)/s ETA Unknown (frag 4/672)
+    //   [download]   0.8% of ~ 352.64MiB at 3.2MiB/s ETA 01:50 (frag 6/672)
+    //   Downloading: 2.23% (2943016/131755366.4 bytes) ... (frag 15/672)
+    //   ...
+    //
+    // Key insight: "(frag N/total)" appears in BOTH "Downloading:" and "[download]"
+    // lines. The leading "Downloading: X%" is byte-level progress within the
+    // current fragment (oscillates 0→100 per fragment) — DO NOT use it for
+    // overall progress. Use (frag N/total) exclusively.
+
     const handleLine = (line) => {
-      if (!line.trim()) return
-      const parsed = parseLine(line)
-      if (!parsed) return
+      const trimmed = line.trim()
+      if (!trimmed) return
       const idx = downloads.findIndex(d => d.id === id)
       if (idx === -1) return
-      downloads[idx] = { ...downloads[idx], ...parsed }
-      // Never let mid-stream messages mark the download as error;
-      // error status is only set by the process exit code below.
-      sendProgress({ id, ...parsed, status: downloads[idx].status })
+
+      // Build an update object by scanning the line for all known patterns.
+      // Multiple patterns can match the same line (e.g. frag + speed + size).
+      const update = {}
+
+      // ── (frag N/total) — THE source of truth for overall progress ────────
+      // Appears as: "... (frag 4/672)" or "(frag 4/672)"
+      const fragMatch = trimmed.match(/\(frag\s+(\d+)\/(\d+)\)/)
+      if (fragMatch) {
+        const currentFrag = parseInt(fragMatch[1])
+        const total = parseInt(fragMatch[2])
+        update.completedFragments = currentFrag
+        update.totalFragments = total
+        update.progress = Math.min(99, Math.round((currentFrag / total) * 100))
+        update.lastMessage = `Fragment ${currentFrag} / ${total}`
+      }
+
+      // ── speed: "at X.XMiB/s" or "at X.XKiB/s" ──────────────────────────
+      const speedMatch = trimmed.match(/\bat\s+([\d.]+\s*(?:[KMGT]i?B|B)\/s)/i)
+      if (speedMatch) update.speed = speedMatch[1].trim()
+
+      // ── size: "of ~ X.XMiB" or "of X.XMiB" ─────────────────────────────
+      const sizeMatch = trimmed.match(/\bof\s+~?\s*([\d.]+\s*(?:[KMGT]i?B|B))\b/i)
+      if (sizeMatch) update.size = sizeMatch[1].trim()
+
+      // ── [hlsnative] Total fragments: N ───────────────────────────────────
+      const fragTotalMatch = trimmed.match(/Total fragments:\s+(\d+)/)
+      if (fragTotalMatch) {
+        const total = parseInt(fragTotalMatch[1])
+        const u = { totalFragments: total, completedFragments: 0, lastMessage: `HLS: ${total} fragments` }
+        downloads[idx] = { ...downloads[idx], ...u }
+        sendProgress({ id, ...u, status: downloads[idx].status })
+        return
+      }
+
+      // ── [download] Destination: /path/file ───────────────────────────────
+      const destMatch = trimmed.match(/^\[download\] Destination:\s+(.+)/)
+      if (destMatch) {
+        const u = { filePath: destMatch[1].trim(), lastMessage: 'Downloading…' }
+        downloads[idx] = { ...downloads[idx], ...u }
+        sendProgress({ id, ...u, status: downloads[idx].status })
+        return
+      }
+
+      // ── [Merger] output path ──────────────────────────────────────────────
+      const mergeMatch = trimmed.match(/\[Merger\] Merging formats into "(.+)"/)
+      if (mergeMatch) {
+        const u = { filePath: mergeMatch[1].trim(), lastMessage: 'Merging…', progress: 99 }
+        downloads[idx] = { ...downloads[idx], ...u }
+        sendProgress({ id, ...u, status: downloads[idx].status })
+        return
+      }
+
+      // ── Send whatever we gathered (skip if nothing useful) ───────────────
+      if (Object.keys(update).length === 0) {
+        // Informational line — just update lastMessage if not already showing frag info
+        if (!downloads[idx].lastMessage.startsWith('Fragment')) {
+          update.lastMessage = trimmed
+        }
+      }
+
+      if (Object.keys(update).length > 0) {
+        downloads[idx] = { ...downloads[idx], ...update }
+        sendProgress({ id, ...update, status: downloads[idx].status })
+      }
     }
 
     let buf = ''
     proc.stdout.on('data', chunk => {
       buf += chunk.toString()
-      const lines = buf.split('\n')
-      buf = lines.pop()
+      // Binary uses \r to overwrite lines in a terminal — split on all variants
+      const lines = buf.split(/\r\n|\r|\n/)
+      buf = lines.pop() // hold incomplete last chunk
       lines.forEach(handleLine)
     })
     proc.stderr.on('data', chunk => {
-      const lines = chunk.toString().split('\n')
-      lines.forEach(handleLine)
+      chunk.toString().split(/\r\n|\r|\n/).forEach(handleLine)
     })
 
     proc.on('close', (code) => {
       if (buf.trim()) handleLine(buf.trim())
       const idx = downloads.findIndex(d => d.id === id)
       if (idx !== -1) {
-        // Determine final status solely from exit code
+        // Status is determined ONLY by exit code, never by mid-stream messages
         const status = code === 0 ? 'completed' : 'error'
         downloads[idx].status = status
         downloads[idx].completedAt = Date.now()
         if (code === 0) downloads[idx].progress = 100
 
-        // Try to find the output file if not already detected
+        // Try to detect output file if destination line wasn't caught
         if (code === 0 && !downloads[idx].filePath) {
           try {
-            const files = fs.readdirSync(downloadPath)
-            // Find newest file matching the name
-            const videoExts = ['.mp4', '.mkv', '.webm', '.avi', '.mov']
-            const match = files
-              .filter(f => videoExts.some(e => f.toLowerCase().endsWith(e)))
+            const VIDEO_EXTS = ['.mp4', '.mkv', '.webm', '.avi', '.ts', '.m4v']
+            const match = fs.readdirSync(downloadPath)
+              .filter(f => VIDEO_EXTS.some(e => f.toLowerCase().endsWith(e)))
               .map(f => ({ f, mtime: fs.statSync(path.join(downloadPath, f)).mtimeMs }))
               .sort((a, b) => b.mtime - a.mtime)[0]
             if (match) downloads[idx].filePath = path.join(downloadPath, match.f)
           } catch {}
         }
 
-        // Get real file size
+        // Real file size from disk
         if (downloads[idx].filePath) {
           try {
-            const stat = fs.statSync(downloads[idx].filePath)
-            const bytes = stat.size
-            const size = bytes > 1e9 ? (bytes / 1e9).toFixed(2) + ' GB'
+            const bytes = fs.statSync(downloads[idx].filePath).size
+            downloads[idx].size = bytes > 1e9 ? (bytes / 1e9).toFixed(2) + ' GB'
               : bytes > 1e6 ? (bytes / 1e6).toFixed(1) + ' MB'
               : bytes > 1e3 ? (bytes / 1e3).toFixed(1) + ' KB'
               : bytes + ' B'
-            downloads[idx].size = size
           } catch {}
         }
 
@@ -288,6 +317,8 @@ ipcMain.handle('run-download', (_, { binaryPath, m3u8Url, name, downloadPath, me
           completedAt: downloads[idx].completedAt,
           filePath: downloads[idx].filePath,
           size: downloads[idx].size,
+          completedFragments: downloads[idx].completedFragments,
+          totalFragments: downloads[idx].totalFragments,
         })
         saveDownloads()
       }
@@ -343,14 +374,11 @@ ipcMain.handle('scan-directory', (_, folderPath) => {
   try {
     if (!folderPath || !fs.existsSync(folderPath)) return []
     const VIDEO_EXTS = ['.mp4', '.mkv', '.webm', '.avi', '.mov', '.m4v', '.ts']
-
     const results = []
-
     const scanDir = (dir, depth = 0) => {
       if (depth > 3) return
       let entries
       try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return }
-
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name)
         if (entry.isDirectory()) {
@@ -360,8 +388,7 @@ ipcMain.handle('scan-directory', (_, folderPath) => {
           if (VIDEO_EXTS.includes(ext)) {
             let size = ''
             try {
-              const stat = fs.statSync(fullPath)
-              const bytes = stat.size
+              const bytes = fs.statSync(fullPath).size
               size = bytes > 1e9 ? (bytes / 1e9).toFixed(2) + ' GB'
                 : bytes > 1e6 ? (bytes / 1e6).toFixed(1) + ' MB'
                 : bytes > 1e3 ? (bytes / 1e3).toFixed(1) + ' KB'
@@ -372,7 +399,6 @@ ipcMain.handle('scan-directory', (_, folderPath) => {
         }
       }
     }
-
     scanDir(folderPath)
     return results
   } catch { return [] }
