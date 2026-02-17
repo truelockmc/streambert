@@ -136,6 +136,8 @@ export default function MoviePage({
           onDownloadStarted={onDownloadStarted}
           mediaId={item.id}
           mediaType="movie"
+          posterPath={d.poster_path}
+          tmdbId={item.id}
         />
       )}
     </div>

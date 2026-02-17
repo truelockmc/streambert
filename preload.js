@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('electron', {
   deleteDownload:  (args)   => ipcRenderer.invoke('delete-download', args),
   showInFolder:    (path)   => ipcRenderer.invoke('show-in-folder', path),
   fileExists:      (path)   => ipcRenderer.invoke('file-exists', path),
+  scanDirectory:   (path)   => ipcRenderer.invoke('scan-directory', path),
 
   // Misc
   pickFolder:    ()    => ipcRenderer.invoke('pick-folder'),

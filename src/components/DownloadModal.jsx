@@ -11,6 +11,8 @@ export default function DownloadModal({
   onDownloadStarted,  // (entry) => void — called when download begins
   // metadata for progress tracking
   mediaId, mediaType, season, episode,
+  // TMDB metadata for offline display
+  posterPath, tmdbId,
 }) {
   const [downloadPath, setDownloadPath]     = useState(() => storage.get('downloadPath') || '')
   const [settingPath, setSettingPath]       = useState(false)
@@ -59,9 +61,10 @@ export default function DownloadModal({
       binaryPath: downloader.binaryPath,
       m3u8Url, name: mediaName, downloadPath,
       mediaId, mediaType, season, episode,
+      posterPath: posterPath || null,
+      tmdbId: tmdbId || mediaId || null,
     })
     if (result.ok) {
-      // Notify App.jsx to add this to downloads state
       if (onDownloadStarted) {
         onDownloadStarted({
           id: result.id, name: mediaName, m3u8Url, downloadPath,
@@ -69,6 +72,8 @@ export default function DownloadModal({
           progress: 0, speed: '', size: '', totalFragments: 0,
           lastMessage: 'Starting…', startedAt: Date.now(), completedAt: null,
           mediaId, mediaType, season, episode,
+          posterPath: posterPath || null,
+          tmdbId: tmdbId || mediaId || null,
         })
       }
       setDownloadStatus('ok')

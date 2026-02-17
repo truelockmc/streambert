@@ -18,7 +18,6 @@ function loadDownloads() {
 
 function saveDownloads() {
   try {
-    // Only persist non-active downloads
     const toSave = downloads.filter(d => d.status !== 'downloading')
     fs.writeFileSync(downloadsFile(), JSON.stringify(toSave, null, 2))
   } catch {}
@@ -36,27 +35,41 @@ function parseLine(line) {
   const dlMatch = line.match(/\[download\]\s+([\d.]+)%\s+of\s+~?\s*([\d.]+\s*\S+)\s+at\s+([\d.]+\s*\S+\/s)/)
   if (dlMatch) return { progress: parseFloat(dlMatch[1]), size: dlMatch[2].trim(), speed: dlMatch[3].trim() }
 
+  // "[download] X.X% of Y.YMiB" (no speed yet)
+  const dlSimple = line.match(/\[download\]\s+([\d.]+)%\s+of\s+~?\s*([\d.]+\s*\S+)/)
+  if (dlSimple) return { progress: parseFloat(dlSimple[1]), size: dlSimple[2].trim() }
+
   // "Downloading: X.XX% (bytes/total bytes)"
   const customMatch = line.match(/^Downloading:\s+([\d.]+)%/)
   if (customMatch) return { progress: parseFloat(customMatch[1]) }
 
-  // "[download] Destination: /path/to/file"
-  const destMatch = line.match(/\[download\] Destination:\s+(.+)/)
-  if (destMatch) return { filePath: destMatch[1].trim() }
+  // HLS fragment progress: "[download] fragment X of Y" or "[hlsnative] Downloading fragment X of Y"
+  const fragMatch = line.match(/fragment\s+(\d+)\s+(?:of\s+|\/\s*)(\d+)/i)
+  if (fragMatch) {
+    const current = parseInt(fragMatch[1])
+    const total = parseInt(fragMatch[2])
+    const progress = total > 0 ? Math.round((current / total) * 100) : 0
+    return { progress, totalFragments: total, lastMessage: line.trim() }
+  }
 
   // "[hlsnative] Total fragments: N"
   const fragTotalMatch = line.match(/Total fragments:\s+(\d+)/)
   if (fragTotalMatch) return { totalFragments: parseInt(fragTotalMatch[1]) }
 
+  // "[download] Destination: /path/to/file"
+  const destMatch = line.match(/\[download\] Destination:\s+(.+)/)
+  if (destMatch) return { filePath: destMatch[1].trim() }
+
+  // Merging / post-processing destination
+  const mergeMatch = line.match(/\[Merger\] Merging formats into "(.+)"/)
+  if (mergeMatch) return { filePath: mergeMatch[1].trim() }
+
   // "[download] 100% of ..."
   const fullMatch = line.match(/\[download\]\s+100%/)
   if (fullMatch) return { progress: 100 }
 
-  // Errors
-  if (line.includes('[yt-dlp ERROR]') || line.includes('ERROR:')) return { isError: true, lastMessage: line.trim() }
-
-  // Warnings / info lines
-  if (line.trim().length > 0 && !line.startsWith('Downloading:')) {
+  // Status messages — informational only, never mark as error
+  if (line.trim().length > 0) {
     return { lastMessage: line.trim() }
   }
 
@@ -82,12 +95,49 @@ function createWindow() {
     },
   })
 
-  // Register local file protocol for in-app video playback
-  protocol.handle('localfile', (request) => {
-    const filePath = decodeURIComponent(request.url.replace('localfile://', ''))
-    return new Response(fs.createReadStream(filePath), {
-      headers: { 'Content-Type': 'video/mp4' },
-    })
+  // Register local file protocol with Range request support (needed for video seeking)
+  protocol.handle('localfile', async (request) => {
+    try {
+      const filePath = decodeURIComponent(request.url.replace('localfile://', ''))
+      const stat = fs.statSync(filePath)
+      const total = stat.size
+
+      // Detect MIME type by extension
+      const ext = path.extname(filePath).toLowerCase()
+      const mime = ext === '.mkv' ? 'video/x-matroska'
+        : ext === '.webm' ? 'video/webm'
+        : ext === '.avi' ? 'video/x-msvideo'
+        : 'video/mp4'
+
+      const rangeHeader = request.headers.get('range')
+      if (rangeHeader) {
+        const match = rangeHeader.match(/bytes=(\d+)-(\d*)/)
+        if (match) {
+          const startByte = parseInt(match[1])
+          const endByte = match[2] ? parseInt(match[2]) : total - 1
+          const chunkSize = endByte - startByte + 1
+          return new Response(fs.createReadStream(filePath, { start: startByte, end: endByte }), {
+            status: 206,
+            headers: {
+              'Content-Type': mime,
+              'Content-Range': `bytes ${startByte}-${endByte}/${total}`,
+              'Accept-Ranges': 'bytes',
+              'Content-Length': String(chunkSize),
+            },
+          })
+        }
+      }
+
+      return new Response(fs.createReadStream(filePath), {
+        headers: {
+          'Content-Type': mime,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': String(total),
+        },
+      })
+    } catch (e) {
+      return new Response('Not found', { status: 404 })
+    }
   })
 
   // Videasy session — strip CSP/X-Frame-Options and capture m3u8 URLs
@@ -142,7 +192,7 @@ ipcMain.handle('check-downloader', (_, folderPath) => {
 })
 
 // ── IPC: start download ───────────────────────────────────────────────────────
-ipcMain.handle('run-download', (_, { binaryPath, m3u8Url, name, downloadPath, mediaId, mediaType, season, episode }) => {
+ipcMain.handle('run-download', (_, { binaryPath, m3u8Url, name, downloadPath, mediaId, mediaType, season, episode, posterPath, tmdbId }) => {
   try {
     const id = crypto.randomUUID()
 
@@ -153,6 +203,8 @@ ipcMain.handle('run-download', (_, { binaryPath, m3u8Url, name, downloadPath, me
       lastMessage: 'Starting…', startedAt: Date.now(), completedAt: null,
       mediaId: mediaId || null, mediaType: mediaType || null,
       season: season || null, episode: episode || null,
+      posterPath: posterPath || null,
+      tmdbId: tmdbId || mediaId || null,
     }
     downloads.push(entry)
     sendProgress({ ...entry })
@@ -169,12 +221,14 @@ ipcMain.handle('run-download', (_, { binaryPath, m3u8Url, name, downloadPath, me
     const proc = spawn(binaryPath, args, { stdio: ['ignore', 'pipe', 'pipe'] })
 
     const handleLine = (line) => {
+      if (!line.trim()) return
       const parsed = parseLine(line)
       if (!parsed) return
       const idx = downloads.findIndex(d => d.id === id)
       if (idx === -1) return
       downloads[idx] = { ...downloads[idx], ...parsed }
-      if (parsed.isError) downloads[idx].status = 'error'
+      // Never let mid-stream messages mark the download as error;
+      // error status is only set by the process exit code below.
       sendProgress({ id, ...parsed, status: downloads[idx].status })
     }
 
@@ -194,11 +248,47 @@ ipcMain.handle('run-download', (_, { binaryPath, m3u8Url, name, downloadPath, me
       if (buf.trim()) handleLine(buf.trim())
       const idx = downloads.findIndex(d => d.id === id)
       if (idx !== -1) {
-        const wasError = downloads[idx].status === 'error'
-        downloads[idx].status = wasError ? 'error' : code === 0 ? 'completed' : 'interrupted'
+        // Determine final status solely from exit code
+        const status = code === 0 ? 'completed' : 'error'
+        downloads[idx].status = status
         downloads[idx].completedAt = Date.now()
         if (code === 0) downloads[idx].progress = 100
-        sendProgress({ id, status: downloads[idx].status, progress: downloads[idx].progress, completedAt: downloads[idx].completedAt })
+
+        // Try to find the output file if not already detected
+        if (code === 0 && !downloads[idx].filePath) {
+          try {
+            const files = fs.readdirSync(downloadPath)
+            // Find newest file matching the name
+            const videoExts = ['.mp4', '.mkv', '.webm', '.avi', '.mov']
+            const match = files
+              .filter(f => videoExts.some(e => f.toLowerCase().endsWith(e)))
+              .map(f => ({ f, mtime: fs.statSync(path.join(downloadPath, f)).mtimeMs }))
+              .sort((a, b) => b.mtime - a.mtime)[0]
+            if (match) downloads[idx].filePath = path.join(downloadPath, match.f)
+          } catch {}
+        }
+
+        // Get real file size
+        if (downloads[idx].filePath) {
+          try {
+            const stat = fs.statSync(downloads[idx].filePath)
+            const bytes = stat.size
+            const size = bytes > 1e9 ? (bytes / 1e9).toFixed(2) + ' GB'
+              : bytes > 1e6 ? (bytes / 1e6).toFixed(1) + ' MB'
+              : bytes > 1e3 ? (bytes / 1e3).toFixed(1) + ' KB'
+              : bytes + ' B'
+            downloads[idx].size = size
+          } catch {}
+        }
+
+        sendProgress({
+          id,
+          status: downloads[idx].status,
+          progress: downloads[idx].progress,
+          completedAt: downloads[idx].completedAt,
+          filePath: downloads[idx].filePath,
+          size: downloads[idx].size,
+        })
         saveDownloads()
       }
     })
@@ -210,10 +300,7 @@ ipcMain.handle('run-download', (_, { binaryPath, m3u8Url, name, downloadPath, me
 })
 
 // ── IPC: get all downloads ────────────────────────────────────────────────────
-ipcMain.handle('get-downloads', () => {
-  // Merge in-memory (active) with persisted (completed) — deduplicated by id
-  return downloads
-})
+ipcMain.handle('get-downloads', () => downloads)
 
 // ── IPC: delete a download ────────────────────────────────────────────────────
 ipcMain.handle('delete-download', (_, { id, filePath }) => {
@@ -232,7 +319,6 @@ ipcMain.handle('show-in-folder', (_, filePath) => {
   if (filePath && fs.existsSync(filePath)) {
     shell.showItemInFolder(filePath)
   } else {
-    // fallback: open the download folder
     shell.openPath(path.dirname(filePath || ''))
   }
 })
@@ -251,3 +337,43 @@ ipcMain.handle('pick-folder', async () => {
 
 // ── IPC: open external URL ────────────────────────────────────────────────────
 ipcMain.handle('open-external', (_, url) => { shell.openExternal(url) })
+
+// ── IPC: scan directory for video files ──────────────────────────────────────
+ipcMain.handle('scan-directory', (_, folderPath) => {
+  try {
+    if (!folderPath || !fs.existsSync(folderPath)) return []
+    const VIDEO_EXTS = ['.mp4', '.mkv', '.webm', '.avi', '.mov', '.m4v', '.ts']
+
+    const results = []
+
+    const scanDir = (dir, depth = 0) => {
+      if (depth > 3) return
+      let entries
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return }
+
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          scanDir(fullPath, depth + 1)
+        } else if (entry.isFile()) {
+          const ext = path.extname(entry.name).toLowerCase()
+          if (VIDEO_EXTS.includes(ext)) {
+            let size = ''
+            try {
+              const stat = fs.statSync(fullPath)
+              const bytes = stat.size
+              size = bytes > 1e9 ? (bytes / 1e9).toFixed(2) + ' GB'
+                : bytes > 1e6 ? (bytes / 1e6).toFixed(1) + ' MB'
+                : bytes > 1e3 ? (bytes / 1e3).toFixed(1) + ' KB'
+                : bytes + ' B'
+            } catch {}
+            results.push({ filePath: fullPath, name: path.basename(entry.name, ext), size, ext })
+          }
+        }
+      }
+    }
+
+    scanDir(folderPath)
+    return results
+  } catch { return [] }
+})

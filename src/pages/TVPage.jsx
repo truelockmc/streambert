@@ -216,6 +216,8 @@ export default function TVPage({
           mediaType="tv"
           season={selectedSeason}
           episode={selectedEp?.episode_number}
+          posterPath={d.poster_path}
+          tmdbId={item.id}
         />
       )}
     </div>
