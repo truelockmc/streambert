@@ -113,18 +113,16 @@ function createWindow() {
     callback({})
   })
 
-  const DEV_URL = process.env.VITE_DEV_SERVER_URL
-  if (DEV_URL) {
-    mainWindow.loadURL(DEV_URL)
-  } else {
-    mainWindow.loadFile(path.join(__dirname, 'dist/index.html'))
-  }
+  mainWindow.loadFile(path.join(__dirname, 'dist/index.html'))
 
-  mainWindow.on('closed', () => { mainWindow = null })
+  mainWindow.on('closed', () => {
+    mainWindow = null
+    app.quit()  // always quit when window is closed
+  })
 }
 
 app.whenReady().then(createWindow)
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
+app.on('window-all-closed', () => app.quit())
 app.on('activate', () => { if (mainWindow === null) createWindow() })
 
 // ── IPC: downloader binary detection ─────────────────────────────────────────
