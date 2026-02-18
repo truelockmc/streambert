@@ -23,4 +23,9 @@ contextBridge.exposeInMainWorld('electron', {
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   openPath: (filePath) => ipcRenderer.invoke('open-path', filePath),
+
+  // Close confirmation
+  onConfirmClose: (cb) => { const h = (_, data) => cb(data); ipcRenderer.on('confirm-close', h); return h },
+  offConfirmClose: (h) => ipcRenderer.removeListener('confirm-close', h),
+  respondClose: (confirm) => ipcRenderer.send('close-response', confirm),
 })

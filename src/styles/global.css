@@ -1714,3 +1714,113 @@ kbd {
         opacity: 1;
     }
 }
+
+.close-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(6px);
+    animation: fadeIn 0.15s ease;
+}
+
+.close-confirm-modal {
+    width: 420px;
+    background: var(--surface);
+    border: 1px solid rgba(229, 9, 20, 0.4);
+    border-radius: 16px;
+    padding: 36px 32px 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 0 0 1px rgba(229, 9, 20, 0.15), 0 32px 80px rgba(0, 0, 0, 0.8), 0 0 60px rgba(229, 9, 20, 0.08);
+    animation: slideUp 0.2s ease;
+}
+
+.close-confirm-icon-wrap {
+    margin-bottom: 4px;
+}
+
+.close-confirm-icon-ring {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(229, 9, 20, 0.12);
+    border: 1.5px solid rgba(229, 9, 20, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--red);
+    box-shadow: 0 0 24px rgba(229, 9, 20, 0.2);
+}
+
+.close-confirm-icon-ring svg {
+    width: 28px;
+    height: 28px;
+}
+
+.close-confirm-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    text-align: center;
+    letter-spacing: -0.3px;
+}
+
+.close-confirm-body {
+    font-size: 14px;
+    color: var(--text2);
+    text-align: center;
+    line-height: 1.6;
+    max-width: 300px;
+}
+
+.close-confirm-count {
+    color: var(--red);
+    font-weight: 600;
+}
+
+.close-confirm-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    margin-top: 8px;
+}
+
+.close-confirm-btn-confirm {
+    background: var(--red) !important;
+    color: #fff !important;
+    border: none !important;
+    padding: 12px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    width: 100%;
+    transition: background 0.15s, transform 0.1s !important;
+}
+
+.close-confirm-btn-confirm:hover {
+    background: var(--red2) !important;
+    transform: translateY(-1px);
+}
+
+.close-confirm-btn-cancel {
+    background: var(--surface2) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    padding: 12px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    border-radius: 8px !important;
+    width: 100%;
+    transition: background 0.15s !important;
+}
+
+.close-confirm-btn-cancel:hover {
+    background: var(--surface3) !important;
+}

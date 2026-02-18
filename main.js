@@ -7,6 +7,9 @@ const fs = require('fs')
 let downloads = []
 const downloadsFile = () => path.join(app.getPath('userData'), 'downloads.json')
 
+// Track running child processes by download id
+const activeProcs = new Map()
+
 function loadDownloads() {
   try {
     const raw = fs.readFileSync(downloadsFile(), 'utf8')
@@ -105,7 +108,64 @@ function createWindow() {
     callback({ responseHeaders: headers })
   })
 
+function cleanupTempFiles(downloadPath) {
+  if (!downloadPath) return
+  const TEMP_PATTERNS = [/\.part$/, /\.part\.\d+$/, /\.part\.tmp$/, /\.tmp$/, /\.ytdl$/, /\.part-Frag\d+$/]
+  try {
+    const entries = fs.readdirSync(downloadPath)
+    for (const entry of entries) {
+      if (TEMP_PATTERNS.some(p => p.test(entry))) {
+        try { fs.unlinkSync(path.join(downloadPath, entry)) } catch { }
+      }
+    }
+  } catch { }
+}
+
+function killAllDownloads() {
+  for (const [id, proc] of activeProcs.entries()) {
+    try { proc.kill('SIGKILL') } catch { }
+    // Mark as error in store
+    const idx = downloads.findIndex(d => d.id === id)
+    if (idx !== -1) {
+      downloads[idx].status = 'error'
+      downloads[idx].lastMessage = 'Cancelled on exit'
+    }
+    activeProcs.delete(id)
+  }
+  // Clean up temp files for all known download folders
+  const folders = new Set(downloads.map(d => d.downloadPath).filter(Boolean))
+  for (const folder of folders) cleanupTempFiles(folder)
+  saveDownloads()
+}
+
   mainWindow.loadFile(path.join(__dirname, 'dist/index.html'))
+
+  // Intercept close — ask user if downloads are running
+  mainWindow.on('close', (e) => {
+    const running = downloads.filter(d => d.status === 'downloading')
+    if (running.length === 0) return // no downloads, close normally
+
+    e.preventDefault()
+    mainWindow.webContents.send('confirm-close', { count: running.length })
+  })
+
+  // Response from renderer modal
+  ipcMain.once('close-response', (_, confirmed) => {
+    if (confirmed) {
+      killAllDownloads()
+      mainWindow.destroy()
+    }
+    // else: stay open — re-arm for next close attempt
+    mainWindow.on('close', (e) => {
+      const running = downloads.filter(d => d.status === 'downloading')
+      if (running.length === 0) return
+      e.preventDefault()
+      mainWindow.webContents.send('confirm-close', { count: running.length })
+      ipcMain.once('close-response', (_, confirmed) => {
+        if (confirmed) { killAllDownloads(); mainWindow.destroy() }
+      })
+    })
+  })
 
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -165,6 +225,7 @@ ipcMain.handle('run-download', (_, { binaryPath, m3u8Url, name, downloadPath, me
     ]
 
     const proc = spawn(binaryPath, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    activeProcs.set(id, proc)
 
     // ── Per-download line parser ───────────────────────────────────────────
     //
@@ -268,6 +329,7 @@ ipcMain.handle('run-download', (_, { binaryPath, m3u8Url, name, downloadPath, me
     })
 
     proc.on('close', (code) => {
+      activeProcs.delete(id)
       if (buf.trim()) handleLine(buf.trim())
       const idx = downloads.findIndex(d => d.id === id)
       if (idx !== -1) {

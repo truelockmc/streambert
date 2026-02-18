@@ -5,6 +5,7 @@ import { tmdbFetch } from './utils/api'
 import Sidebar from './components/Sidebar'
 import SearchModal from './components/SearchModal'
 import SetupScreen from './components/SetupScreen'
+import CloseConfirmModal from './components/CloseConfirmModal'
 
 import HomePage from './pages/HomePage'
 import MoviePage from './pages/MoviePage'
@@ -37,6 +38,14 @@ export default function App() {
 
   // ── Downloads state ──────────────────────────────────────────────────────
   const [downloads, setDownloads] = useState([])
+  const [closeConfirm, setCloseConfirm] = useState(null) // { count }
+
+  // Listen for close confirmation request from main process
+  useEffect(() => {
+    if (!window.electron) return
+    const handler = window.electron.onConfirmClose((data) => setCloseConfirm(data))
+    return () => window.electron.offConfirmClose(handler)
+  }, [])
 
   // Load persisted downloads on startup
   useEffect(() => {
@@ -335,6 +344,13 @@ export default function App() {
         <SearchModal apiKey={apiKey} onSelect={handleSelectResult} onClose={() => setShowSearch(false)} offline={offline} />
       )}
       {toast && <div className="toast">{toast}</div>}
+      {closeConfirm && (
+        <CloseConfirmModal
+          count={closeConfirm.count}
+          onConfirm={() => { setCloseConfirm(null); window.electron.respondClose(true) }}
+          onCancel={() => { setCloseConfirm(null); window.electron.respondClose(false) }}
+        />
+      )}
     </>
   )
 }
