@@ -19,7 +19,12 @@ export default function App() {
   const [selected, setSelected] = useState(null)
   const [showSearch, setShowSearch] = useState(false)
 
+  // Navigation history stack for Ctrl+Z back navigation
+  const [navStack, setNavStack] = useState([])
+
   const [saved, setSaved] = useState(() => storage.get('saved') || {})
+  // Separate order array for drag-and-drop reordering
+  const [savedOrder, setSavedOrder] = useState(() => storage.get('savedOrder') || null)
   const [progress, setProgress] = useState(() => storage.get('progress') || {})
   const [history, setHistory] = useState(() => storage.get('history') || [])
   const [watched, setWatched] = useState(() => storage.get('watched') || {})
@@ -104,15 +109,38 @@ export default function App() {
     }
   }, [])
 
+  // ── Navigation ────────────────────────────────────────────────────────────
+  const navigateBack = useCallback(() => {
+    setNavStack(prev => {
+      if (prev.length === 0) return prev
+      const last = prev[prev.length - 1]
+      setPage(last.page)
+      setSelected(last.selected)
+      return prev.slice(0, -1)
+    })
+  }, [])
+
+  const navigate = (pg, data = null) => {
+    setNavStack(prev => [...prev, { page, selected }])
+    setSelected(data)
+    setPage(pg)
+    setShowSearch(false)
+  }
+
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setShowSearch(true) }
       if (e.key === 'Escape') setShowSearch(false)
+      // Ctrl+Z / Cmd+Z → navigate back
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        navigateBack()
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [])
+  }, [navigateBack])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500) }
@@ -129,12 +157,6 @@ export default function App() {
       .finally(() => setLoadingHome(false))
   }
 
-  const navigate = (pg, data = null) => {
-    setSelected(data)
-    setPage(pg)
-    setShowSearch(false)
-  }
-
   const handleSelectResult = (item) => {
     navigate(item.media_type === 'tv' ? 'tv' : 'movie', item)
   }
@@ -148,8 +170,16 @@ export default function App() {
   const toggleSave = useCallback((item) => {
     const id = `${item.media_type || (item.first_air_date ? 'tv' : 'movie')}_${item.id}`
     const next = { ...saved }
-    if (next[id]) { delete next[id]; showToast('Removed from watchlist') }
-    else {
+    if (next[id]) {
+      delete next[id]
+      showToast('Removed from watchlist')
+      setSavedOrder(prev => {
+        const currentOrder = prev || Object.keys(saved)
+        const newOrder = currentOrder.filter(k => k !== id)
+        storage.set('savedOrder', newOrder)
+        return newOrder
+      })
+    } else {
       next[id] = {
         id: item.id, title: item.title || item.name, poster_path: item.poster_path,
         media_type: item.media_type || (item.first_air_date ? 'tv' : 'movie'),
@@ -157,6 +187,12 @@ export default function App() {
         year: (item.release_date || item.first_air_date || '').slice(0, 4),
       }
       showToast('Added to watchlist')
+      setSavedOrder(prev => {
+        const currentOrder = prev || Object.keys(saved)
+        const newOrder = [...currentOrder, id]
+        storage.set('savedOrder', newOrder)
+        return newOrder
+      })
     }
     setSaved(next); storage.set('saved', next)
   }, [saved])
@@ -226,7 +262,15 @@ export default function App() {
     if (watched[pk]) return false
     return pct != null && pct > 2 && pct < 98
   })
-  const savedList = Object.values(saved)
+
+  // Build savedList respecting drag-and-drop order
+  const orderedKeys = savedOrder ? savedOrder.filter(k => saved[k]) : Object.keys(saved)
+  const savedList = orderedKeys.map(k => saved[k]).filter(Boolean)
+
+  const handleReorderSaved = useCallback((newOrder) => {
+    setSavedOrder(newOrder)
+    storage.set('savedOrder', newOrder)
+  }, [])
 
   if (!apiKey) return <SetupScreen onSave={saveApiKey} />
 
@@ -238,6 +282,9 @@ export default function App() {
         onSearch={() => setShowSearch(true)}
         savedList={savedList}
         activeDownloads={activeDownloadCount}
+        onReorderSaved={handleReorderSaved}
+        canGoBack={navStack.length > 0}
+        onBack={navigateBack}
       />
 
       <div className="main">

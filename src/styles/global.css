@@ -1619,3 +1619,13 @@ kbd {
 .context-menu-item:hover {
     background: rgba(255, 255, 255, 0.08);
 }
+
+.saved-thumb.drag-over {
+    outline: 2px solid var(--accent, #e50914);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.saved-thumb[draggable="true"]:active {
+    cursor: grabbing;
+}
