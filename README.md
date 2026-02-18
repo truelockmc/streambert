@@ -30,8 +30,11 @@ On first launch you'll be prompted to enter your TMDB API key. It's saved locall
 ## Build for Production
 
 ```bash
-npm run build
-npm run preview
+npm run dist:win
+```
+or
+```bash
+npm run dist:linux
 ```
 
 ---
