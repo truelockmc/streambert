@@ -3,6 +3,12 @@ const { spawn } = require('child_process')
 const path = require('path')
 const fs = require('fs')
 
+// Must be called before app.whenReady() — lets the renderer use localfile://
+// as a trusted media source with Range request support (stream: true).
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'localfile', privileges: { secure: true, standard: true, stream: true, supportFetchAPI: true } }
+])
+
 let mainWindow
 
 // ── Download store ────────────────────────────────────────────────────────────
@@ -51,7 +57,11 @@ function createWindow() {
   // Register local file protocol with Range request support (needed for video seeking)
   protocol.handle('localfile', async (request) => {
     try {
-      const filePath = decodeURIComponent(request.url.replace('localfile://', ''))
+      // Strip 'localfile://' leaving either '/home/...' (3-slash URL) or 'home/...' (2-slash URL)
+      // Then ensure leading slash so fs.statSync always gets an absolute path
+      const raw = request.url.replace(/^localfile:\/\//, '')
+      const filePath = decodeURIComponent(raw.startsWith('/') ? raw : '/' + raw)
+      console.log('[localfile] serving:', filePath)
       const stat = fs.statSync(filePath)
       const total = stat.size
 
@@ -87,8 +97,9 @@ function createWindow() {
           'Content-Length': String(total),
         },
       })
-    } catch {
-      return new Response('Not found', { status: 404 })
+    } catch (e) {
+      console.error('[localfile] error:', e.message)
+      return new Response('Not found: ' + e.message, { status: 404 })
     }
   })
 

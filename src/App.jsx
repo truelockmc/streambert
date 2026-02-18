@@ -14,19 +14,20 @@ import SettingsPage from './pages/SettingsPage'
 import DownloadsPage from './pages/DownloadsPage'
 
 export default function App() {
-  const [apiKey, setApiKey]         = useState(() => storage.get('apikey'))
-  const [page, setPage]             = useState('home')
-  const [selected, setSelected]     = useState(null)
+  const [apiKey, setApiKey] = useState(() => storage.get('apikey'))
+  const [page, setPage] = useState('home')
+  const [selected, setSelected] = useState(null)
   const [showSearch, setShowSearch] = useState(false)
 
-  const [saved, setSaved]       = useState(() => storage.get('saved') || {})
+  const [saved, setSaved] = useState(() => storage.get('saved') || {})
   const [progress, setProgress] = useState(() => storage.get('progress') || {})
-  const [history, setHistory]   = useState(() => storage.get('history') || [])
-  const [toast, setToast]       = useState(null)
+  const [history, setHistory] = useState(() => storage.get('history') || [])
+  const [toast, setToast] = useState(null)
 
-  const [trending, setTrending]       = useState([])
-  const [trendingTV, setTrendingTV]   = useState([])
+  const [trending, setTrending] = useState([])
+  const [trendingTV, setTrendingTV] = useState([])
   const [loadingHome, setLoadingHome] = useState(false)
+  const [offline, setOffline] = useState(() => !navigator.onLine)
 
   // ── Downloads state ──────────────────────────────────────────────────────
   const [downloads, setDownloads] = useState([])
@@ -86,9 +87,21 @@ export default function App() {
       tmdbFetch('/trending/tv/week', apiKey),
     ])
       .then(([m, t]) => { setTrending(m.results || []); setTrendingTV(t.results || []) })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoadingHome(false))
   }, [apiKey])
+
+  // ── Network status ───────────────────────────────────────────────────────
+  useEffect(() => {
+    const goOnline = () => setOffline(false)
+    const goOffline = () => setOffline(true)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
@@ -102,6 +115,18 @@ export default function App() {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500) }
+
+  const retryHome = () => {
+    if (!apiKey || offline) return
+    setLoadingHome(true)
+    Promise.all([
+      tmdbFetch('/trending/movie/week', apiKey),
+      tmdbFetch('/trending/tv/week', apiKey),
+    ])
+      .then(([m, t]) => { setTrending(m.results || []); setTrendingTV(t.results || []) })
+      .catch(() => { })
+      .finally(() => setLoadingHome(false))
+  }
 
   const navigate = (pg, data = null) => {
     setSelected(data)
@@ -178,7 +203,8 @@ export default function App() {
       <div className="main">
         {page === 'home' && (
           <HomePage trending={trending} trendingTV={trendingTV} loading={loadingHome}
-            onSelect={handleSelectResult} progress={progress} inProgress={inProgress} />
+            onSelect={handleSelectResult} progress={progress} inProgress={inProgress}
+            offline={offline} onRetry={retryHome} />
         )}
         {page === 'movie' && selected && (
           <MoviePage item={selected} apiKey={apiKey}
@@ -215,7 +241,7 @@ export default function App() {
       </div>
 
       {showSearch && (
-        <SearchModal apiKey={apiKey} onSelect={handleSelectResult} onClose={() => setShowSearch(false)} />
+        <SearchModal apiKey={apiKey} onSelect={handleSelectResult} onClose={() => setShowSearch(false)} offline={offline} />
       )}
       {toast && <div className="toast">{toast}</div>}
     </>

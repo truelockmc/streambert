@@ -6,15 +6,15 @@ const IMG_BASE = 'https://image.tmdb.org/t/p/w154'
 
 const STATUS_COLOR = {
   downloading: 'var(--red)',
-  completed:   '#4caf50',
-  error:       '#f44336',
+  completed: '#4caf50',
+  error: '#f44336',
   interrupted: '#ff9800',
 }
 
 const STATUS_LABEL = {
   downloading: 'Downloading',
-  completed:   'Completed',
-  error:       'Error',
+  completed: 'Completed',
+  error: 'Error',
   interrupted: 'Interrupted',
 }
 
@@ -62,7 +62,7 @@ function LocalPlayer({ item, onClose, onHistory, onProgress, progress }) {
   const videoRef = useRef(null)
   // item can be a download entry or a scanned local file
   const filePath = item.filePath
-  const fileUrl = `localfile://${filePath}`
+  const fileUrl = 'localfile:///' + filePath.split('/').filter(Boolean).map(seg => encodeURIComponent(seg)).join('/')
 
   const progressKey = item.mediaType === 'movie'
     ? `movie_${item.mediaId}`
@@ -107,44 +107,53 @@ function LocalPlayer({ item, onClose, onHistory, onProgress, progress }) {
   }, [])
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        style={{ width: '90vw', maxWidth: 1100, background: '#000', borderRadius: 12, overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.9)' }}
-        onClick={e => e.stopPropagation()}
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: '#000', display: 'flex', flexDirection: 'column',
+    }}>
+      {/* Top bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 16px', background: 'rgba(0,0,0,0.8)',
+        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+        opacity: 0, transition: 'opacity 0.2s',
+      }}
+        onMouseEnter={e => e.currentTarget.style.opacity = 1}
+        onMouseLeave={e => e.currentTarget.style.opacity = 0}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{item.name}</span>
-          <button className="icon-btn" onClick={onClose} style={{ fontSize: 20, lineHeight: 1, color: 'var(--text2)' }}>✕</button>
-        </div>
-        <video
-          ref={videoRef}
-          src={fileUrl}
-          controls
-          autoPlay
-          style={{ width: '100%', display: 'block', maxHeight: '80vh', background: '#000' }}
-        />
-        <div style={{ padding: '10px 16px', background: 'var(--surface)', display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ fontSize: 12, color: 'var(--text3)', marginRight: 8 }}>Mark progress:</span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{item.name}</span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {[25, 50, 75, 100].map(p => (
-            <button key={p} className="btn btn-ghost" style={{ padding: '4px 12px', fontSize: 12 }}
+            <button key={p} className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 11 }}
               onClick={() => onProgress(progressKey, p)}>{p}%</button>
           ))}
+          <button className="icon-btn" onClick={onClose}
+            style={{ fontSize: 22, lineHeight: 1, color: '#fff', marginLeft: 8 }}>✕</button>
         </div>
       </div>
+
+      {/* Video — fills the whole screen */}
+      <video
+        ref={videoRef}
+        src={fileUrl}
+        controls
+        autoPlay
+        style={{ width: '100%', height: '100%', background: '#000', display: 'block' }}
+      />
     </div>
   )
 }
 
 export default function DownloadsPage({ downloads, onDeleteDownload, onHistory, onSaveProgress, progress }) {
-  const [watchItem, setWatchItem]         = useState(null)
+  const [watchItem, setWatchItem] = useState(null)
   const [fileExistsCache, setFileExistsCache] = useState({})
-  const [localFiles, setLocalFiles]       = useState(() => storage.get('localFiles') || [])
-  const [scanning, setScanning]           = useState(false)
-  const [scanFolder, setScanFolder]       = useState(() => storage.get('downloadPath') || '')
+  const [localFiles, setLocalFiles] = useState(() => storage.get('localFiles') || [])
+  const [scanning, setScanning] = useState(false)
+  const [scanFolder, setScanFolder] = useState(() => storage.get('downloadPath') || '')
 
   const isElectron = typeof window !== 'undefined' && !!window.electron
 
-  const active   = downloads.filter(d => d.status === 'downloading')
+  const active = downloads.filter(d => d.status === 'downloading')
   const finished = downloads.filter(d => d.status !== 'downloading')
     .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0))
 

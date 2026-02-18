@@ -2,12 +2,27 @@ import MediaCard from '../components/MediaCard'
 import { PlayIcon, StarIcon } from '../components/Icons'
 import { imgUrl } from '../utils/api'
 
-export default function HomePage({ trending, trendingTV, loading, onSelect, progress, inProgress }) {
+export default function HomePage({ trending, trendingTV, loading, onSelect, progress, inProgress, offline, onRetry }) {
   const hero = trending[0]
 
   return (
     <div className="fade-in">
-      {loading && <div className="loader"><div className="spinner" /></div>}
+      {offline && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          minHeight: '60vh', gap: 16, color: 'var(--text2)',
+        }}>
+          <div style={{ fontSize: 48 }}>📡</div>
+          <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--text)' }}>No internet connection</div>
+          <div style={{ fontSize: 14, color: 'var(--text3)' }}>
+            Trending and search require an internet connection. Your downloads and library still work offline.
+          </div>
+          <button className="btn btn-primary" style={{ marginTop: 8 }} onClick={onRetry}>
+            Retry
+          </button>
+        </div>
+      )}
+      {!offline && loading && <div className="loader"><div className="spinner" /></div>}
 
       {!loading && hero && (
         <div className="hero">

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { tmdbFetch, imgUrl } from '../utils/api'
 import { SearchIcon, CloseIcon } from './Icons'
 
-export default function SearchModal({ apiKey, onSelect, onClose }) {
+export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
@@ -20,7 +20,7 @@ export default function SearchModal({ apiKey, onSelect, onClose }) {
           apiKey
         )
         setResults((data.results || []).filter(r => r.media_type !== 'person').slice(0, 12))
-      } catch {}
+      } catch { }
       setLoading(false)
     }, 380)
     return () => clearTimeout(timer)
@@ -50,7 +50,12 @@ export default function SearchModal({ apiKey, onSelect, onClose }) {
         </div>
 
         <div className="search-results">
-          {loading && <div className="loader"><div className="spinner" /></div>}
+          {offline && (
+            <div style={{ padding: '12px 20px', background: 'rgba(255,165,0,0.1)', borderBottom: '1px solid var(--border)', fontSize: 13, color: '#ff9800', display: 'flex', alignItems: 'center', gap: 8 }}>
+              🌐 No internet, search is unavailable offline.
+            </div>
+          )}
+          {!offline && loading && <div className="loader"><div className="spinner" /></div>}
 
           {!loading && query && results.length === 0 && (
             <div className="search-empty">No results for "{query}"</div>
