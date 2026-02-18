@@ -28,10 +28,10 @@ Once you click 'Download' these Links are used to download the Full Movie/TV Epi
 
 ## Setup & Run
 Option 1: 
-Use a prebuilt Binary from [Releases](https://github.com/truelockmc/video-downloader/releases/latest)
+Use a prebuilt Binary from [Releases](https://github.com/truelockmc/streambert/releases/latest)
 
 Option 2:
-Build it yourself
+Use the Source Code
 ```bash
 # 1. Open a terminal in the Code Folder, then install dependencies:
 npm install
