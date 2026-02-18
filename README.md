@@ -9,9 +9,8 @@ A cross-platform Electron Desktop App to stream and download any Movie or TV Ser
 ## Requirements
 
 - [Node.js](https://nodejs.org/) (>=22.12.0) installed
-- [ffmpeg](https://ffmpeg.org/download.html) installed
 - A free [TMDB API key](https://www.themoviedb.org/settings/api)
-- For downloading, [this Program](https://github.com/truelockmc/video-downloader) somewhere on your PC
+- For downloading, [this Program](https://github.com/truelockmc/video-downloader) somewhere on your PC and [ffmpeg](https://ffmpeg.org/download.html) installed
 
 ---
 
