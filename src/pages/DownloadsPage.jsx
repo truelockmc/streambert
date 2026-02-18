@@ -57,95 +57,8 @@ function Poster({ posterPath, size = 48 }) {
   )
 }
 
-// Local video player modal
-function LocalPlayer({ item, onClose, onHistory, onProgress, progress }) {
-  const videoRef = useRef(null)
-  // item can be a download entry or a scanned local file
-  const filePath = item.filePath
-  const fileUrl = 'localfile:///' + filePath.split('/').filter(Boolean).map(seg => encodeURIComponent(seg)).join('/')
-
-  const progressKey = item.mediaType === 'movie'
-    ? `movie_${item.mediaId}`
-    : item.mediaId
-      ? `tv_${item.mediaId}_s${item.season}e${item.episode}`
-      : `local_${item.id || filePath}`
-
-  useEffect(() => {
-    if (onHistory && item.mediaId) {
-      onHistory({
-        id: item.mediaId,
-        title: item.name,
-        media_type: item.mediaType || 'movie',
-        season: item.season,
-        episode: item.episode,
-        watchedAt: Date.now(),
-      })
-    }
-  }, [])
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-    const savedPct = progress[progressKey]
-    if (savedPct && savedPct > 0 && savedPct < 98) {
-      video.addEventListener('loadedmetadata', () => {
-        video.currentTime = (savedPct / 100) * video.duration
-      }, { once: true })
-    }
-  }, [])
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-    const interval = setInterval(() => {
-      if (!video.paused && video.duration) {
-        const pct = (video.currentTime / video.duration) * 100
-        onProgress(progressKey, Math.floor(pct))
-      }
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [])
-
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
-      background: '#000', display: 'flex', flexDirection: 'column',
-    }}>
-      {/* Top bar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 16px', background: 'rgba(0,0,0,0.8)',
-        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
-        opacity: 0, transition: 'opacity 0.2s',
-      }}
-        onMouseEnter={e => e.currentTarget.style.opacity = 1}
-        onMouseLeave={e => e.currentTarget.style.opacity = 0}
-      >
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{item.name}</span>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {[25, 50, 75, 100].map(p => (
-            <button key={p} className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 11 }}
-              onClick={() => onProgress(progressKey, p)}>{p}%</button>
-          ))}
-          <button className="icon-btn" onClick={onClose}
-            style={{ fontSize: 22, lineHeight: 1, color: '#fff', marginLeft: 8 }}>✕</button>
-        </div>
-      </div>
-
-      {/* Video — fills the whole screen */}
-      <video
-        ref={videoRef}
-        src={fileUrl}
-        controls
-        autoPlay
-        style={{ width: '100%', height: '100%', background: '#000', display: 'block' }}
-      />
-    </div>
-  )
-}
 
 export default function DownloadsPage({ downloads, onDeleteDownload, onHistory, onSaveProgress, progress }) {
-  const [watchItem, setWatchItem] = useState(null)
   const [fileExistsCache, setFileExistsCache] = useState({})
   const [localFiles, setLocalFiles] = useState(() => storage.get('localFiles') || [])
   const [scanning, setScanning] = useState(false)
@@ -274,7 +187,7 @@ export default function DownloadsPage({ downloads, onDeleteDownload, onHistory, 
                 key={dl.id}
                 dl={dl}
                 fileExists={dl.isLocalOnly ? true : fileExistsCache[dl.id]}
-                onWatch={() => setWatchItem(dl)}
+                onWatch={() => window.electron.openPath(dl.filePath)}
                 onShowFolder={() => window.electron?.showInFolder(dl.filePath)}
                 onDelete={dl.isLocalOnly ? undefined : () => handleDelete(dl)}
               />
@@ -295,16 +208,6 @@ export default function DownloadsPage({ downloads, onDeleteDownload, onHistory, 
           <h3>No downloads yet</h3>
           <p>Start a download from any movie or series page, or scan a folder to find local video files.</p>
         </div>
-      )}
-
-      {watchItem && (
-        <LocalPlayer
-          item={watchItem}
-          onClose={() => setWatchItem(null)}
-          onHistory={onHistory}
-          onProgress={onSaveProgress}
-          progress={progress}
-        />
       )}
     </div>
   )

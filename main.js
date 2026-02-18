@@ -1,15 +1,7 @@
-const { app, BrowserWindow, ipcMain, session, shell, dialog, protocol } = require('electron')
-const { spawn } = require('child_process')
+const { app, BrowserWindow, ipcMain, session, shell, dialog } = require('electron')
+const { spawn, spawnSync } = require('child_process')
 const path = require('path')
 const fs = require('fs')
-
-// Must be called before app.whenReady() — lets the renderer use localfile://
-// as a trusted media source with Range request support (stream: true).
-protocol.registerSchemesAsPrivileged([
-  { scheme: 'localfile', privileges: { secure: true, standard: true, stream: true, supportFetchAPI: true } }
-])
-
-let mainWindow
 
 // ── Download store ────────────────────────────────────────────────────────────
 let downloads = []
@@ -26,7 +18,7 @@ function saveDownloads() {
   try {
     const toSave = downloads.filter(d => d.status !== 'downloading')
     fs.writeFileSync(downloadsFile(), JSON.stringify(toSave, null, 2))
-  } catch {}
+  } catch { }
 }
 
 function sendProgress(update) {
@@ -36,6 +28,8 @@ function sendProgress(update) {
 }
 
 // ── Window ────────────────────────────────────────────────────────────────────
+let mainWindow
+
 function createWindow() {
   loadDownloads()
 
@@ -52,55 +46,6 @@ function createWindow() {
       nodeIntegration: false,
       webviewTag: true,
     },
-  })
-
-  // Register local file protocol with Range request support (needed for video seeking)
-  protocol.handle('localfile', async (request) => {
-    try {
-      // Strip 'localfile://' leaving either '/home/...' (3-slash URL) or 'home/...' (2-slash URL)
-      // Then ensure leading slash so fs.statSync always gets an absolute path
-      const raw = request.url.replace(/^localfile:\/\//, '')
-      const filePath = decodeURIComponent(raw.startsWith('/') ? raw : '/' + raw)
-      console.log('[localfile] serving:', filePath)
-      const stat = fs.statSync(filePath)
-      const total = stat.size
-
-      const ext = path.extname(filePath).toLowerCase()
-      const mime = ext === '.mkv' ? 'video/x-matroska'
-        : ext === '.webm' ? 'video/webm'
-        : ext === '.avi' ? 'video/x-msvideo'
-        : 'video/mp4'
-
-      const rangeHeader = request.headers.get('range')
-      if (rangeHeader) {
-        const match = rangeHeader.match(/bytes=(\d+)-(\d*)/)
-        if (match) {
-          const startByte = parseInt(match[1])
-          const endByte = match[2] ? parseInt(match[2]) : total - 1
-          const chunkSize = endByte - startByte + 1
-          return new Response(fs.createReadStream(filePath, { start: startByte, end: endByte }), {
-            status: 206,
-            headers: {
-              'Content-Type': mime,
-              'Content-Range': `bytes ${startByte}-${endByte}/${total}`,
-              'Accept-Ranges': 'bytes',
-              'Content-Length': String(chunkSize),
-            },
-          })
-        }
-      }
-
-      return new Response(fs.createReadStream(filePath), {
-        headers: {
-          'Content-Type': mime,
-          'Accept-Ranges': 'bytes',
-          'Content-Length': String(total),
-        },
-      })
-    } catch (e) {
-      console.error('[localfile] error:', e.message)
-      return new Response('Not found: ' + e.message, { status: 404 })
-    }
   })
 
   // Videasy session — strip CSP/X-Frame-Options and capture m3u8 URLs
@@ -128,7 +73,7 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null
-    app.quit()  // always quit when window is closed
+    app.quit()
   })
 }
 
@@ -305,7 +250,7 @@ ipcMain.handle('run-download', (_, { binaryPath, m3u8Url, name, downloadPath, me
               .map(f => ({ f, mtime: fs.statSync(path.join(downloadPath, f)).mtimeMs }))
               .sort((a, b) => b.mtime - a.mtime)[0]
             if (match) downloads[idx].filePath = path.join(downloadPath, match.f)
-          } catch {}
+          } catch { }
         }
 
         // Real file size from disk
@@ -314,9 +259,9 @@ ipcMain.handle('run-download', (_, { binaryPath, m3u8Url, name, downloadPath, me
             const bytes = fs.statSync(downloads[idx].filePath).size
             downloads[idx].size = bytes > 1e9 ? (bytes / 1e9).toFixed(2) + ' GB'
               : bytes > 1e6 ? (bytes / 1e6).toFixed(1) + ' MB'
-              : bytes > 1e3 ? (bytes / 1e3).toFixed(1) + ' KB'
-              : bytes + ' B'
-          } catch {}
+                : bytes > 1e3 ? (bytes / 1e3).toFixed(1) + ' KB'
+                  : bytes + ' B'
+          } catch { }
         }
 
         sendProgress({
@@ -378,6 +323,9 @@ ipcMain.handle('pick-folder', async () => {
 // ── IPC: open external URL ────────────────────────────────────────────────────
 ipcMain.handle('open-external', (_, url) => { shell.openExternal(url) })
 
+// ── IPC: open file with system default app ──────────────────────────────────
+ipcMain.handle('open-path', (_, filePath) => { shell.openPath(filePath) })
+
 // ── IPC: scan directory for video files ──────────────────────────────────────
 ipcMain.handle('scan-directory', (_, folderPath) => {
   try {
@@ -400,9 +348,9 @@ ipcMain.handle('scan-directory', (_, folderPath) => {
               const bytes = fs.statSync(fullPath).size
               size = bytes > 1e9 ? (bytes / 1e9).toFixed(2) + ' GB'
                 : bytes > 1e6 ? (bytes / 1e6).toFixed(1) + ' MB'
-                : bytes > 1e3 ? (bytes / 1e3).toFixed(1) + ' KB'
-                : bytes + ' B'
-            } catch {}
+                  : bytes > 1e3 ? (bytes / 1e3).toFixed(1) + ' KB'
+                    : bytes + ' B'
+            } catch { }
             results.push({ filePath: fullPath, name: path.basename(entry.name, ext), size, ext })
           }
         }

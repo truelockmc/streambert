@@ -167,24 +167,45 @@ export default function App() {
 
   const addHistory = useCallback((item) => {
     const entry = {
-      id: item.id, title: item.title || item.name, poster_path: item.poster_path,
+      id: item.id,
+      title: item.title || item.name,
+      poster_path: item.poster_path,
       media_type: item.media_type || (item.first_air_date ? 'tv' : 'movie'),
-      watchedAt: Date.now(), season: item.season, episode: item.episode, episodeName: item.episodeName,
+      watchedAt: Date.now(),
+      // Store as numbers so the progress key always matches exactly
+      season: item.season != null ? Number(item.season) : null,
+      episode: item.episode != null ? Number(item.episode) : null,
+      episodeName: item.episodeName || null,
     }
-    const filtered = history.filter(h => !(h.id === item.id && h.media_type === entry.media_type))
-    const next = [entry, ...filtered].slice(0, 50)
-    setHistory(next); storage.set('history', next)
-  }, [history])
+    // Functional update — never reads stale history from closure
+    setHistory(prev => {
+      const filtered = prev.filter(h => !(h.id === entry.id && h.media_type === entry.media_type))
+      const next = [entry, ...filtered].slice(0, 50)
+      storage.set('history', next)
+      return next
+    })
+  }, []) // no deps needed — functional update always sees latest state
 
   const saveProgress = useCallback((key, pct) => {
-    const next = { ...progress, [key]: pct }
-    setProgress(next); storage.set('progress', next)
-  }, [progress])
+    // Functional update — without this, TVPage's setInterval keeps spreading
+    // the progress object from when the interval was created, overwriting
+    // saves from other episodes (classic stale closure bug).
+    setProgress(prev => {
+      const next = { ...prev, [key]: pct }
+      storage.set('progress', next)
+      return next
+    })
+  }, []) // no deps needed
 
   const inProgress = history.filter(h => {
-    const pk = h.media_type === 'movie' ? `movie_${h.id}` : `tv_${h.id}_s${h.season}e${h.episode}`
+    // Guard: TV entries must have valid season + episode to form a matchable key
+    if (h.media_type === 'tv' && (h.season == null || h.episode == null)) return false
+    const pk = h.media_type === 'movie'
+      ? `movie_${h.id}`
+      : `tv_${h.id}_s${h.season}e${h.episode}`
     const pct = progress[pk]
-    return pct && pct > 2 && pct < 95
+    // Show if meaningfully started (>2%) and not fully finished (>98%)
+    return pct != null && pct > 2 && pct < 98
   })
   const savedList = Object.values(saved)
 
