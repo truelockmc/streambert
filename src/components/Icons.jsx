@@ -119,6 +119,13 @@ export const WatchedIcon = ({ size = 22 }) => (
   </svg>
 )
 
+export const TrailerIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="2" y="2" width="20" height="20" rx="2" ry="2" />
+    <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none" />
+  </svg>
+)
+
 export const DownloadsQueueIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />

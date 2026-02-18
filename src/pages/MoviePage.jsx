@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { tmdbFetch, imgUrl, videasyMovieUrl } from '../utils/api'
 import {
   PlayIcon, BookmarkIcon, BookmarkFillIcon, BackIcon,
-  StarIcon, FilmIcon, DownloadIcon, WatchedIcon,
+  StarIcon, FilmIcon, DownloadIcon, WatchedIcon, TrailerIcon,
 } from '../components/Icons'
 import DownloadModal from '../components/DownloadModal'
+import TrailerModal from '../components/TrailerModal'
 import { storage } from '../utils/storage'
 
 export default function MoviePage({
@@ -14,6 +15,8 @@ export default function MoviePage({
   const [details, setDetails] = useState(null)
   const [playing, setPlaying] = useState(false)
   const [showDownload, setShowDownload] = useState(false)
+  const [trailerKey, setTrailerKey] = useState(null)
+  const [showTrailer, setShowTrailer] = useState(false)
   const [m3u8Url, setM3u8Url] = useState(null)
   const [downloaderFolder, setDownloaderFolder] = useState(
     () => storage.get('downloaderFolder') || ''
@@ -33,6 +36,18 @@ export default function MoviePage({
     tmdbFetch(`/movie/${item.id}`, apiKey)
       .then(setDetails)
       .catch(() => setDetails(item))
+  }, [item.id, apiKey])
+
+  useEffect(() => {
+    tmdbFetch(`/movie/${item.id}/videos`, apiKey)
+      .then(data => {
+        const videos = data.results || []
+        const trailer =
+          videos.find(v => v.type === 'Trailer' && v.site === 'YouTube') ||
+          videos.find(v => v.site === 'YouTube')
+        if (trailer) setTrailerKey(trailer.key)
+      })
+      .catch(() => {})
   }, [item.id, apiKey])
 
   useEffect(() => {
@@ -134,6 +149,11 @@ export default function MoviePage({
               <button className="btn btn-primary" onClick={handlePlay}>
                 <PlayIcon /> {playing ? 'Restart' : 'Play'}
               </button>
+              {trailerKey && (
+                <button className="btn btn-secondary" onClick={() => setShowTrailer(true)}>
+                  <TrailerIcon /> Trailer
+                </button>
+              )}
               <button className="btn btn-secondary" onClick={onSave}>
                 {isSaved ? <BookmarkFillIcon /> : <BookmarkIcon />}
                 {isSaved ? 'Saved' : 'Save'}
@@ -189,6 +209,14 @@ export default function MoviePage({
             ))}
           </div>
         </div>
+      )}
+
+      {showTrailer && trailerKey && (
+        <TrailerModal
+          trailerKey={trailerKey}
+          title={title}
+          onClose={() => setShowTrailer(false)}
+        />
       )}
 
       {showDownload && (

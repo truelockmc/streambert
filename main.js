@@ -69,6 +69,42 @@ function createWindow() {
     callback({})
   })
 
+  // Trailer session — strip X-Frame-Options/CSP so YouTube plays in-app
+  const trailerSession = session.fromPartition('persist:trailer')
+
+  trailerSession.setUserAgent(
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+  )
+
+  // Block Google tracking & analytics
+  const BLOCKED_HOSTS = [
+    '*://www.google-analytics.com/*',
+    '*://analytics.google.com/*',
+    '*://googletagmanager.com/*',
+    '*://www.googletagmanager.com/*',
+    '*://googletagservices.com/*',
+    '*://doubleclick.net/*',
+    '*://*.doubleclick.net/*',
+    '*://adservice.google.com/*',
+    '*://adservice.google.de/*',
+    '*://pagead2.googlesyndication.com/*',
+    '*://stats.g.doubleclick.net/*',
+    '*://yt3.ggpht.com/ytc/*',
+  ]
+
+  trailerSession.webRequest.onBeforeRequest({ urls: BLOCKED_HOSTS }, (_, callback) => {
+    callback({ cancel: true })
+  })
+
+  trailerSession.webRequest.onHeadersReceived({ urls: ['*://*/*'] }, (details, callback) => {
+    const headers = { ...details.responseHeaders }
+    for (const key of Object.keys(headers)) {
+      const lower = key.toLowerCase()
+      if (lower === 'x-frame-options' || lower === 'content-security-policy') delete headers[key]
+    }
+    callback({ responseHeaders: headers })
+  })
+
   mainWindow.loadFile(path.join(__dirname, 'dist/index.html'))
 
   mainWindow.on('closed', () => {

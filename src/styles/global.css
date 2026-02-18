@@ -1629,3 +1629,88 @@ kbd {
 .saved-thumb[draggable="true"]:active {
     cursor: grabbing;
 }
+
+.trailer-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+    backdrop-filter: blur(4px);
+}
+
+.trailer-modal {
+    width: 90vw;
+    max-width: 960px;
+    background: var(--surface);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.8);
+    animation: slideUp 0.25s ease;
+}
+
+.trailer-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+}
+
+.trailer-modal-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.trailer-close-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+}
+
+.trailer-close-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.trailer-close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text);
+}
+
+.trailer-embed-wrap {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%;
+    background: #000;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
