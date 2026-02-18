@@ -2,7 +2,7 @@ import MediaCard from '../components/MediaCard'
 import { PlayIcon, StarIcon } from '../components/Icons'
 import { imgUrl } from '../utils/api'
 
-export default function HomePage({ trending, trendingTV, loading, onSelect, progress, inProgress, offline, onRetry }) {
+export default function HomePage({ trending, trendingTV, loading, onSelect, progress, inProgress, offline, onRetry, watched, onMarkWatched, onMarkUnwatched }) {
   const hero = trending[0]
 
   return (
@@ -65,6 +65,9 @@ export default function HomePage({ trending, trendingTV, loading, onSelect, prog
                   item={item}
                   onClick={() => onSelect(item)}
                   progress={progress[pk] || 0}
+                  watched={watched}
+                  onMarkWatched={onMarkWatched}
+                  onMarkUnwatched={onMarkUnwatched}
                 />
               )
             })}
@@ -81,6 +84,9 @@ export default function HomePage({ trending, trendingTV, loading, onSelect, prog
                 key={item.id}
                 item={{ ...item, media_type: 'movie' }}
                 onClick={() => onSelect({ ...item, media_type: 'movie' })}
+                watched={watched}
+                onMarkWatched={onMarkWatched}
+                onMarkUnwatched={onMarkUnwatched}
               />
             ))}
           </div>
@@ -96,6 +102,9 @@ export default function HomePage({ trending, trendingTV, loading, onSelect, prog
                 key={item.id}
                 item={{ ...item, media_type: 'tv' }}
                 onClick={() => onSelect({ ...item, media_type: 'tv' })}
+                watched={watched}
+                onMarkWatched={onMarkWatched}
+                onMarkUnwatched={onMarkUnwatched}
               />
             ))}
           </div>

@@ -99,6 +99,26 @@ export const FolderIcon = () => (
     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
   </svg>
 )
+
+export const WatchedIcon = ({ size = 22 }) => (
+  <svg
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill="none"
+    style={{ filter: 'drop-shadow(0 0 4px rgba(72,199,116,0.7))' }}
+  >
+    <circle cx="12" cy="12" r="11" fill="#1a2e1a" stroke="#48c774" strokeWidth="1.5" />
+    <path
+      d="M6.5 12.5l3.5 3.5 7-7"
+      stroke="#48c774"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
 export const DownloadsQueueIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />

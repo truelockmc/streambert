@@ -1,8 +1,8 @@
 import MediaCard from '../components/MediaCard'
 import { imgUrl } from '../utils/api'
-import { EyeIcon } from '../components/Icons'
+import { EyeIcon, WatchedIcon } from '../components/Icons'
 
-export default function LibraryPage({ history, inProgress, saved, progress, onSelect }) {
+export default function LibraryPage({ history, inProgress, saved, progress, onSelect, watched, onMarkWatched, onMarkUnwatched }) {
   return (
     <div className="fade-in">
       <div className="library-header">
@@ -24,6 +24,9 @@ export default function LibraryPage({ history, inProgress, saved, progress, onSe
                   item={item}
                   onClick={() => onSelect(item)}
                   progress={progress[pk] || 0}
+                  watched={watched}
+                  onMarkWatched={onMarkWatched}
+                  onMarkUnwatched={onMarkUnwatched}
                 />
               )
             })}
@@ -40,6 +43,9 @@ export default function LibraryPage({ history, inProgress, saved, progress, onSe
                 key={`${item.media_type}_${item.id}`}
                 item={item}
                 onClick={() => onSelect(item)}
+                watched={watched}
+                onMarkWatched={onMarkWatched}
+                onMarkUnwatched={onMarkUnwatched}
               />
             ))}
           </div>
@@ -50,25 +56,34 @@ export default function LibraryPage({ history, inProgress, saved, progress, onSe
         <div className="library-section">
           <div className="library-section-title">Watch History</div>
           <div className="history-rows">
-            {history.map((item, i) => (
-              <div key={i} className="history-row" onClick={() => onSelect(item)}>
-                <div className="history-thumb">
-                  {item.poster_path && (
-                    <img src={imgUrl(item.poster_path, 'w92')} alt="" />
-                  )}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500 }}>{item.title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text3)' }}>
-                    {item.media_type === 'tv' && item.season && `S${item.season}E${item.episode} · `}
-                    {new Date(item.watchedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+            {history.map((item, i) => {
+              const pk = item.media_type === 'movie'
+                ? `movie_${item.id}`
+                : `tv_${item.id}_s${item.season}e${item.episode}`
+              const isWatched = !!watched?.[pk]
+              return (
+                <div key={i} className="history-row" onClick={() => onSelect(item)}>
+                  <div className="history-thumb">
+                    {item.poster_path && (
+                      <img src={imgUrl(item.poster_path, 'w92')} alt="" />
+                    )}
                   </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {item.title}
+                      {isWatched && <WatchedIcon size={16} />}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text3)' }}>
+                      {item.media_type === 'tv' && item.season && `S${item.season}E${item.episode} · `}
+                      {new Date(item.watchedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    </div>
+                  </div>
+                  <span className={`search-result-type ${item.media_type === 'tv' ? 'type-tv' : 'type-movie'}`}>
+                    {item.media_type === 'tv' ? 'Series' : 'Movie'}
+                  </span>
                 </div>
-                <span className={`search-result-type ${item.media_type === 'tv' ? 'type-tv' : 'type-movie'}`}>
-                  {item.media_type === 'tv' ? 'Series' : 'Movie'}
-                </span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

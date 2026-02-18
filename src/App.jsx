@@ -22,6 +22,7 @@ export default function App() {
   const [saved, setSaved] = useState(() => storage.get('saved') || {})
   const [progress, setProgress] = useState(() => storage.get('progress') || {})
   const [history, setHistory] = useState(() => storage.get('history') || [])
+  const [watched, setWatched] = useState(() => storage.get('watched') || {})
   const [toast, setToast] = useState(null)
 
   const [trending, setTrending] = useState([])
@@ -197,6 +198,23 @@ export default function App() {
     })
   }, []) // no deps needed
 
+  const markWatched = useCallback((key) => {
+    setWatched(prev => {
+      const next = { ...prev, [key]: true }
+      storage.set('watched', next)
+      return next
+    })
+  }, [])
+
+  const markUnwatched = useCallback((key) => {
+    setWatched(prev => {
+      const next = { ...prev }
+      delete next[key]
+      storage.set('watched', next)
+      return next
+    })
+  }, [])
+
   const inProgress = history.filter(h => {
     // Guard: TV entries must have valid season + episode to form a matchable key
     if (h.media_type === 'tv' && (h.season == null || h.episode == null)) return false
@@ -204,7 +222,8 @@ export default function App() {
       ? `movie_${h.id}`
       : `tv_${h.id}_s${h.season}e${h.episode}`
     const pct = progress[pk]
-    // Show if meaningfully started (>2%) and not fully finished (>98%)
+    // Exclude watched items and items not meaningfully started or already finished
+    if (watched[pk]) return false
     return pct != null && pct > 2 && pct < 98
   })
   const savedList = Object.values(saved)
@@ -225,7 +244,8 @@ export default function App() {
         {page === 'home' && (
           <HomePage trending={trending} trendingTV={trendingTV} loading={loadingHome}
             onSelect={handleSelectResult} progress={progress} inProgress={inProgress}
-            offline={offline} onRetry={retryHome} />
+            offline={offline} onRetry={retryHome}
+            watched={watched} onMarkWatched={markWatched} onMarkUnwatched={markUnwatched} />
         )}
         {page === 'movie' && selected && (
           <MoviePage item={selected} apiKey={apiKey}
@@ -233,6 +253,7 @@ export default function App() {
             onHistory={addHistory} progress={progress} saveProgress={saveProgress}
             onBack={() => navigate('home')} onSettings={() => navigate('settings')}
             onDownloadStarted={handleDownloadStarted}
+            watched={watched} onMarkWatched={markWatched} onMarkUnwatched={markUnwatched}
           />
         )}
         {page === 'tv' && selected && (
@@ -241,11 +262,13 @@ export default function App() {
             onHistory={addHistory} progress={progress} saveProgress={saveProgress}
             onBack={() => navigate('home')} onSettings={() => navigate('settings')}
             onDownloadStarted={handleDownloadStarted}
+            watched={watched} onMarkWatched={markWatched} onMarkUnwatched={markUnwatched}
           />
         )}
         {page === 'history' && (
           <LibraryPage history={history} inProgress={inProgress} saved={savedList}
-            progress={progress} onSelect={handleSelectResult} />
+            progress={progress} onSelect={handleSelectResult}
+            watched={watched} onMarkWatched={markWatched} onMarkUnwatched={markUnwatched} />
         )}
         {page === 'settings' && (
           <SettingsPage apiKey={apiKey} onChangeApiKey={changeApiKey} />

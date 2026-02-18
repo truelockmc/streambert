@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { tmdbFetch, imgUrl, videasyMovieUrl } from '../utils/api'
 import {
   PlayIcon, BookmarkIcon, BookmarkFillIcon, BackIcon,
-  StarIcon, FilmIcon, DownloadIcon,
+  StarIcon, FilmIcon, DownloadIcon, WatchedIcon,
 } from '../components/Icons'
 import DownloadModal from '../components/DownloadModal'
 import { storage } from '../utils/storage'
 
 export default function MoviePage({
   item, apiKey, onSave, isSaved, onHistory, progress, saveProgress, onBack, onSettings, onDownloadStarted,
+  watched, onMarkWatched, onMarkUnwatched,
 }) {
   const [details, setDetails] = useState(null)
   const [playing, setPlaying] = useState(false)
@@ -20,6 +21,13 @@ export default function MoviePage({
 
   const progressKey = `movie_${item.id}`
   const pct = progress[progressKey] || 0
+  const isWatched = !!watched?.[progressKey]
+
+  // Read threshold from settings (default 20s)
+  const watchedThreshold = storage.get('watchedThreshold') ?? 20
+
+  // Ref to prevent double-marking
+  const autoMarkedRef = useRef(false)
 
   useEffect(() => {
     tmdbFetch(`/movie/${item.id}`, apiKey)
@@ -35,7 +43,12 @@ export default function MoviePage({
     return () => window.electron.offM3u8Found(handler)
   }, [])
 
-  // ── Auto-track progress every 5s via webview.executeJavaScript ──────────
+  // Reset auto-mark guard when a new movie loads or watched state resets
+  useEffect(() => {
+    autoMarkedRef.current = false
+  }, [item.id, isWatched])
+
+  // ── Auto-track progress + auto-watched every 5s ──────────────────────────
   useEffect(() => {
     if (!playing) return
     let interval = null
@@ -54,12 +67,19 @@ export default function MoviePage({
           if (result && result.duration > 0) {
             const p = Math.floor((result.currentTime / result.duration) * 100)
             if (p > 1) saveProgress(progressKey, Math.min(p, 100))
+
+            // Auto-mark watched when remaining time ≤ threshold
+            const remaining = result.duration - result.currentTime
+            if (!autoMarkedRef.current && remaining <= watchedThreshold && remaining >= 0) {
+              autoMarkedRef.current = true
+              onMarkWatched?.(progressKey)
+            }
           }
         } catch { }
       }, 5000)
     }, 3000)
     return () => { clearTimeout(timer); clearInterval(interval) }
-  }, [playing, progressKey])
+  }, [playing, progressKey, watchedThreshold])
 
   const handlePlay = () => {
     setM3u8Url(null)
@@ -83,14 +103,22 @@ export default function MoviePage({
         <div className="detail-bg" style={{ backgroundImage: `url(${imgUrl(d.backdrop_path, 'original')})` }} />
         <div className="detail-gradient" />
         <div className="detail-content">
-          <div className="detail-poster">
+          <div className="detail-poster" style={{ position: 'relative' }}>
             {d.poster_path
               ? <img src={imgUrl(d.poster_path)} alt={title} />
               : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}><FilmIcon /></div>
             }
+            {isWatched && (
+              <div className="detail-watched-badge">
+                <WatchedIcon size={36} />
+              </div>
+            )}
           </div>
           <div className="detail-info">
-            <div className="detail-type">Movie</div>
+            <div className="detail-type" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              Movie
+              {isWatched && <span className="watched-label"><WatchedIcon size={14} /> Watched</span>}
+            </div>
             <div className="detail-title">{title}</div>
             <div className="genres">
               {(d.genres || []).map(g => <span key={g.id} className="genre-tag">{g.name}</span>)}
@@ -110,6 +138,18 @@ export default function MoviePage({
                 {isSaved ? <BookmarkFillIcon /> : <BookmarkIcon />}
                 {isSaved ? 'Saved' : 'Save'}
               </button>
+              {isWatched
+                ? (
+                  <button className="btn btn-ghost watched-btn" onClick={() => onMarkUnwatched?.(progressKey)}>
+                    <WatchedIcon size={16} /> Watched
+                  </button>
+                )
+                : (
+                  <button className="btn btn-ghost" onClick={() => onMarkWatched?.(progressKey)}>
+                    ✓ Mark Watched
+                  </button>
+                )
+              }
               <button className="btn btn-ghost" onClick={onBack}>
                 <BackIcon /> Back
               </button>
