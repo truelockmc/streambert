@@ -8,6 +8,7 @@
 ## Requirements
 
 - [Node.js](https://nodejs.org/) (>=22.12.0) — download and install it first
+- [ffmpeg](https://ffmpeg.org/download.html)
 - A free [TMDB API key](https://www.themoviedb.org/settings/api)
 
 ---
