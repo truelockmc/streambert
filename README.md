@@ -5,7 +5,7 @@ A cross-platform Electron Desktop App to stream and download any Movie or TV Ser
 ![Watch TV Series](screenshots/series.png)
 ![Download Everything](screenshots/download.png)
 ---
-
+---
 ## Streaming
 The Application gets Video Streams from videasy.net (more Providers will follow). <br></br>
 It fetches Information for Images, Info Texts, Search and Homepage from [tmdb](https://www.themoviedb.org/).
@@ -27,9 +27,11 @@ Once you click 'Download' these Links are used to download the Full Movie/TV Epi
 ---
 
 ## Setup & Run
-1. Use a prebuilt Binary from [Releases](https://github.com/truelockmc/video-downloader/releases/latest)
+Option 1: 
+Use a prebuilt Binary from [Releases](https://github.com/truelockmc/video-downloader/releases/latest)
 
-2. Build it yourself
+Option 2:
+Build it yourself
 ```bash
 # 1. Open a terminal in the Code Folder, then install dependencies:
 npm install
