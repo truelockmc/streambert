@@ -1,4 +1,5 @@
 # Streambert
+A cross-platform Electron Desktop App to stream and download any Movie or TV Series in the World. <br></br>
 ![Logo](public/logo.svg)
 
 ![Watch TV Series](screenshots/series.png)
@@ -10,8 +11,17 @@
 - [Node.js](https://nodejs.org/) (>=22.12.0) — download and install it first
 - [ffmpeg](https://ffmpeg.org/download.html)
 - A free [TMDB API key](https://www.themoviedb.org/settings/api)
+- For downloading, [this Program](https://github.com/truelockmc/video-downloader) somewhere on your PC
 
 ---
+
+## Streaming
+The Application gets Video Streams from videasy.net (more Providers will follow). <br></br>
+It fetches Information for Images, Info Texts, Search and Homepage from [tmdb](https://www.themoviedb.org/).
+
+## Downloading
+You can download those Video Streams because the Program sources Links to their .m3u8 Playlist Files ([similar to this Browser Extension](https://addons.mozilla.org/en-US/firefox/addon/m3u8-link-finder/)). <br></br>
+Once you click 'Download' these Links are used to download the Full Movie/TV Episode using [this Program](https://github.com/truelockmc/video-downloader). 
 
 ## Setup & Run
 
@@ -24,7 +34,7 @@ npm start
 
 ```
 
-On first launch you'll be prompted to enter your TMDB API key. It's saved locally — you only need to do this once.
+On first launch you'll be prompted to enter your TMDB API key. It's saved locally, you only need to do this once.
 
 ---
 
