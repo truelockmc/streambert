@@ -10,10 +10,10 @@ import { storage } from '../utils/storage'
 export default function MoviePage({
   item, apiKey, onSave, isSaved, onHistory, progress, saveProgress, onBack, onSettings, onDownloadStarted,
 }) {
-  const [details, setDetails]           = useState(null)
-  const [playing, setPlaying]           = useState(false)
+  const [details, setDetails] = useState(null)
+  const [playing, setPlaying] = useState(false)
   const [showDownload, setShowDownload] = useState(false)
-  const [m3u8Url, setM3u8Url]           = useState(null)
+  const [m3u8Url, setM3u8Url] = useState(null)
   const [downloaderFolder, setDownloaderFolder] = useState(
     () => storage.get('downloaderFolder') || ''
   )
@@ -34,6 +34,32 @@ export default function MoviePage({
     })
     return () => window.electron.offM3u8Found(handler)
   }, [])
+
+  // ── Auto-track progress every 5s via webview.executeJavaScript ──────────
+  useEffect(() => {
+    if (!playing) return
+    let interval = null
+    const timer = setTimeout(() => {
+      interval = setInterval(async () => {
+        try {
+          const wv = document.querySelector('webview')
+          if (!wv) return
+          const result = await wv.executeJavaScript(`
+            (() => {
+              const v = document.querySelector('video')
+              if (!v || !v.duration || v.duration === Infinity || v.paused) return null
+              return { currentTime: v.currentTime, duration: v.duration }
+            })()
+          `)
+          if (result && result.duration > 0) {
+            const p = Math.floor((result.currentTime / result.duration) * 100)
+            if (p > 1) saveProgress(progressKey, Math.min(p, 100))
+          }
+        } catch { }
+      }, 5000)
+    }, 3000)
+    return () => { clearTimeout(timer); clearInterval(interval) }
+  }, [playing, progressKey])
 
   const handlePlay = () => {
     setM3u8Url(null)
@@ -60,7 +86,7 @@ export default function MoviePage({
           <div className="detail-poster">
             {d.poster_path
               ? <img src={imgUrl(d.poster_path)} alt={title} />
-              : <div style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text3)' }}><FilmIcon /></div>
+              : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}><FilmIcon /></div>
             }
           </div>
           <div className="detail-info">
@@ -99,7 +125,7 @@ export default function MoviePage({
               src={videasyMovieUrl(item.id)}
               partition="persist:videasy"
               allowpopups="true"
-              style={{ position:'absolute',inset:0,width:'100%',height:'100%',border:'none' }}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
             />
             <button className="player-overlay-btn" onClick={() => setShowDownload(true)} title="Download">
               <DownloadIcon />
@@ -110,15 +136,15 @@ export default function MoviePage({
           {pct > 0 && (
             <div className="progress-bar-row">
               <div className="progress-bar-outer">
-                <div className="progress-bar-fill" style={{ width: `${Math.min(pct,100)}%` }} />
+                <div className="progress-bar-fill" style={{ width: `${Math.min(pct, 100)}%` }} />
               </div>
-              <span style={{ fontSize:12,color:'var(--text3)' }}>{pct.toFixed(0)}% watched</span>
+              <span style={{ fontSize: 12, color: 'var(--text3)' }}>{pct.toFixed(0)}% watched</span>
             </div>
           )}
           <div className="progress-mark-row">
-            <span style={{ fontSize:12,color:'var(--text3)',marginRight:4 }}>Mark progress:</span>
-            {[25,50,75,100].map(p => (
-              <button key={p} className="btn btn-ghost" style={{ padding:'5px 14px',fontSize:12 }}
+            <span style={{ fontSize: 12, color: 'var(--text3)', marginRight: 4 }}>Mark progress:</span>
+            {[25, 50, 75, 100].map(p => (
+              <button key={p} className="btn btn-ghost" style={{ padding: '5px 14px', fontSize: 12 }}
                 onClick={() => saveProgress(progressKey, p)}>{p}%</button>
             ))}
           </div>
