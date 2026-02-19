@@ -35,6 +35,42 @@ function EpisodeContextMenu({ x, y, isWatched, onMarkWatched, onMarkUnwatched, o
   )
 }
 
+// Expandable episode description
+function EpisodeDesc({ overview, episodeName }) {
+  const [open, setOpen] = useState(false)
+  if (!overview) return <div className="episode-desc" />
+
+  return (
+    <>
+      <div className="episode-desc-wrap">
+        <div className="episode-desc">{overview}</div>
+        <button
+          className="episode-desc-toggle"
+          onClick={e => { e.stopPropagation(); setOpen(true) }}
+        >
+          More
+        </button>
+      </div>
+
+      {open && (
+        <div
+          className="ep-desc-overlay"
+          onClick={e => { e.stopPropagation(); setOpen(false) }}
+        >
+          <div
+            className="ep-desc-popup"
+            onClick={e => e.stopPropagation()}
+          >
+            {episodeName && <div className="ep-desc-popup-title">{episodeName}</div>}
+            <p className="ep-desc-popup-text">{overview}</p>
+            <button className="ep-desc-popup-close" onClick={() => setOpen(false)}>Close</button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function TVPage({
   item, apiKey, onSave, isSaved, onHistory, progress, saveProgress, onBack, onSettings, onDownloadStarted,
   watched, onMarkWatched, onMarkUnwatched,
@@ -80,7 +116,7 @@ export default function TVPage({
           videos.find(v => v.site === 'YouTube')
         if (trailer) setTrailerKey(trailer.key)
       })
-      .catch(() => {})
+      .catch(() => { })
   }, [item.id, apiKey])
 
   useEffect(() => {
@@ -295,11 +331,6 @@ export default function TVPage({
                           : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}><PlayIcon /></div>
                         }
                         <div className="episode-thumb-play"><PlayIcon /></div>
-                        {!epWatched && epPct > 0 && (
-                          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: 'rgba(255,255,255,0.1)' }}>
-                            <div style={{ width: `${Math.min(epPct, 100)}%`, height: '100%', background: 'var(--red)' }} />
-                          </div>
-                        )}
                       </div>
                       <div className="episode-info">
                         <div className="episode-num" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -307,7 +338,7 @@ export default function TVPage({
                           {epWatched && <WatchedIcon size={14} />}
                         </div>
                         <div className="episode-name">{ep.name}</div>
-                        <div className="episode-desc">{ep.overview}</div>
+                        <EpisodeDesc overview={ep.overview} episodeName={ep.name} />
                         {!epWatched && epPct > 0 && (
                           <div className="episode-progress-bar">
                             <div className="episode-progress-fill" style={{ width: `${Math.min(epPct, 100)}%` }} />

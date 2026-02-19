@@ -954,6 +954,87 @@ body,
     overflow: hidden;
 }
 
+.episode-desc-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.episode-desc-toggle {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--red);
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    align-self: flex-start;
+    opacity: 0.8;
+    transition: opacity 0.15s;
+}
+
+.episode-desc-toggle:hover {
+    opacity: 1;
+}
+
+.ep-desc-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ep-desc-popup {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    max-width: 480px;
+    width: 90%;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+}
+
+.ep-desc-popup-title {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--text1);
+}
+
+.ep-desc-popup-text {
+    font-size: 14px;
+    color: var(--text2);
+    line-height: 1.6;
+    margin: 0;
+}
+
+.ep-desc-popup-close {
+    align-self: flex-end;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 18px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text2);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.ep-desc-popup-close:hover {
+    background: var(--red);
+    color: #fff;
+    border-color: var(--red);
+}
+
 .episode-progress-bar {
     margin-top: 6px;
     height: 2px;
