@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { storage } from '../utils/storage'
+import { DEFAULT_INVIDIOUS_BASE } from '../components/TrailerModal'
 
 // ── Confirmation Dialog ───────────────────────────────────────────────────────
 function ResetConfirmDialog({ onConfirm, onCancel }) {
@@ -128,6 +129,45 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
   const [saved, setSaved] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
 
+  // Invidious
+  const [invidiousBase, setInvidiousBase] = useState(
+    () => storage.get('invidiousBase') || DEFAULT_INVIDIOUS_BASE
+  )
+  const [invidiousStatus, setInvidiousStatus] = useState(null) // null | { ok: bool, msg: string }
+  const [invidiousChecking, setInvidiousChecking] = useState(false)
+  const [invidiousSaved, setInvidiousSaved] = useState(false)
+
+  const checkInvidious = async (baseUrl) => {
+    const clean = (baseUrl || '').trim().replace(/\/$/, '')
+    if (!clean) {
+      setInvidiousStatus({ ok: false, msg: 'Please enter a URL first.' })
+      return
+    }
+    setInvidiousChecking(true)
+    setInvidiousStatus(null)
+    try {
+      const url = `${clean}/api/v1/stats`
+      const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
+      if (res.ok) {
+        setInvidiousStatus({ ok: true, msg: 'Instance reachable and responding.' })
+      } else {
+        setInvidiousStatus({ ok: false, msg: `Server responded with status ${res.status}.` })
+      }
+    } catch (e) {
+      setInvidiousStatus({ ok: false, msg: 'Could not reach instance. Check the URL or try another.' })
+    } finally {
+      setInvidiousChecking(false)
+    }
+  }
+
+  const saveInvidiousBase = () => {
+    const clean = (invidiousBase || '').trim().replace(/\/$/, '')
+    storage.set('invidiousBase', clean || DEFAULT_INVIDIOUS_BASE)
+    setInvidiousBase(clean || DEFAULT_INVIDIOUS_BASE)
+    setInvidiousSaved(true)
+    setTimeout(() => setInvidiousSaved(false), 2000)
+  }
+
   const isElectron = typeof window !== 'undefined' && !!window.electron
 
   const pickFolder = async () => {
@@ -212,6 +252,63 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
             </code>
             <button className="btn btn-ghost" onClick={onChangeApiKey}>Change API Token</button>
           </div>
+        </div>
+
+        <div style={{ height: 1, background: 'var(--border)', marginBottom: 40 }} />
+
+        {/* ── Invidious Base URL ── */}
+        <div style={{ marginBottom: 40 }}>
+          <div className="settings-section-title">Invidious Instance</div>
+          <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 16, lineHeight: 1.6 }}>
+            Trailers are played via{' '}
+            <span style={{ color: 'var(--text)', fontWeight: 600 }}>Invidious</span>, a
+            privacy-friendly YouTube frontend. Your configured instance is tried first; if it
+            should fail, the app automatically falls back through a list of known
+            working instances.
+            The default is <code style={{ fontSize: 12 }}>{DEFAULT_INVIDIOUS_BASE}</code>.
+            The instance must have its API enabled (<code style={{ fontSize: 12 }}>/api/v1/stats</code> reachable).
+          </div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              className="apikey-input"
+              style={{ flex: 1, minWidth: 260, marginBottom: 0 }}
+              placeholder={DEFAULT_INVIDIOUS_BASE}
+              value={invidiousBase}
+              onChange={e => { setInvidiousBase(e.target.value); setInvidiousStatus(null) }}
+            />
+            <button
+              className="btn btn-ghost"
+              disabled={invidiousChecking}
+              onClick={() => checkInvidious(invidiousBase)}
+              style={{ opacity: invidiousChecking ? 0.5 : 1 }}
+            >
+              {invidiousChecking ? 'Checking…' : 'Check'}
+            </button>
+            <button className="btn btn-primary" onClick={saveInvidiousBase}>Save</button>
+          </div>
+
+          {/* Status indicator */}
+          {invidiousStatus && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+              <div style={{
+                width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
+                background: invidiousStatus.ok ? '#48c774' : '#ff3860',
+                boxShadow: invidiousStatus.ok
+                  ? '0 0 6px rgba(72,199,116,0.6)'
+                  : '0 0 6px rgba(255,56,96,0.6)',
+              }} />
+              <span style={{
+                fontSize: 13, fontWeight: 500,
+                color: invidiousStatus.ok ? '#48c774' : '#ff3860',
+              }}>
+                {invidiousStatus.msg}
+              </span>
+            </div>
+          )}
+
+          {invidiousSaved && (
+            <div style={{ marginTop: 10, fontSize: 13, color: '#48c774' }}>✓ Saved</div>
+          )}
         </div>
 
         <div style={{ height: 1, background: 'var(--border)', marginBottom: 40 }} />

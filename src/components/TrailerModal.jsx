@@ -1,204 +1,88 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { CloseIcon } from './Icons'
+import { storage } from '../utils/storage'
 
-const HIDE_CSS = `
-  /* Hide everything except the video player */
-  ytd-app > * { display: none !important; }
-  #content, ytd-page-manager { display: block !important; }
-  ytd-watch-flexy, ytd-watch-modern { display: block !important; background: #000 !important; }
+export const DEFAULT_INVIDIOUS_BASE = 'https://inv.nadeko.net'
 
-  /* Hide all non-player columns */
-  #secondary, #below, #comments, ytd-watch-metadata,
-  #masthead-container, tp-yt-app-drawer, ytd-mini-guide-renderer,
-  #chat, #panels, ytd-merch-shelf-renderer,
-  .ytp-share-button, .ytp-watermark, .ytp-chrome-top
-  .ytp-chrome-top-buttons,columns
-  ytd-engagement-panel-section-list-renderer { display: none !important; }
+const FALLBACK_INSTANCES = [
+  'https://invidious.privacyredirect.com',
+  'https://inv.tux.pizza',
+  'https://yt.cdaut.de',
+  'https://invidious.lunar.icu',
+  'https://invidious.protokolla.fi',
+  'https://invidious.nerdvpn.de',
+  'https://iv.melmac.space',
+  'https://invidious.perennialte.ch',
+]
 
-  /* Page background */
-  html, body { background: #000 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; }
+export function getInvidiousBase() {
+  return (storage.get('invidiousBase') || DEFAULT_INVIDIOUS_BASE).replace(/\/$/, '')
+}
 
-  /* Collapse the top chrome */
-  .ytp-chrome-top {
-    height: 0 !important;
-    overflow: hidden !important;
-    opacity: 0 !important;
-  }
-
-  /* Hide end cards / endscreen recommendations */
-  .ytp-endscreen-content,
-  .ytp-ce-element,
-  .ytp-videowall-still,
-  .html5-endscreen { display: none !important; }
-
-  /* Completely remove autoplay toggle + tooltip */
-  .ytp-autonav-toggle-button-container,
-  .ytp-autonav-toggle-button,
-  .ytp-tooltip[data-tooltip-target-id="ytp-autonav-toggle-button"] {
-    display: none !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
-    width: 0 !important;
-    height: 0 !important;
-    overflow: hidden !important;
-  }
-`
-
-const CONSENT_REJECT_JS = `
-(function autoRejectConsent() {
-  var REJECT_PATTERNS = [
-    'reject', 'ablehnen', 'tout refuser', 'rifiuta', 'rechazar',
-    'rejeitar', 'weiger', 'afvis', 'odmítnout', 'elutasít',
-  ]
-  var clicked = function() {
-    var candidates = document.querySelectorAll(
-      'button, [role="button"], .VfPpkd-LgbsSe, ytd-button-renderer'
-    )
-    for (var i = 0; i < candidates.length; i++) {
-      var el = candidates[i]
-      var text = (el.innerText || el.textContent || '').trim().toLowerCase()
-      if (REJECT_PATTERNS.some(function(p) { return text.includes(p) })) {
-        el.click()
-        return true
-      }
-    }
-    var form = document.querySelector('form[action*="reject"], form[action*="refuse"]')
-    if (form) { form.submit(); return true }
-    return false
-  }
-  if (!clicked()) {
-    [300, 800, 1800, 3500].forEach(function(ms) { setTimeout(clicked, ms) })
-  }
+const DETECT_BOT_JS = `
+(function() {
+  var title = (document.title || '').toLowerCase()
+  var body  = (document.body  && document.body.innerText || '').toLowerCase()
+  var botKeywords = ['verifying', 'antibot', 'challenge', 'ddos', 'please wait', 'checking your browser', 'just a moment']
+  var isBot = botKeywords.some(function(k) { return title.includes(k) || body.includes(k) })
+  isBot
 })()
 `
 
-const PLAYER_SETUP_JS = `
-(function setup() {
-  if (window.__trailerSetupDone) return
-  window.__trailerSetupDone = true
+// Hide the built-in Invidious button, detect video end
+const SETUP_JS = `
+(function() {
+  if (window.__trailerSetup) return
+  window.__trailerSetup = true
 
-  var CONTAINERS = [
-    '#player-container-outer', '#player-container',
-    '#player-container-inner', '#player', 'ytd-player',
-    'ytd-watch-flexy', 'ytd-watch-modern',
-  ]
+  // Hide the "Watch on Invidious" button inside the player
+  var style = document.createElement('style')
+  style.textContent = '.player-container .invidious-link, a[href*="/watch"], .vjs-invidious-button { display: none !important; }'
+  document.head.appendChild(style)
 
-  var fixLayout = function() {
-    window.scrollTo(0, 0)
-    CONTAINERS.forEach(function(sel) {
-      var el = document.querySelector(sel)
-      if (!el) return
-      el.style.setProperty('width', '100vw', 'important')
-      el.style.setProperty('height', '100vh', 'important')
-      el.style.setProperty('max-width', 'none', 'important')
-      el.style.setProperty('margin', '0', 'important')
-      el.style.setProperty('padding', '0', 'important')
-      el.style.setProperty('position', 'fixed', 'important')
-      el.style.setProperty('top', '0', 'important')
-      el.style.setProperty('left', '0', 'important')
-    })
-  }
-  fixLayout()
-  setTimeout(fixLayout, 500)
-  setTimeout(fixLayout, 1500)
-
-  document.addEventListener('fullscreenchange', function() {
-    if (!document.fullscreenElement) {
-      [0, 50, 150, 300, 600, 1000].forEach(function(ms) { setTimeout(fixLayout, ms) })
-    }
-  })
-
-  var styleObserver = new MutationObserver(function() { fixLayout() })
-  var armObserver = function() {
-    CONTAINERS.forEach(function(sel) {
-      var el = document.querySelector(sel)
-      if (el) styleObserver.observe(el, { attributes: true, attributeFilter: ['style', 'class'] })
-    })
-  }
-  armObserver(); setTimeout(armObserver, 2000)
-
-  // ── Autoplay OFF ─────────────────────────────────────────────────────────────
-  var forceAutoplayOff = function() {
-    var btn = document.querySelector('.ytp-autonav-toggle-button')
-    if (btn && btn.getAttribute('aria-checked') === 'true') btn.click()
-    try {
-      var player = document.getElementById('movie_player')
-      if (player && player.setAutonavState) player.setAutonavState(false)
-    } catch(e) {}
-  }
-  forceAutoplayOff()
-  setTimeout(forceAutoplayOff, 1000)
-  setTimeout(forceAutoplayOff, 3000)
-  var autoplayObserver = new MutationObserver(forceAutoplayOff)
-  var observeAutoplay = function() {
-    var c = document.querySelector('.ytp-autonav-toggle-button-container')
-    if (c) autoplayObserver.observe(c, { attributes: true, subtree: true })
-  }
-  observeAutoplay(); setTimeout(observeAutoplay, 2000)
-
-  // ── Remove "More Videos" button + up-next panel from DOM, keep it gone ───────
-  // Covers both the in-player button (.ytp-upnext-button) and the suggestion
-  // overlay (.ytp-upnext, .ytp-upnext-autoplay) in normal and fullscreen mode
-  var UPNEXT_SELECTORS = [
-    '.ytp-upnext',
-    '.ytp-upnext-autoplay',
-    '.ytp-upnext-button',
-    'ytd-compact-video-renderer',
-    'ytd-compact-auto-generated-playlist-renderer',
-  ]
-  var removeUpNext = function() {
-    UPNEXT_SELECTORS.forEach(function(sel) {
-      document.querySelectorAll(sel).forEach(function(el) { el.remove() })
-    })
-  }
-  removeUpNext()
-  var upNextObserver = new MutationObserver(removeUpNext)
-  var observeUpNext = function() {
-    var player = document.getElementById('movie_player')
-    var target = player || document.body
-    upNextObserver.observe(target, { childList: true, subtree: true })
-  }
-  observeUpNext()
-  setTimeout(removeUpNext, 1000)
-  setTimeout(removeUpNext, 3000)
-
-  // ── Block V-key ───────────────────────────────────────────────────────────────
-  var blockV = function(e) {
-    if (e.key === 'v' || e.key === 'V') {
-      e.preventDefault()
-      e.stopImmediatePropagation()
-    }
-  }
-  document.addEventListener('keydown', blockV, true)
-
-  // ── Detect video end ──────────────────────────────────────────────────────────
-  var attachEndedListener = function() {
+  // Detect video end and notify host
+  var attachEnded = function() {
     var video = document.querySelector('video')
     if (!video) return false
-    video.addEventListener('ended', function() { window.__trailerEnded = true })
+    video.addEventListener('ended', function() {
+      window.__trailerEnded = true
+    })
     return true
   }
-  if (!attachEndedListener()) {
-    var waitObs = new MutationObserver(function() {
-      if (attachEndedListener()) waitObs.disconnect()
-    })
-    waitObs.observe(document.body, { childList: true, subtree: true })
+  if (!attachEnded()) {
+    var obs = new MutationObserver(function() { if (attachEnded()) obs.disconnect() })
+    obs.observe(document.body, { childList: true, subtree: true })
   }
-
-  // ── Block outbound link clicks (endscreen cards etc.) ────────────────────────
-  document.addEventListener('click', function(e) {
-    var link = e.target.closest('a[href]')
-    if (!link) return
-    var href = link.getAttribute('href') || ''
-    if (href.startsWith('#')) return
-    e.preventDefault()
-    e.stopImmediatePropagation()
-  }, true)
 })()
 `
 
 export default function TrailerModal({ trailerKey, title, onClose }) {
   const webviewRef = useRef(null)
+  const [currentSrc, setCurrentSrc] = useState(null)
+  const [statusMsg, setStatusMsg]   = useState('Loading trailer…')
+  const [failed, setFailed]         = useState(false)
+  const instanceIndexRef = useRef(-1)
+
+  const tryNextInstance = useCallback(() => {
+    const preferred = getInvidiousBase()
+    const list = [preferred, ...FALLBACK_INSTANCES.filter(i => i !== preferred)]
+    instanceIndexRef.current += 1
+    const idx = instanceIndexRef.current
+    if (idx >= list.length) {
+      setFailed(true)
+      setStatusMsg('All Invidious instances failed. Try setting a custom instance in Settings.')
+      return
+    }
+    const instance = list[idx]
+    const label = instance.replace(/^https?:\/\//, '')
+    setStatusMsg(idx === 0 ? 'Loading trailer…' : `Trying ${label}…`)
+    setCurrentSrc(`${instance}/embed/${trailerKey}?autoplay=1&listen=0`)
+  }, [trailerKey])
+
+  useEffect(() => {
+    instanceIndexRef.current = -1
+    tryNextInstance()
+  }, [tryNextInstance])
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose() }
@@ -206,71 +90,126 @@ export default function TrailerModal({ trailerKey, title, onClose }) {
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
+  // Open current video on Invidious in system browser
+  const openInBrowser = () => {
+    const preferred = getInvidiousBase()
+    const url = `${preferred}/watch?v=${trailerKey}`
+    window.electron?.openExternal(url)
+  }
+
   useEffect(() => {
     const wv = webviewRef.current
-    if (!wv) return
+    if (!wv || !currentSrc) return
 
-    const allowedUrl = `https://www.youtube.com/watch?v=${trailerKey}`
-
-    const injectAll = () => {
-      wv.insertCSS(HIDE_CSS).catch(() => { })
-      wv.executeJavaScript(CONSENT_REJECT_JS).catch(() => { })
-      wv.executeJavaScript(PLAYER_SETUP_JS).catch(() => { })
+    const onLoad = () => {
+      wv.executeJavaScript(DETECT_BOT_JS)
+        .then(isBot => {
+          if (isBot) {
+            tryNextInstance()
+          } else {
+            wv.executeJavaScript(SETUP_JS).catch(() => {})
+            setStatusMsg(null)
+          }
+        })
+        .catch(() => tryNextInstance())
     }
 
-    // Block navigation away from the video
+    const onFailLoad = () => { tryNextInstance() }
+
     const onWillNavigate = (e) => {
-      const target = e.url || ''
-      const isAllowed =
-        target.startsWith(allowedUrl) ||
-        target.includes('consent.youtube.com') ||
-        target.includes('accounts.google.com')
-      if (!isAllowed) {
+      const instanceBase = currentSrc.split('/embed/')[0]
+      if (!e.url.startsWith(instanceBase)) {
         e.preventDefault()
-        if (target.includes('youtube.com/watch')) onClose()
+        window.electron?.openExternal(e.url)
       }
     }
 
     const endedPoll = setInterval(() => {
-      wv.executeJavaScript('window.__trailerEnded === true')
-        .then((ended) => { if (ended) { clearInterval(endedPoll); onClose() } })
-        .catch(() => { })
-    }, 500)
+      wv.executeJavaScript('!!window.__trailerEnded')
+        .then(ended => {
+          if (ended) { clearInterval(endedPoll); setTimeout(onClose, 1200) }
+        })
+        .catch(() => {})
+    }, 800)
 
-    const onNavigate = () => { wv.executeJavaScript(CONSENT_REJECT_JS).catch(() => { }) }
-    const onLoad = () => { injectAll() }
-
-    wv.addEventListener('will-navigate', onWillNavigate)
-    wv.addEventListener('did-navigate', onNavigate)
-    wv.addEventListener('did-navigate-in-page', onNavigate)
     wv.addEventListener('did-finish-load', onLoad)
-
+    wv.addEventListener('did-fail-load', onFailLoad)
+    wv.addEventListener('will-navigate', onWillNavigate)
     return () => {
       clearInterval(endedPoll)
-      wv.removeEventListener('will-navigate', onWillNavigate)
       wv.removeEventListener('did-finish-load', onLoad)
-      wv.removeEventListener('did-navigate', onNavigate)
-      wv.removeEventListener('did-navigate-in-page', onNavigate)
+      wv.removeEventListener('did-fail-load', onFailLoad)
+      wv.removeEventListener('will-navigate', onWillNavigate)
     }
-  }, [onClose, trailerKey])
+  }, [currentSrc, tryNextInstance, onClose])
 
   return (
     <div className="trailer-overlay" onClick={onClose}>
       <div className="trailer-modal" onClick={e => e.stopPropagation()}>
         <div className="trailer-modal-header">
           <span className="trailer-modal-title">🎬 {title} — Official Trailer</span>
-          <button className="trailer-close-btn" onClick={onClose} title="Close">
-            <CloseIcon />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={openInBrowser}
+              title="Open in browser"
+              style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 6,
+                color: 'rgba(255,255,255,0.75)',
+                cursor: 'pointer',
+                fontSize: 12,
+                padding: '4px 10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              Open in Browser
+            </button>
+            <button className="trailer-close-btn" onClick={onClose} title="Close">
+              <CloseIcon />
+            </button>
+          </div>
         </div>
-        <div className="trailer-embed-wrap">
-          <webview
-            ref={webviewRef}
-            src={`https://www.youtube.com/watch?v=${trailerKey}`}
-            partition="persist:trailer"
-            allowpopups="false"
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
-          />
+        <div className="trailer-embed-wrap" style={{ background: '#000', position: 'relative' }}>
+          {(statusMsg || failed) && (
+            <div style={{
+              position: 'absolute', inset: 0, zIndex: 2,
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              background: '#000',
+              color: failed ? '#ff3860' : 'rgba(255,255,255,0.6)',
+              fontSize: 14, textAlign: 'center', padding: '0 32px', gap: 10,
+            }}>
+              {failed
+                ? <><span style={{ fontSize: 28 }}>⚠</span><span>{statusMsg}</span></>
+                : <><span style={{ opacity: 0.5 }}>⏳</span><span>{statusMsg}</span></>
+              }
+            </div>
+          )}
+
+          {currentSrc && (
+            <webview
+              ref={webviewRef}
+              src={currentSrc}
+              partition="persist:trailer"
+              allowpopups="false"
+              style={{
+                position: 'absolute', inset: 0,
+                width: '100%', height: '100%',
+                border: 'none',
+                opacity: statusMsg ? 0 : 1,
+                transition: 'opacity 0.2s',
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
