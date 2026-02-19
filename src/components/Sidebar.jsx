@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { imgUrl } from '../utils/api'
 import {
   StreambertLogo, HomeIcon, SearchIcon, HistoryIcon,
-  FilmIcon, SettingsIcon, DownloadsQueueIcon,
+  FilmIcon, SettingsIcon, DownloadsQueueIcon, QuitIcon, BackIcon,
 } from './Icons'
 
 export default function Sidebar({ page, onNavigate, onSearch, savedList, activeDownloads, onReorderSaved, canGoBack, onBack }) {
@@ -112,6 +112,15 @@ export default function Sidebar({ page, onNavigate, onSearch, savedList, activeD
 
       <div className="sidebar-bottom">
         <SideBtn active={page === 'settings'} onClick={() => onNavigate('settings')} icon={<SettingsIcon />} label="Settings" />
+        <button
+          className="sidebar-btn"
+          onClick={() => window.electron?.quitApp?.()}
+          title="Quit App"
+          style={{ color: '#e53e3e', marginTop: 4 }}
+        >
+          <QuitIcon />
+          <span className="tooltip">Quit App</span>
+        </button>
       </div>
     </div>
   )
@@ -134,14 +143,5 @@ function SideBtn({ active, onClick, icon, label, badge }) {
         </span>
       )}
     </button>
-  )
-}
-
-function BackIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="15 18 9 12 15 6" />
-    </svg>
   )
 }

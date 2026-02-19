@@ -28,6 +28,9 @@ contextBridge.exposeInMainWorld('electron', {
   offConfirmClose: (h) => ipcRenderer.removeListener('confirm-close', h),
   respondClose: (confirm) => ipcRenderer.send('close-response', confirm),
 
+  // Quit app
+  quitApp: () => ipcRenderer.invoke('quit-app'),
+
   // Storage cleaning
   clearAppCache: () => ipcRenderer.invoke('clear-app-cache'),
   clearWatchData: () => ipcRenderer.invoke('clear-watch-data'),

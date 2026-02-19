@@ -531,6 +531,11 @@ ipcMain.handle('delete-all-downloads', async () => {
   }
 })
 
+// ── IPC: Quit app ─────────────────────────
+ipcMain.handle('quit-app', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close()
+})
+
 // ── IPC: Full app reset ───────────────────────────────────────────────────────
 ipcMain.handle('reset-app', async () => {
   try {
