@@ -214,7 +214,7 @@ export default function TVPage({
             <div className="detail-content">
               <div className="detail-poster">
                 {d.poster_path
-                  ? <img src={imgUrl(d.poster_path)} alt={title} />
+                  ? <img src={imgUrl(d.poster_path)} alt={title} loading="lazy" />
                   : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}><TVIcon /></div>
                 }
               </div>
@@ -273,7 +273,8 @@ export default function TVPage({
                 <webview
                   src={videasyTVUrl(item.id, selectedSeason, selectedEp.episode_number)}
                   partition="persist:videasy"
-                  allowpopups="true"
+                  allowpopups="false"
+                  sandbox="allow-scripts allow-same-origin allow-forms"
                   style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
                 />
                 <button className="player-overlay-btn" onClick={() => setShowDownload(true)} title="Download">

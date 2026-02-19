@@ -5,8 +5,9 @@ export const imgUrl = (path, size = 'w500') =>
   path ? `${IMG_BASE}/${size}${path}` : null
 
 export const tmdbFetch = async (path, apiKey) => {
-  const sep = path.includes('?') ? '&' : '?'
-  const res = await fetch(`${TMDB_BASE}${path}${sep}api_key=${apiKey}`)
+  const res = await fetch(`${TMDB_BASE}${path}`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  })
   if (!res.ok) throw new Error(`TMDB ${res.status}`)
   return res.json()
 }

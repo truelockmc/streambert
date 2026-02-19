@@ -173,7 +173,7 @@ export default function App() {
   const saveApiKey = (key) => { storage.set('apikey', key); setApiKey(key) }
 
   const changeApiKey = () => {
-    if (confirm('Reset TMDB API key?')) { storage.remove('apikey'); setApiKey(null) }
+    if (confirm('Reset TMDB API Read Access Token?')) { storage.remove('apikey'); setApiKey(null) }
   }
 
   const toggleSave = useCallback((item) => {
@@ -237,6 +237,7 @@ export default function App() {
     // the progress object from when the interval was created, overwriting
     // saves from other episodes (classic stale closure bug).
     setProgress(prev => {
+      if (prev[key] === pct) return prev // no change — skip write
       const next = { ...prev, [key]: pct }
       storage.set('progress', next)
       return next

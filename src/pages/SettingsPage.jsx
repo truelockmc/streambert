@@ -199,9 +199,9 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
           App configuration for Streambert
         </div>
 
-        {/* ── TMDB API Key ── */}
+        {/* ── TMDB API Key/Read Access Token ── */}
         <div style={{ marginBottom: 40 }}>
-          <div className="settings-section-title">TMDB API Key</div>
+          <div className="settings-section-title">TMDB Read Access Token</div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <code style={{
               fontSize: 13, color: 'var(--text2)',
@@ -210,7 +210,7 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
             }}>
               {apiKey ? apiKey.slice(0, 8) + '••••••••••••••••' : '(not set)'}
             </code>
-            <button className="btn btn-ghost" onClick={onChangeApiKey}>Change API Key</button>
+            <button className="btn btn-ghost" onClick={onChangeApiKey}>Change API Token</button>
           </div>
         </div>
 
@@ -340,7 +340,7 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
                   </span>
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text3)', lineHeight: 1.6 }}>
-                  Completely resets Streambert to factory defaults, clears all settings, API key,
+                  Completely resets Streambert to factory defaults, clears all settings, API Token,
                   saved library, watch history/progress, and all cached data. Your downloaded
                   video files will not be touched.
                 </div>

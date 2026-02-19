@@ -47,7 +47,7 @@ export default function MoviePage({
           videos.find(v => v.site === 'YouTube')
         if (trailer) setTrailerKey(trailer.key)
       })
-      .catch(() => {})
+      .catch(() => { })
   }, [item.id, apiKey])
 
   useEffect(() => {
@@ -120,7 +120,7 @@ export default function MoviePage({
         <div className="detail-content">
           <div className="detail-poster" style={{ position: 'relative' }}>
             {d.poster_path
-              ? <img src={imgUrl(d.poster_path)} alt={title} />
+              ? <img src={imgUrl(d.poster_path)} alt={title} loading="lazy" />
               : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}><FilmIcon /></div>
             }
             {isWatched && (
@@ -184,7 +184,8 @@ export default function MoviePage({
             <webview
               src={videasyMovieUrl(item.id)}
               partition="persist:videasy"
-              allowpopups="true"
+              allowpopups="false"
+              sandbox="allow-scripts allow-same-origin allow-forms"
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
             />
             <button className="player-overlay-btn" onClick={() => setShowDownload(true)} title="Download">

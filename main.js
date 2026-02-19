@@ -164,30 +164,27 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'dist/index.html'))
 
   // Intercept close — ask user if downloads are running
+  let closeResponsePending = false
+
   mainWindow.on('close', (e) => {
     const running = downloads.filter(d => d.status === 'downloading')
     if (running.length === 0) return // no downloads, close normally
 
     e.preventDefault()
+    if (closeResponsePending) return // already waiting for a response, don't stack
+
+    closeResponsePending = true
     mainWindow.webContents.send('confirm-close', { count: running.length })
   })
 
-  // Response from renderer modal
-  ipcMain.once('close-response', (_, confirmed) => {
+  // Single persistent listener, never re-registers
+  ipcMain.on('close-response', (_, confirmed) => {
+    closeResponsePending = false
     if (confirmed) {
       killAllDownloads()
       mainWindow.destroy()
     }
-    // else: stay open — re-arm for next close attempt
-    mainWindow.on('close', (e) => {
-      const running = downloads.filter(d => d.status === 'downloading')
-      if (running.length === 0) return
-      e.preventDefault()
-      mainWindow.webContents.send('confirm-close', { count: running.length })
-      ipcMain.once('close-response', (_, confirmed) => {
-        if (confirmed) { killAllDownloads(); mainWindow.destroy() }
-      })
-    })
+    // else: stay open
   })
 
   mainWindow.on('closed', () => {
