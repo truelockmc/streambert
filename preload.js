@@ -18,7 +18,6 @@ contextBridge.exposeInMainWorld('electron', {
   fileExists: (path) => ipcRenderer.invoke('file-exists', path),
   scanDirectory: (path) => ipcRenderer.invoke('scan-directory', path),
 
-
   // Misc
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
@@ -28,4 +27,10 @@ contextBridge.exposeInMainWorld('electron', {
   onConfirmClose: (cb) => { const h = (_, data) => cb(data); ipcRenderer.on('confirm-close', h); return h },
   offConfirmClose: (h) => ipcRenderer.removeListener('confirm-close', h),
   respondClose: (confirm) => ipcRenderer.send('close-response', confirm),
+
+  // Storage cleaning
+  clearAppCache: () => ipcRenderer.invoke('clear-app-cache'),
+  clearWatchData: () => ipcRenderer.invoke('clear-watch-data'),
+  deleteAllDownloads: () => ipcRenderer.invoke('delete-all-downloads'),
+  resetApp: () => ipcRenderer.invoke('reset-app'),
 })

@@ -481,3 +481,73 @@ ipcMain.handle('scan-directory', (_, folderPath) => {
     return results
   } catch { return [] }
 })
+
+// ── IPC: Clear browser cache ──────────────────────────────────────────────────
+ipcMain.handle('clear-app-cache', async () => {
+  try {
+    const sessions = [
+      session.defaultSession,
+      session.fromPartition('persist:videasy'),
+      session.fromPartition('persist:trailer'),
+    ]
+    await Promise.all(sessions.map(s => s.clearCache()))
+    await Promise.all(sessions.map(s => s.clearStorageData({
+      storages: ['shadercache', 'serviceworkers', 'cachestorage']
+    })))
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+})
+
+// ── IPC: Clear watch progress & videasy partition data ────────────────────────
+ipcMain.handle('clear-watch-data', async () => {
+  try {
+    const videasySession = session.fromPartition('persist:videasy')
+    await videasySession.clearStorageData()
+    await videasySession.clearCache()
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+})
+
+// ── IPC: Delete all downloads (files + registry) ──────────────────────────────
+ipcMain.handle('delete-all-downloads', async () => {
+  try {
+    let deleted = 0, errors = 0
+    for (const dl of downloads) {
+      if (dl.filePath) {
+        try {
+          if (fs.existsSync(dl.filePath)) { fs.unlinkSync(dl.filePath); deleted++ }
+        } catch { errors++ }
+      }
+    }
+    downloads = []
+    saveDownloads()
+    return { ok: true, deleted, errors }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+})
+
+// ── IPC: Full app reset ───────────────────────────────────────────────────────
+ipcMain.handle('reset-app', async () => {
+  try {
+    const sessions = [
+      session.defaultSession,
+      session.fromPartition('persist:videasy'),
+      session.fromPartition('persist:trailer'),
+    ]
+    await Promise.all(sessions.map(s => s.clearStorageData()))
+    await Promise.all(sessions.map(s => s.clearCache()))
+
+    const dlFile = downloadsFile()
+    if (fs.existsSync(dlFile)) fs.unlinkSync(dlFile)
+    downloads = []
+
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+})
