@@ -108,35 +108,58 @@ function createWindow() {
     callback({ responseHeaders: headers })
   })
 
-function cleanupTempFiles(downloadPath) {
-  if (!downloadPath) return
-  const TEMP_PATTERNS = [/\.part$/, /\.part\.\d+$/, /\.part\.tmp$/, /\.tmp$/, /\.ytdl$/, /\.part-Frag\d+$/]
-  try {
-    const entries = fs.readdirSync(downloadPath)
-    for (const entry of entries) {
-      if (TEMP_PATTERNS.some(p => p.test(entry))) {
-        try { fs.unlinkSync(path.join(downloadPath, entry)) } catch { }
-      }
-    }
-  } catch { }
-}
-
-function killAllDownloads() {
-  for (const [id, proc] of activeProcs.entries()) {
-    try { proc.kill('SIGKILL') } catch { }
-    // Mark as error in store
-    const idx = downloads.findIndex(d => d.id === id)
-    if (idx !== -1) {
-      downloads[idx].status = 'error'
-      downloads[idx].lastMessage = 'Cancelled on exit'
-    }
-    activeProcs.delete(id)
+  // Pre-set YouTube consent cookie so tracking/cookie consent popup never appears
+  // "SOCS=CAI" is the minimal value
+  // YouTube recognises as "reject non-essential cookies", should supress Consent-Gate
+  const youtubeDomains = ['.youtube.com', '.youtube-nocookie.com']
+  for (const domain of youtubeDomains) {
+    trailerSession.cookies.set({
+      url: 'https://www.youtube.com',
+      domain,
+      name: 'SOCS',
+      value: 'CAI',
+      path: '/',
+      secure: true,
+      httpOnly: false,
+      expirationDate: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365 * 2, // 2 years
+      sameSite: 'no_restriction',
+    }).catch(() => { })
   }
-  // Clean up temp files for all known download folders
-  const folders = new Set(downloads.map(d => d.downloadPath).filter(Boolean))
-  for (const folder of folders) cleanupTempFiles(folder)
-  saveDownloads()
-}
+
+  function cleanupTempFiles(downloadPath) {
+    if (!downloadPath) return
+    const TEMP_PATTERNS = [/\.part$/, /\.part\.\d+$/, /\.part\.tmp$/, /\.tmp$/, /\.ytdl$/, /\.part-Frag\d+$/]
+    try {
+      const entries = fs.readdirSync(downloadPath)
+      for (const entry of entries) {
+        if (TEMP_PATTERNS.some(p => p.test(entry))) {
+          try { fs.unlinkSync(path.join(downloadPath, entry)) } catch { }
+        }
+      }
+    } catch { }
+  }
+
+  function killAllDownloads() {
+    for (const [id, proc] of activeProcs.entries()) {
+      try { proc.kill('SIGKILL') } catch { }
+      // Mark as error in store
+      const idx = downloads.findIndex(d => d.id === id)
+      if (idx !== -1) {
+        downloads[idx].status = 'error'
+        downloads[idx].lastMessage = 'Cancelled on exit'
+      }
+      activeProcs.delete(id)
+    }
+    // Clean up temp files for all known download folders
+    const folders = new Set(downloads.map(d => d.downloadPath).filter(Boolean))
+    for (const folder of folders) cleanupTempFiles(folder)
+    saveDownloads()
+  }
+
+  // Block any popup windows spawned by webviews in trailer view
+  mainWindow.webContents.on('did-attach-webview', (_, webviewContents) => {
+    webviewContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  })
 
   mainWindow.loadFile(path.join(__dirname, 'dist/index.html'))
 
