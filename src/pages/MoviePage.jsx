@@ -31,6 +31,10 @@ export default function MoviePage({
 
   // Ref to prevent double-marking
   const autoMarkedRef = useRef(false)
+  // Tracks last known playback position — used to detect resolution-change resets
+  const lastKnownTimeRef = useRef(0)
+  // Timestamp until which we ignore reset detection (post-seekback cooldown)
+  const seekBackCooldownRef = useRef(0)
 
   useEffect(() => {
     tmdbFetch(`/movie/${item.id}`, apiKey)
@@ -61,6 +65,8 @@ export default function MoviePage({
   // Reset auto-mark guard when a new movie loads or watched state resets
   useEffect(() => {
     autoMarkedRef.current = false
+    lastKnownTimeRef.current = 0
+    seekBackCooldownRef.current = 0
   }, [item.id, isWatched])
 
   // ── Auto-track progress + auto-watched every 5s ──────────────────────────
@@ -76,15 +82,60 @@ export default function MoviePage({
             (() => {
               const v = document.querySelector('video')
               if (!v || !v.duration || v.duration === Infinity || v.paused) return null
-              return { currentTime: v.currentTime, duration: v.duration }
+              // Re-attach seek tracker if video element was recreated (e.g. quality change)
+              if (!v._seekTracked) {
+                v._seekTracked = true
+                v.addEventListener('seeked', () => {
+                  v._lastUserSeek = Date.now()
+                  v._lastUserSeekTo = v.currentTime
+                })
+              }
+              return {
+                currentTime: v.currentTime,
+                duration: v.duration,
+                recentUserSeek: v._lastUserSeek ? (Date.now() - v._lastUserSeek < 6000) : false,
+                lastUserSeekTo: v._lastUserSeekTo ?? null,
+              }
             })()
           `)
           if (result && result.duration > 0) {
-            const p = Math.floor((result.currentTime / result.duration) * 100)
-            if (p > 1) saveProgress(progressKey, Math.min(p, 100))
+            const ct = result.currentTime
+
+            // ── Resolution-change reset detection ──────────────────────────
+            // Videasy resets to 0 on quality change. We only seek back if:
+            // - ct is near zero (≤5s)
+            // - we were well into the video (>30s)
+            // - the user did NOT manually seek in the last 6s
+            const now = Date.now()
+            if (lastKnownTimeRef.current > 30 && ct <= 5 && !result.recentUserSeek) {
+              if (now > seekBackCooldownRef.current) {
+                // First reset: seek back and start cooldown
+                const seekTo = lastKnownTimeRef.current
+                seekBackCooldownRef.current = now + 8000
+                try {
+                  await wv.executeJavaScript(`
+                    (() => {
+                      const v = document.querySelector('video')
+                      if (v) v.currentTime = ${seekTo}
+                    })()
+                  `)
+                } catch { }
+              }
+              // In both cases (first reset or cooldown): skip progress save with wrong position
+              return
+            }
+
+            // If user seeked, update ref to their chosen position immediately
+            if (result.recentUserSeek && result.lastUserSeekTo !== null) {
+              lastKnownTimeRef.current = result.lastUserSeekTo
+            } else {
+              lastKnownTimeRef.current = ct
+            }
+            const p = Math.floor((ct / result.duration) * 100)
+            saveProgress(progressKey, Math.min(p, 100))
 
             // Auto-mark watched when remaining time ≤ threshold
-            const remaining = result.duration - result.currentTime
+            const remaining = result.duration - ct
             if (!autoMarkedRef.current && remaining <= watchedThreshold && remaining >= 0) {
               autoMarkedRef.current = true
               onMarkWatched?.(progressKey)
