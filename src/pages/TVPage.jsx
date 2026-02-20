@@ -703,129 +703,149 @@ export default function TVPage({
             )}
             {!loadingSeason && seasonData?.episodes && (
               <div className="episodes-grid">
-                {seasonData.episodes.map((ep) => {
-                  const pk = `tv_${item.id}_s${selectedSeason}e${ep.episode_number}`;
-                  const epPct = progress[pk] || 0;
-                  const epWatched = !!watched?.[pk];
-                  const isPlaying =
-                    playing && selectedEp?.episode_number === ep.episode_number;
-                  const epDownload = (downloads || []).find(
-                    (dl) =>
-                      dl.mediaType === "tv" &&
-                      (dl.tmdbId === item.id || dl.mediaId === item.id) &&
-                      dl.season === selectedSeason &&
-                      dl.episode === ep.episode_number &&
-                      (dl.status === "completed" ||
-                        dl.status === "local" ||
-                        dl.status === "downloading"),
-                  );
-                  return (
-                    <div
-                      key={ep.episode_number}
-                      className={`episode-card ${isPlaying ? "playing" : ""} ${epWatched ? "ep-watched" : ""} ${restricted ? "episode-card--restricted" : ""}`}
-                      onClick={() => (restricted ? null : playEpisode(ep))}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (!restricted)
-                          setEpMenu({ x: e.clientX, y: e.clientY, pk });
-                      }}
-                    >
-                      <div className="episode-thumb">
-                        {ep.still_path ? (
-                          <img
-                            src={imgUrl(ep.still_path, "w300")}
-                            alt={ep.name}
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "var(--text3)",
-                            }}
-                          >
-                            <PlayIcon />
-                          </div>
-                        )}
-                        {restricted ? (
-                          <div className="episode-restricted-overlay">
-                            🔒<span>Inappropriate for your age</span>
-                          </div>
-                        ) : isPlaying ? (
-                          <div className="episode-playing-badge">
-                            <span className="episode-playing-dot" />
-                            Playing
-                          </div>
-                        ) : (
-                          <div className="episode-thumb-play">
-                            <PlayIcon />
-                          </div>
-                        )}
-                      </div>
-                      <div className="episode-info">
-                        <div
-                          className="episode-num"
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 5,
-                          }}
-                        >
-                          E{ep.episode_number}
-                          {epWatched && <WatchedIcon size={14} />}
-                          {epDownload && (
-                            <span
-                              className="ep-downloaded-badge"
-                              title={
-                                epDownload.status === "downloading"
-                                  ? "Downloading… – click to view in Downloads"
-                                  : "Downloaded – click to view in Downloads"
-                              }
+                {(() => {
+                  // Compute today once, outside the per-episode loop
+                  const todayEp = new Date();
+                  todayEp.setHours(0, 0, 0, 0);
+                  return seasonData.episodes.map((ep) => {
+                    const pk = `tv_${item.id}_s${selectedSeason}e${ep.episode_number}`;
+                    const epPct = progress[pk] || 0;
+                    const epWatched = !!watched?.[pk];
+                    const isPlaying =
+                      playing &&
+                      selectedEp?.episode_number === ep.episode_number;
+
+                    // Unreleased: only if air_date exists and is strictly in the future
+                    const epUnreleased = ep.air_date
+                      ? new Date(ep.air_date) > todayEp
+                      : false;
+                    const epDownload = (downloads || []).find(
+                      (dl) =>
+                        dl.mediaType === "tv" &&
+                        (dl.tmdbId === item.id || dl.mediaId === item.id) &&
+                        dl.season === selectedSeason &&
+                        dl.episode === ep.episode_number &&
+                        (dl.status === "completed" ||
+                          dl.status === "local" ||
+                          dl.status === "downloading"),
+                    );
+                    return (
+                      <div
+                        key={ep.episode_number}
+                        className={`episode-card ${isPlaying ? "playing" : ""} ${epWatched ? "ep-watched" : ""} ${restricted ? "episode-card--restricted" : ""} ${epUnreleased ? "episode-card--unreleased" : ""}`}
+                        onClick={() =>
+                          restricted || epUnreleased ? null : playEpisode(ep)
+                        }
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!restricted && !epUnreleased)
+                            setEpMenu({ x: e.clientX, y: e.clientY, pk });
+                        }}
+                        style={epUnreleased ? { cursor: "default" } : undefined}
+                      >
+                        <div className="episode-thumb">
+                          {ep.still_path ? (
+                            <img
+                              src={imgUrl(ep.still_path, "w300")}
+                              alt={ep.name}
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div
                               style={{
-                                borderColor:
-                                  epDownload.status === "downloading"
-                                    ? "rgba(229,9,20,0.5)"
-                                    : "rgba(72,199,116,0.5)",
-                                color:
-                                  epDownload.status === "downloading"
-                                    ? "var(--red)"
-                                    : "#4caf50",
-                                background:
-                                  epDownload.status === "downloading"
-                                    ? "rgba(229,9,20,0.12)"
-                                    : "rgba(72,199,116,0.18)",
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onGoToDownloads?.(epDownload.id);
+                                width: "100%",
+                                height: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "var(--text3)",
                               }}
                             >
-                              {epDownload.status === "downloading" ? "↓" : "↓"}
-                            </span>
+                              <PlayIcon />
+                            </div>
+                          )}
+                          {restricted ? (
+                            <div className="episode-restricted-overlay">
+                              🔒<span>Inappropriate for your age</span>
+                            </div>
+                          ) : epUnreleased ? (
+                            <div className="episode-restricted-overlay">
+                              🔒<span>Unreleased</span>
+                            </div>
+                          ) : isPlaying ? (
+                            <div className="episode-playing-badge">
+                              <span className="episode-playing-dot" />
+                              Playing
+                            </div>
+                          ) : (
+                            <div className="episode-thumb-play">
+                              <PlayIcon />
+                            </div>
                           )}
                         </div>
-                        <div className="episode-name">{ep.name}</div>
-                        <EpisodeDesc
-                          overview={ep.overview}
-                          episodeName={ep.name}
-                        />
-                        {!epWatched && epPct > 0 && (
-                          <div className="episode-progress-bar">
-                            <div
-                              className="episode-progress-fill"
-                              style={{ width: `${Math.min(epPct, 100)}%` }}
-                            />
+                        <div className="episode-info">
+                          <div
+                            className="episode-num"
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 5,
+                            }}
+                          >
+                            E{ep.episode_number}
+                            {epWatched && <WatchedIcon size={14} />}
+                            {epDownload && (
+                              <span
+                                className="ep-downloaded-badge"
+                                title={
+                                  epDownload.status === "downloading"
+                                    ? "Downloading… – click to view in Downloads"
+                                    : "Downloaded – click to view in Downloads"
+                                }
+                                style={{
+                                  borderColor:
+                                    epDownload.status === "downloading"
+                                      ? "rgba(229,9,20,0.5)"
+                                      : "rgba(72,199,116,0.5)",
+                                  color:
+                                    epDownload.status === "downloading"
+                                      ? "var(--red)"
+                                      : "#4caf50",
+                                  background:
+                                    epDownload.status === "downloading"
+                                      ? "rgba(229,9,20,0.12)"
+                                      : "rgba(72,199,116,0.18)",
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onGoToDownloads?.(epDownload.id);
+                                }}
+                              >
+                                {epDownload.status === "downloading"
+                                  ? "↓"
+                                  : "↓"}
+                              </span>
+                            )}
                           </div>
-                        )}
+                          <div className="episode-name">{ep.name}</div>
+                          <EpisodeDesc
+                            overview={ep.overview}
+                            episodeName={ep.name}
+                          />
+                          {!epWatched && epPct > 0 && (
+                            <div className="episode-progress-bar">
+                              <div
+                                className="episode-progress-fill"
+                                style={{ width: `${Math.min(epPct, 100)}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
             )}
           </div>

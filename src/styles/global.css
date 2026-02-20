@@ -2265,3 +2265,52 @@ kbd {
     color: rgba(255, 107, 107, 0.85);
     letter-spacing: 0.2px;
 }
+
+.card--unreleased .card-poster {
+    opacity: 0.55;
+    filter: grayscale(40%);
+}
+
+.card-unreleased-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+    gap: 6px;
+}
+
+.card-unreleased-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffd700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 4px 10px;
+    border-radius: 6px;
+}
+
+.card-badge--unreleased {
+    background: #7c5c00;
+    color: #ffd700;
+    border-color: rgba(255, 215, 0, 0.35);
+}
+
+.episode-card--unreleased {
+    cursor: default !important;
+}
+
+.episode-card--unreleased .episode-thumb {
+    opacity: 0.6;
+    filter: grayscale(40%);
+}
+
+.episode-card--unreleased .episode-num,
+.episode-card--unreleased .episode-name,
+.episode-card--unreleased .episode-desc-wrap,
+.episode-card--unreleased .episode-progress-bar {
+    opacity: 0.6;
+}

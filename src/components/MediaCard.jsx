@@ -23,6 +23,12 @@ export default function MediaCard({
   const year = (item.release_date || item.first_air_date || "").slice(0, 4);
   const isTV = item.media_type === "tv";
 
+  // Unreleased detection
+  const rawDate = item.release_date || item.first_air_date;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isUnreleased = rawDate ? new Date(rawDate) > today : false;
+
   // Build watched key – for TV cards from Continue Watching we get season/episode
   const watchedKey = isTV
     ? item.season != null && item.episode != null
@@ -74,9 +80,9 @@ export default function MediaCard({
   return (
     <>
       <div
-        className={`card${isWatched ? " ep-watched" : ""}`}
+        className={`card${isWatched ? " ep-watched" : ""}${isUnreleased ? " card--unreleased" : ""}`}
         onClick={onClick}
-        onContextMenu={openMenu}
+        onContextMenu={isUnreleased ? undefined : openMenu}
       >
         <div className="card-poster">
           {item.poster_path ? (
@@ -107,11 +113,17 @@ export default function MediaCard({
           )}
 
           <div className="card-overlay">
-            <div className="card-play">
-              <PlayIcon />
-            </div>
+            {isUnreleased ? (
+              <div className="card-unreleased-overlay">
+                <span className="card-unreleased-label">🔒 Unreleased</span>
+              </div>
+            ) : (
+              <div className="card-play">
+                <PlayIcon />
+              </div>
+            )}
           </div>
-          {progress > 0 && !isWatched && (
+          {!isUnreleased && progress > 0 && !isWatched && (
             <div className="card-progress">
               <div
                 className="card-progress-fill"
@@ -119,7 +131,7 @@ export default function MediaCard({
               />
             </div>
           )}
-          {isWatched && (
+          {!isUnreleased && isWatched && (
             <div className="card-watched-badge">
               <WatchedIcon size={26} />
             </div>
@@ -133,7 +145,11 @@ export default function MediaCard({
             {year} · {isTV ? "Series" : "Movie"}
           </div>
         </div>
-        <span className="card-badge">{isTV ? "TV" : "HD"}</span>
+        <span
+          className={`card-badge${isUnreleased ? " card-badge--unreleased" : ""}`}
+        >
+          {isUnreleased ? "SOON" : isTV ? "TV" : "HD"}
+        </span>
       </div>
 
       {menu && (

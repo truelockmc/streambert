@@ -212,6 +212,13 @@ export default function MoviePage({
   const year = (d.release_date || "").slice(0, 4);
   const mediaName = `${title}${year ? " (" + year + ")" : ""}`;
 
+  // Unreleased detection
+  const todayMovie = new Date();
+  todayMovie.setHours(0, 0, 0, 0);
+  const isUnreleased = d.release_date
+    ? new Date(d.release_date) > todayMovie
+    : false;
+
   // Check if this movie is already downloaded or currently downloading
   const movieDownload = (downloads || []).find(
     (dl) =>
@@ -307,7 +314,15 @@ export default function MoviePage({
             )}
             <p className="detail-overview">{d.overview}</p>
             <div className="detail-actions">
-              {restricted ? (
+              {isUnreleased ? (
+                <button
+                  className="btn btn-primary btn-restricted"
+                  disabled
+                  title="This movie has not been released yet"
+                >
+                  🔒 Unreleased
+                </button>
+              ) : restricted ? (
                 <button
                   className="btn btn-primary btn-restricted"
                   disabled
@@ -364,7 +379,7 @@ export default function MoviePage({
         </div>
       </div>
 
-      {playing && !restricted && (
+      {playing && !restricted && !isUnreleased && (
         <div className="section">
           <div className="player-wrap">
             <webview
