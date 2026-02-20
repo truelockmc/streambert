@@ -886,6 +886,64 @@ body,
     background: var(--red-dim);
 }
 
+.episode-playing-badge {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-radius: 5px;
+}
+
+.episode-playing-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--red);
+    display: inline-block;
+    animation: playing-pulse 1.1s ease-in-out infinite;
+    flex-shrink: 0;
+}
+
+@keyframes playing-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.45;
+        transform: scale(0.75);
+    }
+}
+
+/* Season button – fully watched */
+.season-btn.season-watched {
+    border-color: rgba(72, 199, 116, 0.6);
+    color: rgb(72, 199, 116);
+}
+
+.season-btn.season-watched.active {
+    background: rgba(72, 199, 116, 0.85);
+    border-color: rgba(72, 199, 116, 0.85);
+    color: #fff;
+}
+
+.season-watched-icon {
+    margin-right: 4px;
+    font-size: 11px;
+    opacity: 0.9;
+}
+
 .episode-thumb {
     width: 110px;
     flex-shrink: 0;

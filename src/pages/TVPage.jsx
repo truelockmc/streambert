@@ -35,6 +35,33 @@ function EpisodeContextMenu({ x, y, isWatched, onMarkWatched, onMarkUnwatched, o
   )
 }
 
+// Small context menu for season buttons
+function SeasonContextMenu({ x, y, isWatched, onMarkWatched, onMarkUnwatched, onClose }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    const close = () => onClose()
+    window.addEventListener('click', close)
+    window.addEventListener('contextmenu', close)
+    return () => {
+      window.removeEventListener('click', close)
+      window.removeEventListener('contextmenu', close)
+    }
+  }, [])
+  return (
+    <div
+      ref={ref}
+      className="context-menu"
+      style={{ top: y, left: x }}
+      onClick={e => e.stopPropagation()}
+    >
+      {isWatched
+        ? <button className="context-menu-item" onClick={e => { e.stopPropagation(); onMarkUnwatched(); onClose() }}>↩ Mark Season as Unwatched</button>
+        : <button className="context-menu-item" onClick={e => { e.stopPropagation(); onMarkWatched(); onClose() }}>✓ Mark Season as Watched</button>
+      }
+    </div>
+  )
+}
+
 // Expandable episode description
 function EpisodeDesc({ overview, episodeName }) {
   const [open, setOpen] = useState(false)
@@ -90,6 +117,38 @@ export default function TVPage({
     () => storage.get('downloaderFolder') || ''
   )
   const [epMenu, setEpMenu] = useState(null) // { x, y, pk }
+  const [seasonMenu, setSeasonMenu] = useState(null) // { x, y, seasonNum }
+
+  // Check if all episodes of a season are watched
+  const isSeasonWatched = (seasonNum) => {
+    const seasonInfo = seasons.find(s => s.season_number === seasonNum)
+    const count = seasonNum === selectedSeason
+      ? (seasonData?.episodes?.length || seasonInfo?.episode_count || 0)
+      : (seasonInfo?.episode_count || 0)
+    if (!count) return false
+    for (let i = 1; i <= count; i++) {
+      if (!watched?.[`tv_${item.id}_s${seasonNum}e${i}`]) return false
+    }
+    return true
+  }
+
+  const markSeasonWatched = (seasonNum) => {
+    const seasonInfo = seasons.find(s => s.season_number === seasonNum)
+    const episodes = seasonNum === selectedSeason ? seasonData?.episodes : null
+    const count = episodes?.length || seasonInfo?.episode_count || 0
+    for (let i = 1; i <= count; i++) {
+      onMarkWatched?.(`tv_${item.id}_s${seasonNum}e${i}`)
+    }
+  }
+
+  const markSeasonUnwatched = (seasonNum) => {
+    const seasonInfo = seasons.find(s => s.season_number === seasonNum)
+    const episodes = seasonNum === selectedSeason ? seasonData?.episodes : null
+    const count = episodes?.length || seasonInfo?.episode_count || 0
+    for (let i = 1; i <= count; i++) {
+      onMarkUnwatched?.(`tv_${item.id}_s${seasonNum}e${i}`)
+    }
+  }
 
   // Read threshold from settings (default 20s)
   const watchedThreshold = storage.get('watchedThreshold') ?? 20
@@ -347,13 +406,24 @@ export default function TVPage({
             <div className="section-title">Episodes</div>
             {seasons.length > 0 && (
               <div className="season-selector">
-                {seasons.map(s => (
-                  <button key={s.season_number}
-                    className={`season-btn ${selectedSeason === s.season_number ? 'active' : ''}`}
-                    onClick={() => setSelectedSeason(s.season_number)}>
-                    Season {s.season_number}
-                  </button>
-                ))}
+                {seasons.map(s => {
+                  const sw = isSeasonWatched(s.season_number)
+                  return (
+                    <button key={s.season_number}
+                      className={`season-btn ${selectedSeason === s.season_number ? 'active' : ''} ${sw ? 'season-watched' : ''}`}
+                      onClick={() => setSelectedSeason(s.season_number)}
+                      onContextMenu={e => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setSeasonMenu({ x: e.clientX, y: e.clientY, seasonNum: s.season_number })
+                      }}
+                      title="Right-click to mark season as watched/unwatched"
+                    >
+                      {sw && <span className="season-watched-icon">✓</span>}
+                      Season {s.season_number}
+                    </button>
+                  )
+                })}
               </div>
             )}
             {loadingSeason && <div className="loader"><div className="spinner" /></div>}
@@ -380,7 +450,10 @@ export default function TVPage({
                           ? <img src={imgUrl(ep.still_path, 'w300')} alt={ep.name} loading="lazy" />
                           : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)' }}><PlayIcon /></div>
                         }
-                        <div className="episode-thumb-play"><PlayIcon /></div>
+                        {isPlaying
+                          ? <div className="episode-playing-badge"><span className="episode-playing-dot" />Playing</div>
+                          : <div className="episode-thumb-play"><PlayIcon /></div>
+                        }
                       </div>
                       <div className="episode-info">
                         <div className="episode-num" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -420,6 +493,17 @@ export default function TVPage({
           onMarkWatched={() => onMarkWatched?.(epMenu.pk)}
           onMarkUnwatched={() => onMarkUnwatched?.(epMenu.pk)}
           onClose={() => setEpMenu(null)}
+        />
+      )}
+
+      {seasonMenu && (
+        <SeasonContextMenu
+          x={seasonMenu.x}
+          y={seasonMenu.y}
+          isWatched={isSeasonWatched(seasonMenu.seasonNum)}
+          onMarkWatched={() => markSeasonWatched(seasonMenu.seasonNum)}
+          onMarkUnwatched={() => markSeasonUnwatched(seasonMenu.seasonNum)}
+          onClose={() => setSeasonMenu(null)}
         />
       )}
 
