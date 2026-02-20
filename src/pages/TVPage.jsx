@@ -406,6 +406,8 @@ export default function TVPage({
             }
             const p = Math.floor((ct / result.duration) * 100);
             saveProgress(currentProgressKey, Math.min(p, 100));
+            // Also persist actual seconds so DownloadsPage can show resume position
+            storage.set("dlTime_" + currentProgressKey, Math.floor(ct));
 
             // Auto-mark watched when remaining time ≤ threshold
             const remaining = result.duration - ct;

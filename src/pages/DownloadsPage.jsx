@@ -11,11 +11,11 @@ import { storage } from "../utils/storage";
 
 const IMG_BASE = "https://image.tmdb.org/t/p/w154";
 
-const STATUS_COLOR = {
-  downloading: "var(--red)",
-  completed: "#4caf50",
-  error: "#f44336",
-  interrupted: "#ff9800",
+const STATUS_CLASS = {
+  downloading: "dl-status--downloading",
+  completed: "dl-status--completed",
+  error: "dl-status--error",
+  interrupted: "dl-status--interrupted",
 };
 
 const STATUS_LABEL = {
@@ -34,41 +34,22 @@ function timeAgo(ts) {
   return Math.floor(sec / 86400) + "d ago";
 }
 
-// Poster thumbnail — shows TMDB image or fallback icon
 function Poster({ posterPath, size = 48 }) {
   const [errored, setErrored] = useState(false);
+  const style = { width: size, height: size * 1.5 };
   if (posterPath && !errored) {
     return (
       <img
         src={`${IMG_BASE}${posterPath}`}
         alt=""
         onError={() => setErrored(true)}
-        style={{
-          width: size,
-          height: size * 1.5,
-          objectFit: "cover",
-          borderRadius: 6,
-          flexShrink: 0,
-          display: "block",
-          background: "var(--surface3)",
-        }}
+        className="dl-poster"
+        style={style}
       />
     );
   }
   return (
-    <div
-      style={{
-        width: size,
-        height: size * 1.5,
-        borderRadius: 6,
-        background: "var(--surface3)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "var(--text3)",
-        flexShrink: 0,
-      }}
-    >
+    <div className="dl-poster dl-poster--fallback" style={style}>
       <FilmIcon />
     </div>
   );
@@ -104,19 +85,17 @@ export default function DownloadsPage({
     .filter((d) => d.status !== "downloading")
     .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
 
-  // Scroll to and highlight the targeted download item
   useEffect(() => {
     if (!highlightId || !highlightRef.current) return;
     const el = highlightRef.current;
-    setTimeout(() => {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 150);
-    // Clear the highlight after animation
+    setTimeout(
+      () => el.scrollIntoView({ behavior: "smooth", block: "center" }),
+      150,
+    );
     const t = setTimeout(() => onClearHighlight?.(), 3000);
     return () => clearTimeout(t);
   }, [highlightId]);
 
-  // Check file existence for completed downloads
   useEffect(() => {
     if (!isElectron) return;
     finished.forEach((d) => {
@@ -133,7 +112,6 @@ export default function DownloadsPage({
     setScanning(true);
     try {
       const files = await window.electron.scanDirectory(scanFolder);
-      // Deduplicate against known downloads by filePath
       const knownPaths = new Set(
         downloads.map((d) => d.filePath).filter(Boolean),
       );
@@ -152,7 +130,6 @@ export default function DownloadsPage({
     onDeleteDownload(dl.id);
   };
 
-  // Combine finished downloads + scanned local files into one "Local Files" list
   const localFileItems = localFiles.map((f) => ({
     id: f.filePath,
     name: f.name,
@@ -170,30 +147,17 @@ export default function DownloadsPage({
   ];
 
   return (
-    <div className="fade-in" style={{ padding: "48px 48px 80px" }}>
-      {/* Header */}
-      <div
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: 48,
-          letterSpacing: 1,
-          marginBottom: 6,
-        }}
-      >
-        DOWNLOADS
-      </div>
-      <div style={{ color: "var(--text3)", fontSize: 14, marginBottom: 40 }}>
+    <div className="fade-in dl-page">
+      <div className="dl-page__title">DOWNLOADS</div>
+      <div className="dl-page__subtitle">
         {active.length > 0 ? `${active.length} active` : "No active downloads"}{" "}
         · {finished.length} completed
       </div>
 
-      {/* ── Active downloads ── */}
       {active.length > 0 && (
-        <div style={{ marginBottom: 48 }}>
-          <div className="settings-section-title" style={{ marginBottom: 16 }}>
-            Active
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="dl-page__section">
+          <div className="settings-section-title dl-section-title">Active</div>
+          <div className="dl-page__list">
             {active.map((dl) => (
               <ActiveCard
                 key={dl.id}
@@ -205,41 +169,22 @@ export default function DownloadsPage({
         </div>
       )}
 
-      {/* ── Local Files ── */}
       <div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 16,
-            flexWrap: "wrap",
-            gap: 10,
-          }}
-        >
-          <div className="settings-section-title" style={{ marginBottom: 0 }}>
+        <div className="dl-page__local-header">
+          <div className="settings-section-title dl-section-title--inline">
             Local Files
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div className="dl-page__scan-controls">
             {isElectron && (
               <>
                 <input
-                  style={{
-                    background: "var(--surface2)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 6,
-                    padding: "5px 10px",
-                    fontSize: 12,
-                    color: "var(--text)",
-                    width: 220,
-                  }}
+                  className="dl-page__scan-input"
                   placeholder="Folder to scan…"
                   value={scanFolder}
                   onChange={(e) => setScanFolder(e.target.value)}
                 />
                 <button
-                  className="btn btn-secondary"
-                  style={{ fontSize: 12, padding: "5px 12px" }}
+                  className="btn btn-secondary btn--sm"
                   onClick={async () => {
                     const folder = await window.electron.pickFolder();
                     if (folder) {
@@ -251,8 +196,7 @@ export default function DownloadsPage({
                   Browse
                 </button>
                 <button
-                  className="btn btn-ghost"
-                  style={{ fontSize: 12, padding: "5px 12px" }}
+                  className="btn btn-ghost btn--sm"
                   onClick={handleScanFolder}
                   disabled={scanning || !scanFolder}
                 >
@@ -264,10 +208,9 @@ export default function DownloadsPage({
         </div>
 
         {allLocalItems.length > 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="dl-page__local-list">
             {allLocalItems.map((dl) => {
               const isHighlighted = dl.id === highlightId;
-              // Build watched key from download metadata
               const watchedKey =
                 dl.mediaType === "movie"
                   ? `movie_${dl.tmdbId || dl.mediaId}`
@@ -315,9 +258,7 @@ export default function DownloadsPage({
             })}
           </div>
         ) : (
-          <div
-            style={{ color: "var(--text3)", fontSize: 14, padding: "16px 0" }}
-          >
+          <div className="dl-page__empty-text">
             {downloads.length === 0 && localFiles.length === 0
               ? "No local files yet. Scan a folder or start a download."
               : "No completed downloads or local files found."}
@@ -346,37 +287,11 @@ function ActiveCard({ dl, onDelete }) {
   const pct = dl.progress || 0;
   return (
     <div className="dl-card dl-card-active">
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          gap: 12,
-          marginBottom: 10,
-        }}
-      >
+      <div className="dl-card__header">
         <Poster posterPath={dl.posterPath} size={42} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontWeight: 600,
-              fontSize: 15,
-              marginBottom: 3,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {dl.name}
-          </div>
-          <div
-            style={{
-              display: "flex",
-              gap: 14,
-              fontSize: 12,
-              color: "var(--text3)",
-              flexWrap: "wrap",
-            }}
-          >
+        <div className="dl-card__info">
+          <div className="dl-card__name">{dl.name}</div>
+          <div className="dl-card__meta">
             {dl.speed && <span>↓ {dl.speed}</span>}
             {dl.size && <span>{dl.size}</span>}
             {dl.totalFragments > 0 && (
@@ -386,71 +301,43 @@ function ActiveCard({ dl, onDelete }) {
             )}
           </div>
         </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            flexShrink: 0,
-          }}
-        >
-          <div
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: 28,
-              color: "var(--red)",
-              minWidth: 56,
-              textAlign: "right",
-            }}
-          >
-            {pct.toFixed(1)}%
-          </div>
+        <div className="dl-card__right">
+          <div className="dl-card__pct">{pct.toFixed(1)}%</div>
           <button className="icon-btn" onClick={onDelete} title="Remove">
             <TrashIcon />
           </button>
         </div>
       </div>
-
-      {/* Progress bar */}
-      <div
-        style={{
-          height: 6,
-          background: "var(--surface3)",
-          borderRadius: 3,
-          overflow: "hidden",
-        }}
-      >
+      <div className="dl-card__bar-wrap">
         <div
-          style={{
-            width: `${Math.min(pct, 100)}%`,
-            height: "100%",
-            background: pct > 0 ? "var(--red)" : "var(--surface3)",
-            borderRadius: 3,
-            transition: "width 0.4s ease",
-            boxShadow: pct > 0 ? "0 0 8px rgba(229,9,20,0.6)" : "none",
-          }}
+          className={`dl-card__bar-fill${pct > 0 ? " dl-card__bar-fill--active" : ""}`}
+          style={{ width: `${Math.min(pct, 100)}%` }}
         />
       </div>
-
-      {/* Last status */}
-      {dl.lastMessage && (
-        <div
-          style={{
-            marginTop: 8,
-            fontSize: 11,
-            color: "var(--text3)",
-            fontFamily: "monospace",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {dl.lastMessage}
-        </div>
-      )}
+      {dl.lastMessage && <div className="dl-card__log">{dl.lastMessage}</div>}
     </div>
   );
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function secsToHms(s) {
+  if (!s || s <= 0) return null;
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = Math.floor(s % 60);
+  return [h, m, sec].map((v) => String(v).padStart(2, "0")).join(":");
+}
+
+function hmsToSecs(str) {
+  const parts = str.trim().split(":").map(Number);
+  if (parts.some(isNaN)) return null;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 1 && parts[0] >= 0) return parts[0];
+  return null;
+}
+
+const PROGRESS_TIME_PREFIX = "dlTime_";
 
 // ── Local file / completed download card ──────────────────────────────────────
 function LocalFileCard({
@@ -465,27 +352,77 @@ function LocalFileCard({
   onMarkWatched,
   onMarkUnwatched,
   onSelect,
+  watchedKey,
 }) {
   const isDownload = !dl.isLocalOnly;
-  const statusColor = STATUS_COLOR[dl.status] || "var(--text3)";
-  // Allow watching if file exists on disk (regardless of reported status)
   const canWatch = !!fileExists && !!dl.filePath;
+
+  const storageKey = watchedKey ? PROGRESS_TIME_PREFIX + watchedKey : null;
+  const [savedSecs, setSavedSecs] = useState(() =>
+    storageKey ? (storage.get(storageKey) ?? null) : null,
+  );
+  const [editing, setEditing] = useState(false);
+  const [editVal, setEditVal] = useState("");
+  const inputRef = useRef(null);
+
+  // Re-sync from storage when key changes (picks up progress from online watching)
+  useEffect(() => {
+    if (!storageKey) return;
+    setSavedSecs(storage.get(storageKey) ?? null);
+  }, [storageKey]);
+
+  const startEdit = useCallback(() => {
+    setEditVal(secsToHms(savedSecs) ?? "");
+    setEditing(true);
+  }, [savedSecs]);
+
+  useEffect(() => {
+    if (editing && inputRef.current) inputRef.current.focus();
+  }, [editing]);
+
+  const commitEdit = useCallback(() => {
+    const secs = hmsToSecs(editVal);
+    if (secs !== null && storageKey) {
+      storage.set(storageKey, secs);
+      setSavedSecs(secs);
+    }
+    setEditing(false);
+  }, [editVal, storageKey]);
+
+  const handleKeyDown = useCallback(
+    (e) => {
+      if (e.key === "Enter") commitEdit();
+      if (e.key === "Escape") setEditing(false);
+    },
+    [commitEdit],
+  );
+
+  const handleWatch = useCallback(() => {
+    if (!dl.filePath) return;
+    if (savedSecs > 0 && window.electron?.openPathAtTime) {
+      window.electron.openPathAtTime(dl.filePath, savedSecs);
+    } else {
+      onWatch();
+    }
+  }, [dl.filePath, savedSecs, onWatch]);
+
+  const progressLabel = (() => {
+    if (isWatched) return null;
+    if (!storageKey) return null;
+    if (!savedSecs) return "Not started";
+    return secsToHms(savedSecs);
+  })();
 
   return (
     <div
       ref={highlightRef}
       className={`dl-card${isHighlighted ? " dl-card-highlighted" : ""}`}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+      <div className="dl-card__row">
         <div
+          className={`dl-card__poster-wrap${onSelect ? " dl-card__poster-wrap--clickable" : ""}`}
           onClick={onSelect || undefined}
           title={onSelect ? "Go to page" : undefined}
-          style={{
-            flexShrink: 0,
-            cursor: onSelect ? "pointer" : "default",
-            borderRadius: 6,
-            transition: "opacity 0.15s",
-          }}
           onMouseEnter={(e) => {
             if (onSelect) e.currentTarget.style.opacity = "0.75";
           }}
@@ -496,108 +433,85 @@ function LocalFileCard({
           <Poster posterPath={dl.posterPath} size={40} />
         </div>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 7,
-              marginBottom: 3,
-              minWidth: 0,
-            }}
-          >
+        <div className="dl-card__body">
+          <div className="dl-card__title-row">
             <div
+              className={`dl-card__title${onSelect ? " dl-card__title--clickable" : ""}`}
               onClick={onSelect || undefined}
-              style={{
-                fontWeight: 600,
-                fontSize: 14,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                cursor: onSelect ? "pointer" : "default",
-                color: onSelect ? "var(--text)" : "var(--text)",
-                textDecoration: "none",
-                transition: "color 0.15s",
-              }}
               onMouseEnter={(e) => {
                 if (onSelect) e.currentTarget.style.color = "var(--red)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = "var(--text)";
+                e.currentTarget.style.color = "";
               }}
               title={onSelect ? `Open ${dl.name}` : undefined}
             >
               {dl.name}
             </div>
             {isWatched && (
-              <span
-                title="Watched"
-                style={{
-                  color: "#4caf50",
-                  flexShrink: 0,
-                  display: "flex",
-                  alignItems: "center",
-                }}
-              >
+              <span className="dl-card__watched-icon" title="Watched">
                 <WatchedIcon size={14} />
               </span>
             )}
           </div>
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              fontSize: 12,
-              color: "var(--text3)",
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
+
+          <div className="dl-card__meta">
             {isDownload && (
-              <span style={{ color: statusColor, fontWeight: 600 }}>
+              <span className={`dl-status ${STATUS_CLASS[dl.status] || ""}`}>
                 {STATUS_LABEL[dl.status]}
               </span>
             )}
             {!isDownload && (
-              <span style={{ color: "#4caf50", fontWeight: 600 }}>Local</span>
+              <span className="dl-status dl-status--local">Local</span>
             )}
             {dl.completedAt && <span>{timeAgo(dl.completedAt)}</span>}
             {dl.size && <span>{dl.size}</span>}
             {fileExists === false && (
-              <span style={{ color: "#f44336" }}>File missing</span>
+              <span className="dl-status--missing">File missing</span>
+            )}
+
+            {progressLabel !== null && storageKey && (
+              <span
+                className={`dl-progress-pill${savedSecs ? " dl-progress-pill--active" : " dl-progress-pill--empty"}`}
+              >
+                {editing ? (
+                  <input
+                    ref={inputRef}
+                    className="dl-progress-pill__input"
+                    value={editVal}
+                    onChange={(e) => setEditVal(e.target.value)}
+                    onBlur={commitEdit}
+                    onKeyDown={handleKeyDown}
+                    placeholder="HH:MM:SS"
+                  />
+                ) : (
+                  <span
+                    className="dl-progress-pill__label"
+                    onClick={startEdit}
+                    title="Click to set resume position"
+                  >
+                    {progressLabel}
+                  </span>
+                )}
+                {!editing && (
+                  <span
+                    className="dl-progress-pill__edit-icon"
+                    onClick={startEdit}
+                    title="Edit"
+                  >
+                    ✎
+                  </span>
+                )}
+              </span>
             )}
           </div>
-          {dl.lastMessage && dl.status === "error" && (
-            <div
-              style={{
-                fontSize: 11,
-                color: "#f44336",
-                marginTop: 2,
-                fontFamily: "monospace",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {dl.lastMessage}
-            </div>
-          )}
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            gap: 6,
-            flexShrink: 0,
-            alignItems: "center",
-          }}
-        >
-          {/* Watched toggle */}
+        <div className="dl-card__actions">
           {onMarkWatched &&
             (isWatched ? (
               <button
-                className="btn btn-ghost watched-btn"
-                style={{ padding: "5px 10px", fontSize: 12, gap: 4 }}
+                className="btn btn-ghost watched-btn dl-btn--sm"
                 onClick={onMarkUnwatched}
                 title="Mark as Unwatched"
               >
@@ -605,8 +519,7 @@ function LocalFileCard({
               </button>
             ) : (
               <button
-                className="btn btn-ghost"
-                style={{ padding: "5px 10px", fontSize: 12 }}
+                className="btn btn-ghost dl-btn--sm"
                 onClick={onMarkWatched}
                 title="Mark as Watched"
               >
@@ -615,17 +528,18 @@ function LocalFileCard({
             ))}
           {canWatch && (
             <button
-              className="btn btn-primary"
-              style={{ padding: "6px 14px", fontSize: 12, gap: 5 }}
-              onClick={onWatch}
+              className="btn btn-primary dl-btn--sm-primary"
+              onClick={handleWatch}
+              title={
+                savedSecs > 0 ? `Resume at ${secsToHms(savedSecs)}` : "Watch"
+              }
             >
-              <PlayIcon /> Watch
+              <PlayIcon /> {savedSecs > 0 ? "Resume" : "Watch"}
             </button>
           )}
           {dl.filePath && (
             <button
-              className="btn btn-ghost"
-              style={{ padding: "6px 10px", fontSize: 12 }}
+              className="btn btn-ghost dl-btn--sm-icon"
               onClick={onShowFolder}
               title="Show in folder"
             >

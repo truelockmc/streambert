@@ -580,6 +580,73 @@ ipcMain.handle("open-path", (_, filePath) => {
   shell.openPath(filePath);
 });
 
+// ── IPC: open file at specific timestamp ─────────────────────────────────────
+ipcMain.handle("open-path-at-time", (_, { filePath, seconds }) => {
+  const sec = Math.floor(seconds || 0);
+  const platform = process.platform;
+
+  // Resolve a binary to its full path synchronously.
+  // For absolute paths: check fs.existsSync.
+  // For bare names: use `which` (Linux/mac) or `where` (Windows) via spawnSync.
+  const resolveBin = (bin) => {
+    if (path.isAbsolute(bin)) {
+      return fs.existsSync(bin) ? bin : null;
+    }
+    const whichCmd = platform === "win32" ? "where" : "which";
+    try {
+      const result = spawnSync(whichCmd, [bin], { encoding: "utf8" });
+      if (result.status === 0 && result.stdout.trim()) {
+        return result.stdout.trim().split("\n")[0].trim();
+      }
+    } catch {}
+    return null;
+  };
+
+  const tryLaunch = (bin, args) => {
+    const resolved = resolveBin(bin);
+    if (!resolved) return false;
+    try {
+      const proc = spawn(resolved, args, { detached: true, stdio: "ignore" });
+      proc.unref();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const vlcPaths =
+    platform === "win32"
+      ? [
+          "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe",
+          "C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe",
+          "vlc",
+        ]
+      : platform === "darwin"
+        ? ["/Applications/VLC.app/Contents/MacOS/VLC", "vlc"]
+        : ["/usr/bin/vlc", "/usr/local/bin/vlc", "/snap/bin/vlc", "vlc"];
+
+  const mpvPaths =
+    platform === "win32"
+      ? ["mpv", "C:\\Program Files\\mpv\\mpv.exe"]
+      : platform === "darwin"
+        ? ["/opt/homebrew/bin/mpv", "/usr/local/bin/mpv", "mpv"]
+        : ["/usr/bin/mpv", "/usr/local/bin/mpv", "/snap/bin/mpv", "mpv"];
+
+  if (sec > 0) {
+    // Try mpv first
+    for (const mpv of mpvPaths) {
+      if (tryLaunch(mpv, [`--start=${sec}`, filePath])) return;
+    }
+    // Try VLC
+    for (const vlc of vlcPaths) {
+      if (tryLaunch(vlc, [`--start-time=${sec}`, filePath])) return;
+    }
+  }
+
+  // Fallback: open with default app (no timestamp)
+  shell.openPath(filePath);
+});
+
 // ── IPC: scan directory for video files ──────────────────────────────────────
 ipcMain.handle("scan-directory", (_, folderPath) => {
   try {
