@@ -210,8 +210,8 @@ export default function TVPage({
 
   // Age rating
   const [rating, setRating] = useState({ cert: null, minAge: null });
-  const ageLimitSetting = getAgeLimitSetting(storage);
-  const ratingCountry = getRatingCountry(storage);
+  const [ageLimitSetting] = useState(() => getAgeLimitSetting(storage));
+  const [ratingCountry] = useState(() => getRatingCountry(storage));
   const restricted = isRestricted(rating.minAge, ageLimitSetting);
   const [seasonMenu, setSeasonMenu] = useState(null); // { x, y, seasonNum }
 
