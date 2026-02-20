@@ -1,4 +1,50 @@
-@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap");
+@font-face {
+    font-family: "Bebas Neue";
+    src: url("fonts/bebas-neue-regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "DM Sans";
+    src: url("fonts/dm-sans-300.woff2") format("woff2");
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "DM Sans";
+    src: url("fonts/dm-sans-300italic.woff2") format("woff2");
+    font-weight: 300;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "DM Sans";
+    src: url("fonts/dm-sans-regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "DM Sans";
+    src: url("fonts/dm-sans-500.woff2") format("woff2");
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "DM Sans";
+    src: url("fonts/dm-sans-600.woff2") format("woff2");
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
 
 *,
 *::before,
@@ -1260,7 +1306,6 @@ body,
     line-height: 1.5;
 }
 
-/* Inline spinner inside button */
 .apikey-spinner {
     display: inline-block;
     width: 14px;
@@ -1808,7 +1853,6 @@ kbd {
     animation: watchedPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-/* Badge on detail poster */
 .detail-watched-badge {
     position: absolute;
     bottom: 10px;
@@ -1834,7 +1878,6 @@ kbd {
     }
 }
 
-/* "Watched" label next to detail-type */
 .watched-label {
     display: inline-flex;
     align-items: center;
@@ -1849,7 +1892,6 @@ kbd {
     letter-spacing: 0.3px;
 }
 
-/* Watched button (green tinted ghost) */
 .watched-btn {
     color: #48c774 !important;
     border-color: rgba(72, 199, 116, 0.4) !important;
@@ -1862,14 +1904,12 @@ kbd {
     background: rgba(72, 199, 116, 0.1) !important;
 }
 
-/* Watched episode card subtle tint */
 .episode-card.ep-watched {
     border-color: rgba(72, 199, 116, 0.45);
     background: rgba(72, 199, 116, 0.04);
     box-shadow: 0 0 0 1px rgba(72, 199, 116, 0.15);
 }
 
-/* Watched media card (movies & TV posters) green border */
 .card.ep-watched {
     border-color: rgba(72, 199, 116, 0.55);
     box-shadow:
@@ -2324,7 +2364,6 @@ kbd {
     padding: 1px 7px;
     font-size: 11px;
     font-variant-numeric: tabular-nums;
-
     font-family:
         ui-monospace, "Cascadia Mono", "Segoe UI Mono", "Liberation Mono",
         monospace;
