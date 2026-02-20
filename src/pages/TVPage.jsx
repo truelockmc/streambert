@@ -233,7 +233,14 @@ export default function TVPage({
     const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
     const episodes = seasonNum === selectedSeason ? seasonData?.episodes : null;
     const count = episodes?.length || seasonInfo?.episode_count || 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     for (let i = 1; i <= count; i++) {
+      // Skip unreleased episodes (only when we have episode data with air_date)
+      if (episodes) {
+        const ep = episodes.find((e) => e.episode_number === i);
+        if (ep?.air_date && new Date(ep.air_date) > today) continue;
+      }
       onMarkWatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
     }
   };

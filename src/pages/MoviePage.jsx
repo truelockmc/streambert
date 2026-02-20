@@ -356,21 +356,22 @@ export default function MoviePage({
                 {isSaved ? <BookmarkFillIcon /> : <BookmarkIcon />}
                 {isSaved ? "Saved" : "Save"}
               </button>
-              {isWatched ? (
-                <button
-                  className="btn btn-ghost watched-btn"
-                  onClick={() => onMarkUnwatched?.(progressKey)}
-                >
-                  <WatchedIcon size={16} /> Watched
-                </button>
-              ) : (
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => onMarkWatched?.(progressKey)}
-                >
-                  ✓ Mark Watched
-                </button>
-              )}
+              {!isUnreleased &&
+                (isWatched ? (
+                  <button
+                    className="btn btn-ghost watched-btn"
+                    onClick={() => onMarkUnwatched?.(progressKey)}
+                  >
+                    <WatchedIcon size={16} /> Watched
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => onMarkWatched?.(progressKey)}
+                  >
+                    ✓ Mark Watched
+                  </button>
+                ))}
               <button className="btn btn-ghost" onClick={onBack}>
                 <BackIcon /> Back
               </button>
