@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { storage } from './utils/storage'
-import { tmdbFetch } from './utils/api'
+import { tmdbFetch, setApiErrorHandlers } from './utils/api'
 
 import Sidebar from './components/Sidebar'
 import SearchModal from './components/SearchModal'
@@ -16,6 +16,7 @@ import DownloadsPage from './pages/DownloadsPage'
 
 export default function App() {
   const [apiKey, setApiKey] = useState(() => storage.get('apikey'))
+  const [apiKeyStatus, setApiKeyStatus] = useState('checking') // 'checking' | 'ok' | 'invalid_token' | 'unreachable'
   const [page, setPage] = useState('home')
   const [selected, setSelected] = useState(null)
   const [showSearch, setShowSearch] = useState(false)
@@ -47,6 +48,35 @@ export default function App() {
     const handler = window.electron.onConfirmClose((data) => setCloseConfirm(data))
     return () => window.electron.offConfirmClose(handler)
   }, [])
+
+  // ── Register global API error handlers ──────────────────────────────────
+  // Fire on any tmdbFetch call that returns 401/403 or network failure
+  useEffect(() => {
+    setApiErrorHandlers(
+      () => setApiKeyStatus('invalid_token'),  // 401 / 403
+      () => setApiKeyStatus('unreachable'),     // network failure
+    )
+  }, [])
+
+  // ── Validate stored API key on startup ───────────────────────────────────
+  useEffect(() => {
+    if (!apiKey) { setApiKeyStatus('ok'); return }
+    setApiKeyStatus('checking')
+    const controller = new AbortController()
+    fetch('https://api.themoviedb.org/3/configuration', {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: controller.signal,
+    })
+      .then(res => {
+        if (res.status === 401 || res.status === 403) setApiKeyStatus('invalid_token')
+        else setApiKeyStatus('ok')
+      })
+      .catch(err => {
+        if (err.name === 'AbortError') return
+        setApiKeyStatus('unreachable')
+      })
+    return () => controller.abort()
+  }, [apiKey])
 
   // Load persisted downloads on startup
   useEffect(() => {
@@ -299,6 +329,19 @@ export default function App() {
       />
 
       <div className="main">
+        {/* ── API key status banner ── */}
+        {apiKeyStatus === 'invalid_token' && (
+          <div className="api-status-banner api-status-error">
+            <span>⚠ Your TMDB token is invalid or has been revoked. Movies and shows won't load.</span>
+            <button className="api-status-btn" onClick={changeApiKey}>Update Token</button>
+          </div>
+        )}
+        {apiKeyStatus === 'unreachable' && (
+          <div className="api-status-banner api-status-warn">
+            <span>⚠ Cannot reach TMDB, check your internet connection. Content may not load.</span>
+            <button className="api-status-btn" onClick={() => setApiKeyStatus('checking') || window.location.reload()}>Retry</button>
+          </div>
+        )}
         {page === 'home' && (
           <HomePage trending={trending} trendingTV={trendingTV} loading={loadingHome}
             onSelect={handleSelectResult} progress={progress} inProgress={inProgress}
