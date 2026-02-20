@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { DownloadIcon, TrashIcon, FolderIcon, PlayIcon, FilmIcon } from '../components/Icons'
+import { DownloadIcon, TrashIcon, FolderIcon, PlayIcon, FilmIcon, WatchedIcon } from '../components/Icons'
 import { storage } from '../utils/storage'
 
 const IMG_BASE = 'https://image.tmdb.org/t/p/w154'
@@ -58,17 +58,30 @@ function Poster({ posterPath, size = 48 }) {
 }
 
 
-export default function DownloadsPage({ downloads, onDeleteDownload, onHistory, onSaveProgress, progress }) {
+export default function DownloadsPage({ downloads, onDeleteDownload, onHistory, onSaveProgress, progress, watched, onMarkWatched, onMarkUnwatched, highlightId, onClearHighlight }) {
   const [fileExistsCache, setFileExistsCache] = useState({})
   const [localFiles, setLocalFiles] = useState(() => storage.get('localFiles') || [])
   const [scanning, setScanning] = useState(false)
   const [scanFolder, setScanFolder] = useState(() => storage.get('downloadPath') || '')
+  const highlightRef = useRef(null)
 
   const isElectron = typeof window !== 'undefined' && !!window.electron
 
   const active = downloads.filter(d => d.status === 'downloading')
   const finished = downloads.filter(d => d.status !== 'downloading')
     .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0))
+
+  // Scroll to and highlight the targeted download item
+  useEffect(() => {
+    if (!highlightId || !highlightRef.current) return
+    const el = highlightRef.current
+    setTimeout(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 150)
+    // Clear the highlight after animation
+    const t = setTimeout(() => onClearHighlight?.(), 3000)
+    return () => clearTimeout(t)
+  }, [highlightId])
 
   // Check file existence for completed downloads
   useEffect(() => {
@@ -182,16 +195,31 @@ export default function DownloadsPage({ downloads, onDeleteDownload, onHistory, 
 
         {allLocalItems.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {allLocalItems.map(dl => (
-              <LocalFileCard
-                key={dl.id}
-                dl={dl}
-                fileExists={dl.isLocalOnly ? true : fileExistsCache[dl.id]}
-                onWatch={() => window.electron.openPath(dl.filePath)}
-                onShowFolder={() => window.electron?.showInFolder(dl.filePath)}
-                onDelete={dl.isLocalOnly ? undefined : () => handleDelete(dl)}
-              />
-            ))}
+            {allLocalItems.map(dl => {
+              const isHighlighted = dl.id === highlightId
+              // Build watched key from download metadata
+              const watchedKey = dl.mediaType === 'movie'
+                ? `movie_${dl.tmdbId || dl.mediaId}`
+                : dl.mediaType === 'tv' && dl.tmdbId && dl.season && dl.episode
+                  ? `tv_${dl.tmdbId}_s${dl.season}e${dl.episode}`
+                  : null
+              return (
+                <LocalFileCard
+                  key={dl.id}
+                  dl={dl}
+                  fileExists={dl.isLocalOnly ? true : fileExistsCache[dl.id]}
+                  onWatch={() => window.electron.openPath(dl.filePath)}
+                  onShowFolder={() => window.electron?.showInFolder(dl.filePath)}
+                  onDelete={dl.isLocalOnly ? undefined : () => handleDelete(dl)}
+                  isHighlighted={isHighlighted}
+                  highlightRef={isHighlighted ? highlightRef : null}
+                  watchedKey={watchedKey}
+                  isWatched={watchedKey ? !!watched?.[watchedKey] : false}
+                  onMarkWatched={watchedKey ? () => onMarkWatched?.(watchedKey) : null}
+                  onMarkUnwatched={watchedKey ? () => onMarkUnwatched?.(watchedKey) : null}
+                />
+              )
+            })}
           </div>
         ) : (
           <div style={{ color: 'var(--text3)', fontSize: 14, padding: '16px 0' }}>
@@ -264,20 +292,30 @@ function ActiveCard({ dl, onDelete }) {
 }
 
 // ── Local file / completed download card ──────────────────────────────────────
-function LocalFileCard({ dl, fileExists, onWatch, onShowFolder, onDelete }) {
+function LocalFileCard({ dl, fileExists, onWatch, onShowFolder, onDelete, isHighlighted, highlightRef, isWatched, onMarkWatched, onMarkUnwatched }) {
   const isDownload = !dl.isLocalOnly
   const statusColor = STATUS_COLOR[dl.status] || 'var(--text3)'
   // Allow watching if file exists on disk (regardless of reported status)
   const canWatch = !!fileExists && !!dl.filePath
 
   return (
-    <div className="dl-card">
+    <div
+      ref={highlightRef}
+      className={`dl-card${isHighlighted ? ' dl-card-highlighted' : ''}`}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <Poster posterPath={dl.posterPath} size={40} />
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>
-            {dl.name}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3, minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {dl.name}
+            </div>
+            {isWatched && (
+              <span title="Watched" style={{ color: '#4caf50', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                <WatchedIcon size={14} />
+              </span>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text3)', alignItems: 'center', flexWrap: 'wrap' }}>
             {isDownload && (
@@ -295,7 +333,21 @@ function LocalFileCard({ dl, fileExists, onWatch, onShowFolder, onDelete }) {
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+          {/* Watched toggle */}
+          {onMarkWatched && (
+            isWatched
+              ? (
+                <button className="btn btn-ghost watched-btn" style={{ padding: '5px 10px', fontSize: 12, gap: 4 }} onClick={onMarkUnwatched} title="Mark as Unwatched">
+                  <WatchedIcon size={13} /> Watched
+                </button>
+              )
+              : (
+                <button className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 12 }} onClick={onMarkWatched} title="Mark as Watched">
+                  ✓ Mark Watched
+                </button>
+              )
+          )}
           {canWatch && (
             <button className="btn btn-primary" style={{ padding: '6px 14px', fontSize: 12, gap: 5 }} onClick={onWatch}>
               <PlayIcon /> Watch

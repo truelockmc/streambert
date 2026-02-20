@@ -100,7 +100,7 @@ function EpisodeDesc({ overview, episodeName }) {
 
 export default function TVPage({
   item, apiKey, onSave, isSaved, onHistory, progress, saveProgress, onBack, onSettings, onDownloadStarted,
-  watched, onMarkWatched, onMarkUnwatched,
+  watched, onMarkWatched, onMarkUnwatched, downloads, onGoToDownloads,
 }) {
   const [details, setDetails] = useState(null)
   const [seasonData, setSeasonData] = useState(null)
@@ -206,6 +206,17 @@ export default function TVPage({
 
   const currentProgressKey = selectedEp
     ? `tv_${item.id}_s${selectedSeason}e${selectedEp.episode_number}`
+    : null
+
+  // Check if currently-playing episode is already downloaded or downloading
+  const currentEpDownload = selectedEp
+    ? (downloads || []).find(dl =>
+      dl.mediaType === 'tv' &&
+      (dl.tmdbId === item.id || dl.mediaId === item.id) &&
+      dl.season === selectedSeason &&
+      dl.episode === selectedEp.episode_number &&
+      (dl.status === 'completed' || dl.status === 'local' || dl.status === 'downloading')
+    )
     : null
 
   // Reset auto-mark guard when episode changes
@@ -385,9 +396,14 @@ export default function TVPage({
                   sandbox="allow-scripts allow-same-origin allow-forms"
                   style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
                 />
-                <button className="player-overlay-btn" onClick={() => setShowDownload(true)} title="Download">
-                  <DownloadIcon />
-                  {m3u8Url && <span className="player-overlay-dot" />}
+                <button className="player-overlay-btn" onClick={() => currentEpDownload ? onGoToDownloads?.(currentEpDownload.id) : setShowDownload(true)} title={currentEpDownload ? (currentEpDownload.status === 'downloading' ? 'Downloading… – view in Downloads' : 'Already downloaded – view in Downloads') : 'Download'}>
+                  {currentEpDownload
+                    ? <span className="player-downloaded-icon" style={{ color: currentEpDownload.status === 'downloading' ? 'var(--red)' : '#4caf50' }}>
+                      {currentEpDownload.status === 'downloading' ? '↓' : '✓'}
+                    </span>
+                    : <DownloadIcon />
+                  }
+                  {!currentEpDownload && m3u8Url && <span className="player-overlay-dot" />}
                 </button>
               </div>
               {currentProgressKey && (
@@ -434,6 +450,13 @@ export default function TVPage({
                   const epPct = progress[pk] || 0
                   const epWatched = !!watched?.[pk]
                   const isPlaying = playing && selectedEp?.episode_number === ep.episode_number
+                  const epDownload = (downloads || []).find(dl =>
+                    dl.mediaType === 'tv' &&
+                    (dl.tmdbId === item.id || dl.mediaId === item.id) &&
+                    dl.season === selectedSeason &&
+                    dl.episode === ep.episode_number &&
+                    (dl.status === 'completed' || dl.status === 'local' || dl.status === 'downloading')
+                  )
                   return (
                     <div
                       key={ep.episode_number}
@@ -459,6 +482,16 @@ export default function TVPage({
                         <div className="episode-num" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                           E{ep.episode_number}
                           {epWatched && <WatchedIcon size={14} />}
+                          {epDownload && (
+                            <span
+                              className="ep-downloaded-badge"
+                              title={epDownload.status === 'downloading' ? 'Downloading… – click to view in Downloads' : 'Downloaded – click to view in Downloads'}
+                              style={{ borderColor: epDownload.status === 'downloading' ? 'rgba(229,9,20,0.5)' : 'rgba(72,199,116,0.5)', color: epDownload.status === 'downloading' ? 'var(--red)' : '#4caf50', background: epDownload.status === 'downloading' ? 'rgba(229,9,20,0.12)' : 'rgba(72,199,116,0.18)' }}
+                              onClick={e => { e.stopPropagation(); onGoToDownloads?.(epDownload.id) }}
+                            >
+                              {epDownload.status === 'downloading' ? '↓' : '↓'}
+                            </span>
+                          )}
                         </div>
                         <div className="episode-name">{ep.name}</div>
                         <EpisodeDesc overview={ep.overview} episodeName={ep.name} />

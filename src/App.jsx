@@ -38,6 +38,7 @@ export default function App() {
 
   // ── Downloads state ──────────────────────────────────────────────────────
   const [downloads, setDownloads] = useState([])
+  const [highlightDownload, setHighlightDownload] = useState(null)
   const [closeConfirm, setCloseConfirm] = useState(null) // { count }
 
   // Listen for close confirmation request from main process
@@ -311,6 +312,8 @@ export default function App() {
             onBack={() => navigate('home')} onSettings={() => navigate('settings')}
             onDownloadStarted={handleDownloadStarted}
             watched={watched} onMarkWatched={markWatched} onMarkUnwatched={markUnwatched}
+            downloads={downloads}
+            onGoToDownloads={(id) => { setHighlightDownload(id || null); navigate('downloads') }}
           />
         )}
         {page === 'tv' && selected && (
@@ -320,6 +323,8 @@ export default function App() {
             onBack={() => navigate('home')} onSettings={() => navigate('settings')}
             onDownloadStarted={handleDownloadStarted}
             watched={watched} onMarkWatched={markWatched} onMarkUnwatched={markUnwatched}
+            downloads={downloads}
+            onGoToDownloads={(id) => { setHighlightDownload(id || null); navigate('downloads') }}
           />
         )}
         {page === 'history' && (
@@ -337,6 +342,11 @@ export default function App() {
             onHistory={addHistory}
             onSaveProgress={saveProgress}
             progress={progress}
+            watched={watched}
+            onMarkWatched={markWatched}
+            onMarkUnwatched={markUnwatched}
+            highlightId={highlightDownload}
+            onClearHighlight={() => setHighlightDownload(null)}
           />
         )}
       </div>

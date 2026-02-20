@@ -1416,6 +1416,44 @@ kbd {
     flex-shrink: 0;
 }
 
+.player-downloaded-icon {
+    font-size: 15px;
+    font-weight: 700;
+    color: #4caf50;
+    line-height: 1;
+}
+
+.player-overlay-btn:has(.player-downloaded-icon) {
+    border-color: rgba(72, 199, 116, 0.5);
+    color: #4caf50;
+}
+
+.player-overlay-btn:has(.player-downloaded-icon):hover {
+    background: rgba(72, 199, 116, 0.2);
+    border-color: rgba(72, 199, 116, 0.8);
+}
+
+.ep-downloaded-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(72, 199, 116, 0.18);
+    border: 1px solid rgba(72, 199, 116, 0.5);
+    color: #4caf50;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+
+.ep-downloaded-badge:hover {
+    background: rgba(72, 199, 116, 0.35);
+}
+
 /* ── Download modal ─────────────────────────────────────────────────────── */
 .modal-backdrop {
     position: fixed;
@@ -1616,11 +1654,36 @@ kbd {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 14px 16px;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
 .dl-card:hover {
     border-color: var(--border);
+}
+
+.dl-card-highlighted {
+    border-color: rgba(72, 199, 116, 0.8) !important;
+    background: rgba(72, 199, 116, 0.06) !important;
+    box-shadow: 0 0 0 2px rgba(72, 199, 116, 0.3), 0 0 20px rgba(72, 199, 116, 0.15);
+    animation: dl-highlight-fade 3s ease forwards;
+}
+
+@keyframes dl-highlight-fade {
+    0% {
+        border-color: rgba(72, 199, 116, 0.9);
+        box-shadow: 0 0 0 3px rgba(72, 199, 116, 0.4), 0 0 24px rgba(72, 199, 116, 0.2);
+    }
+
+    60% {
+        border-color: rgba(72, 199, 116, 0.8);
+        box-shadow: 0 0 0 2px rgba(72, 199, 116, 0.25);
+    }
+
+    100% {
+        border-color: var(--border);
+        box-shadow: none;
+        background: var(--surface2);
+    }
 }
 
 .dl-card-active {

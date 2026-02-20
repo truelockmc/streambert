@@ -10,7 +10,7 @@ import { storage } from '../utils/storage'
 
 export default function MoviePage({
   item, apiKey, onSave, isSaved, onHistory, progress, saveProgress, onBack, onSettings, onDownloadStarted,
-  watched, onMarkWatched, onMarkUnwatched,
+  watched, onMarkWatched, onMarkUnwatched, downloads, onGoToDownloads,
 }) {
   const [details, setDetails] = useState(null)
   const [playing, setPlaying] = useState(false)
@@ -163,6 +163,12 @@ export default function MoviePage({
   const year = (d.release_date || '').slice(0, 4)
   const mediaName = `${title}${year ? ' (' + year + ')' : ''}`
 
+  // Check if this movie is already downloaded or currently downloading
+  const movieDownload = (downloads || []).find(dl =>
+    dl.mediaType === 'movie' && (dl.tmdbId === item.id || dl.mediaId === item.id) &&
+    (dl.status === 'completed' || dl.status === 'local' || dl.status === 'downloading')
+  )
+
   return (
     <div className="fade-in">
       <div className="detail-hero">
@@ -239,9 +245,14 @@ export default function MoviePage({
               sandbox="allow-scripts allow-same-origin allow-forms"
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
             />
-            <button className="player-overlay-btn" onClick={() => setShowDownload(true)} title="Download">
-              <DownloadIcon />
-              {m3u8Url && <span className="player-overlay-dot" />}
+            <button className="player-overlay-btn" onClick={() => movieDownload ? onGoToDownloads?.(movieDownload.id) : setShowDownload(true)} title={movieDownload ? (movieDownload.status === 'downloading' ? 'Downloading… – view in Downloads' : 'Already downloaded – view in Downloads') : 'Download'}>
+              {movieDownload
+                ? <span className="player-downloaded-icon" style={{ color: movieDownload.status === 'downloading' ? 'var(--red)' : '#4caf50' }}>
+                  {movieDownload.status === 'downloading' ? '↓' : '✓'}
+                </span>
+                : <DownloadIcon />
+              }
+              {!movieDownload && m3u8Url && <span className="player-overlay-dot" />}
             </button>
           </div>
 
