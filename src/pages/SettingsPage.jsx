@@ -158,6 +158,7 @@ function CleanRow({
 }) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(null);
+  const [hovered, setHovered] = useState(false);
 
   const handle = async () => {
     setBusy(true);
@@ -198,14 +199,15 @@ function CleanRow({
           {sizeLabel && (
             <span
               style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: "var(--red)",
-                background: "rgba(229,9,20,0.1)",
-                border: "1px solid rgba(229,9,20,0.25)",
-                borderRadius: 5,
-                padding: "2px 8px",
-                letterSpacing: 0.3,
+                fontSize: 13,
+                fontWeight: 600,
+                color: "var(--text2)",
+                background: "var(--surface2)",
+                border: "1px solid var(--border)",
+                borderRadius: 6,
+                padding: "3px 10px",
+                letterSpacing: 0.2,
+                fontVariantNumeric: "tabular-nums",
               }}
             >
               {sizeLabel}
@@ -222,12 +224,16 @@ function CleanRow({
           className="btn btn-ghost"
           disabled={busy}
           onClick={handle}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
           style={
             danger
               ? {
-                  color: "var(--red)",
-                  borderColor: "rgba(229,9,20,0.35)",
+                  color: hovered ? "#fff" : "var(--red)",
+                  background: hovered ? "rgba(229,9,20,0.85)" : "transparent",
+                  borderColor: hovered ? "transparent" : "rgba(229,9,20,0.35)",
                   opacity: busy ? 0.5 : 1,
+                  transition: "all 0.2s",
                 }
               : { opacity: busy ? 0.5 : 1 }
           }
@@ -260,6 +266,7 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
   );
   const [saved, setSaved] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetHovered, setResetHovered] = useState(false);
 
   // Age Rating
   const [ratingCountry, setRatingCountry] = useState(
@@ -340,11 +347,14 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
     }
     (async () => {
       try {
-        const [cache, downloads] = await Promise.all([
-          window.electron.getCacheSize?.() ?? -1,
-          window.electron.getDownloadsSize?.() ?? -1,
+        const [cacheRes, downloadsRes] = await Promise.all([
+          window.electron.getCacheSize?.() ?? null,
+          window.electron.getDownloadsSize?.() ?? null,
         ]);
-        setSizes({ cache, downloads });
+        setSizes({
+          cache: cacheRes?.bytes ?? -1,
+          downloads: downloadsRes?.bytes ?? -1,
+        });
       } catch {
         setSizes({ cache: -1, downloads: -1 });
       }
@@ -906,10 +916,17 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
                 <button
                   className="btn"
                   onClick={() => setShowResetConfirm(true)}
+                  onMouseEnter={() => setResetHovered(true)}
+                  onMouseLeave={() => setResetHovered(false)}
                   style={{
-                    color: "var(--red)",
-                    background: "rgba(229,9,20,0.08)",
-                    border: "1px solid rgba(229,9,20,0.3)",
+                    color: resetHovered ? "#fff" : "var(--red)",
+                    background: resetHovered
+                      ? "rgba(229,9,20,0.85)"
+                      : "rgba(229,9,20,0.08)",
+                    border: resetHovered
+                      ? "1px solid transparent"
+                      : "1px solid rgba(229,9,20,0.3)",
+                    transition: "all 0.2s",
                   }}
                 >
                   Reset App
