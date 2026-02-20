@@ -77,26 +77,8 @@ function createWindow() {
     },
   );
 
-  videasySession.webRequest.onBeforeRequest(
-    { urls: ["*://*/*"] },
-    (details, callback) => {
-      if (details.url.includes(".m3u8")) {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send("m3u8-found", details.url);
-        }
-      }
-      callback({});
-    },
-  );
-
-  // Trailer session — strip X-Frame-Options/CSP so YouTube plays in-app
-  const trailerSession = session.fromPartition("persist:trailer");
-
-  trailerSession.setUserAgent(
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-  );
-
-  // Block Google tracking & analytics
+  // Block Google tracking & analytics + videasy trackers
+  // Defined here so both videasy and trailer sessions can use the same list
   const BLOCKED_HOSTS = [
     "*://www.google-analytics.com/*",
     "*://analytics.google.com/*",
@@ -110,7 +92,38 @@ function createWindow() {
     "*://pagead2.googlesyndication.com/*",
     "*://stats.g.doubleclick.net/*",
     "*://yt3.ggpht.com/ytc/*",
+    // Google Fonts (Tracking)
+    "*://fonts.googleapis.com/*",
+    "*://fonts.gstatic.com/*",
+    // Videasy-Tracker
+    "*://im.malocacomals.com/*",
   ];
+
+  videasySession.webRequest.onBeforeRequest(
+    { urls: ["*://*/*"] },
+    (details, callback) => {
+      if (details.url.includes(".m3u8")) {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("m3u8-found", details.url);
+        }
+      }
+
+      const isBlocked = BLOCKED_HOSTS.some((pattern) => {
+        const regex = new RegExp(
+          "^" + pattern.replace(/\./g, "\\.").replace(/\*/g, ".*") + "$",
+        );
+        return regex.test(details.url);
+      });
+      callback(isBlocked ? { cancel: true } : {});
+    },
+  );
+
+  // Trailer session — strip X-Frame-Options/CSP so YouTube plays in-app
+  const trailerSession = session.fromPartition("persist:trailer");
+
+  trailerSession.setUserAgent(
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  );
 
   trailerSession.webRequest.onBeforeRequest(
     { urls: BLOCKED_HOSTS },
