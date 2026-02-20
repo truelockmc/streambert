@@ -300,6 +300,11 @@ export default function TVPage({
       .finally(() => setLoadingSeason(false));
   }, [item.id, selectedSeason, apiKey]);
 
+  // Reset m3u8 URL whenever the series or episode changes
+  useEffect(() => {
+    setM3u8Url(null);
+  }, [item.id, selectedEp?.episode_number, selectedSeason]);
+
   useEffect(() => {
     if (!window.electron) return;
     const handler = window.electron.onM3u8Found((url) => {

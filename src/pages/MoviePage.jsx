@@ -92,6 +92,12 @@ export default function MoviePage({
       .catch(() => {});
   }, [item.id, apiKey]);
 
+  // Reset m3u8 URL whenever the movie changes so a stale URL from a
+  // previously watched film can never be passed to the download modal.
+  useEffect(() => {
+    setM3u8Url(null);
+  }, [item.id]);
+
   useEffect(() => {
     if (!window.electron) return;
     const handler = window.electron.onM3u8Found((url) => {

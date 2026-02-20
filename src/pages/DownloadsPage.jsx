@@ -102,6 +102,11 @@ export default function DownloadsPage({
       if (d.filePath && fileExistsCache[d.id] === undefined) {
         window.electron.fileExists(d.filePath).then((exists) => {
           setFileExistsCache((prev) => ({ ...prev, [d.id]: exists }));
+          // Auto-remove from registry if file was deleted externally
+          if (!exists) {
+            window.electron.deleteDownload({ id: d.id, filePath: null });
+            onDeleteDownload(d.id);
+          }
         });
       }
     });
@@ -151,7 +156,7 @@ export default function DownloadsPage({
       <div className="dl-page__title">DOWNLOADS</div>
       <div className="dl-page__subtitle">
         {active.length > 0 ? `${active.length} active` : "No active downloads"}{" "}
-        · {finished.length} completed
+        · {allLocalItems.length} completed
       </div>
 
       {active.length > 0 && (
