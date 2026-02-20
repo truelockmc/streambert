@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { storage } from "../utils/storage";
 import { DEFAULT_INVIDIOUS_BASE } from "../components/TrailerModal";
 import { RATING_COUNTRIES } from "../utils/ageRating";
@@ -148,7 +148,14 @@ function StatusBadge({ status }) {
 }
 
 // ── Clean Row ─────────────────────────────────────────────────────────────────
-function CleanRow({ title, description, buttonLabel, onAction, danger }) {
+function CleanRow({
+  title,
+  description,
+  buttonLabel,
+  onAction,
+  danger,
+  sizeLabel,
+}) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(null);
 
@@ -182,9 +189,28 @@ function CleanRow({ title, description, buttonLabel, onAction, danger }) {
             fontWeight: 600,
             color: "var(--text)",
             marginBottom: 4,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
           }}
         >
           {title}
+          {sizeLabel && (
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "var(--red)",
+                background: "rgba(229,9,20,0.1)",
+                border: "1px solid rgba(229,9,20,0.25)",
+                borderRadius: 5,
+                padding: "2px 8px",
+                letterSpacing: 0.3,
+              }}
+            >
+              {sizeLabel}
+            </span>
+          )}
         </div>
         <div style={{ fontSize: 13, color: "var(--text3)", lineHeight: 1.6 }}>
           {description}
@@ -211,6 +237,17 @@ function CleanRow({ title, description, buttonLabel, onAction, danger }) {
       </div>
     </div>
   );
+}
+
+function formatBytes(bytes) {
+  if (bytes === null || bytes === undefined) return "…";
+  if (bytes === -1) return null; // unavailable, show nothing
+  if (bytes === 0) return "0 B";
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  if (bytes < 1024 * 1024 * 1024)
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -293,6 +330,27 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
     setTimeout(() => setInvidiousSaved(false), 2000);
   };
 
+  // Storage sizes - null = loading, -1 = unavailable, ≥0 = real value
+  const [sizes, setSizes] = useState({ cache: null, downloads: null });
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.electron) {
+      setSizes({ cache: -1, downloads: -1 });
+      return;
+    }
+    (async () => {
+      try {
+        const [cache, downloads] = await Promise.all([
+          window.electron.getCacheSize?.() ?? -1,
+          window.electron.getDownloadsSize?.() ?? -1,
+        ]);
+        setSizes({ cache, downloads });
+      } catch {
+        setSizes({ cache: -1, downloads: -1 });
+      }
+    })();
+  }, []);
+
   const isElectron = typeof window !== "undefined" && !!window.electron;
 
   const pickFolder = async () => {
@@ -326,6 +384,7 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
 
   const handleClearCache = async () => {
     if (isElectron) await window.electron.clearAppCache();
+    setSizes((prev) => ({ ...prev, cache: 0 }));
     return { msg: "✓ Cache cleared successfully" };
   };
 
@@ -340,6 +399,7 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
 
   const handleDeleteAllDownloads = async () => {
     let msg = "✓ All downloads removed";
+    setSizes((prev) => ({ ...prev, downloads: 0 }));
     if (isElectron) {
       const res = await window.electron.deleteAllDownloads();
       if (res?.deleted != null) {
@@ -720,7 +780,7 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
           )}
           {!downloadPath && (
             <div style={{ marginTop: 10, fontSize: 13, color: "var(--red)" }}>
-              ⚠ No download folder set — videos cannot be downloaded until you
+              ⚠ No download folder set, videos cannot be downloaded until you
               set one.
             </div>
           )}
@@ -756,6 +816,7 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
               description="Removes temporary browser cache, shader cache, and service worker data from all internal sessions (main, video player, trailer). Does not affect your personal data or settings."
               buttonLabel="Clear Cache"
               onAction={handleClearCache}
+              sizeLabel={formatBytes(sizes.cache)}
             />
           </div>
 
@@ -780,6 +841,7 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
               description="Permanently deletes all video files that were downloaded through Streambert and removes them from the download list. Only files downloaded trough the app will be deleted, nothing else in your folder is touched."
               buttonLabel="Delete All"
               onAction={handleDeleteAllDownloads}
+              sizeLabel={formatBytes(sizes.downloads)}
               danger
             />
           </div>

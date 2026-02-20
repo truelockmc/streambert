@@ -483,6 +483,7 @@ export default function App() {
             onMarkUnwatched={markUnwatched}
             highlightId={highlightDownload}
             onClearHighlight={() => setHighlightDownload(null)}
+            onSelect={handleSelectResult}
           />
         )}
       </div>
