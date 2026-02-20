@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap");
 
 *,
 *::before,
@@ -24,8 +24,8 @@
     --text3: #666666;
     --sidebar: 72px;
     --radius: 8px;
-    --font-display: 'Bebas Neue', sans-serif;
-    --font-body: 'DM Sans', sans-serif;
+    --font-display: "Bebas Neue", sans-serif;
+    --font-body: "DM Sans", sans-serif;
 }
 
 html,
@@ -230,7 +230,8 @@ body,
 .hero-gradient {
     position: absolute;
     inset: 0;
-    background: linear-gradient(to right, rgba(10, 10, 10, 0.95) 30%, transparent 70%),
+    background:
+        linear-gradient(to right, rgba(10, 10, 10, 0.95) 30%, transparent 70%),
         linear-gradient(to top, var(--bg) 0%, transparent 40%);
 }
 
@@ -371,7 +372,7 @@ body,
 }
 
 .section-title::after {
-    content: '';
+    content: "";
     flex: 1;
     height: 1px;
     background: var(--border);
@@ -787,7 +788,7 @@ body,
 }
 
 .player-wrap::before {
-    content: '';
+    content: "";
     display: block;
     padding-top: 56.25%;
 }
@@ -913,7 +914,6 @@ body,
 }
 
 @keyframes playing-pulse {
-
     0%,
     100% {
         opacity: 1;
@@ -1750,7 +1750,10 @@ kbd {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 14px 16px;
-    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    transition:
+        border-color 0.2s,
+        box-shadow 0.2s,
+        background 0.2s;
 }
 
 .dl-card:hover {
@@ -1760,14 +1763,18 @@ kbd {
 .dl-card-highlighted {
     border-color: rgba(72, 199, 116, 0.8) !important;
     background: rgba(72, 199, 116, 0.06) !important;
-    box-shadow: 0 0 0 2px rgba(72, 199, 116, 0.3), 0 0 20px rgba(72, 199, 116, 0.15);
+    box-shadow:
+        0 0 0 2px rgba(72, 199, 116, 0.3),
+        0 0 20px rgba(72, 199, 116, 0.15);
     animation: dl-highlight-fade 3s ease forwards;
 }
 
 @keyframes dl-highlight-fade {
     0% {
         border-color: rgba(72, 199, 116, 0.9);
-        box-shadow: 0 0 0 3px rgba(72, 199, 116, 0.4), 0 0 24px rgba(72, 199, 116, 0.2);
+        box-shadow:
+            0 0 0 3px rgba(72, 199, 116, 0.4),
+            0 0 24px rgba(72, 199, 116, 0.2);
     }
 
     60% {
@@ -1865,7 +1872,9 @@ kbd {
 /* Watched media card (movies & TV posters) green border */
 .card.ep-watched {
     border-color: rgba(72, 199, 116, 0.55);
-    box-shadow: 0 0 0 1px rgba(72, 199, 116, 0.2), inset 0 0 20px rgba(72, 199, 116, 0.05);
+    box-shadow:
+        0 0 0 1px rgba(72, 199, 116, 0.2),
+        inset 0 0 20px rgba(72, 199, 116, 0.05);
 }
 
 .card.ep-watched:hover {
@@ -1981,7 +1990,9 @@ kbd {
     height: 32px;
     border-radius: 6px;
     flex-shrink: 0;
-    transition: background 0.15s, color 0.15s;
+    transition:
+        background 0.15s,
+        color 0.15s;
 }
 
 .trailer-close-btn svg {
@@ -2035,7 +2046,10 @@ kbd {
     flex-direction: column;
     align-items: center;
     gap: 16px;
-    box-shadow: 0 0 0 1px rgba(229, 9, 20, 0.15), 0 32px 80px rgba(0, 0, 0, 0.8), 0 0 60px rgba(229, 9, 20, 0.08);
+    box-shadow:
+        0 0 0 1px rgba(229, 9, 20, 0.15),
+        0 32px 80px rgba(0, 0, 0, 0.8),
+        0 0 60px rgba(229, 9, 20, 0.08);
     animation: slideUp 0.2s ease;
 }
 
@@ -2099,7 +2113,9 @@ kbd {
     font-weight: 600 !important;
     border-radius: 8px !important;
     width: 100%;
-    transition: background 0.15s, transform 0.1s !important;
+    transition:
+        background 0.15s,
+        transform 0.1s !important;
 }
 
 .close-confirm-btn-confirm:hover {
@@ -2121,4 +2137,131 @@ kbd {
 
 .close-confirm-btn-cancel:hover {
     background: var(--surface3) !important;
+}
+
+.age-rating-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text);
+}
+
+.age-rating-badge--restricted {
+    background: rgba(229, 9, 20, 0.15);
+    border-color: rgba(229, 9, 20, 0.4);
+    color: #ff6b6b;
+}
+
+.btn-restricted {
+    opacity: 0.45 !important;
+    cursor: not-allowed !important;
+    filter: grayscale(0.6);
+    pointer-events: none;
+}
+
+.btn-restricted:hover {
+    transform: none !important;
+}
+
+.episode-card--restricted {
+    cursor: default !important;
+    opacity: 0.5;
+    filter: grayscale(0.4);
+}
+
+.episode-card--restricted:hover {
+    background: var(--surface) !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.episode-restricted-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 18px;
+    border-radius: inherit;
+}
+
+.episode-restricted-overlay span {
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.75);
+    text-align: center;
+    letter-spacing: 0.3px;
+    padding: 0 6px;
+}
+
+.card-age-badge {
+    position: absolute;
+    top: 7px;
+    left: 7px;
+    background: rgba(0, 0, 0, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 3px 7px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    line-height: 1;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.card-age-badge--restricted {
+    background: rgba(229, 9, 20, 0.82);
+    border-color: rgba(229, 9, 20, 0.6);
+    color: #fff;
+}
+
+.age-rating-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    margin-bottom: 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    width: fit-content;
+}
+
+.age-rating-pill--restricted {
+    background: rgba(229, 9, 20, 0.12);
+    border-color: rgba(229, 9, 20, 0.45);
+    color: #ff6b6b;
+}
+
+.age-rating-pill-cert {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.age-rating-pill-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 107, 107, 0.85);
+    letter-spacing: 0.2px;
 }
