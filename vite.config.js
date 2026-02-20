@@ -1,18 +1,18 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  base: './',
+  base: "./",
   build: {
-    minify: 'terser',
+    minify: "terser",
     terserOptions: {
-      compress: { drop_console: false, drop_debugger: true }
+      compress: { drop_console: false, drop_debugger: true },
     },
     rollupOptions: {
       output: {
-        manualChunks: undefined
-      }
-    }
-  }
-})
+        manualChunks: undefined,
+      },
+    },
+  },
+});
