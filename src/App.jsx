@@ -16,6 +16,7 @@ import DownloadsPage from "./pages/DownloadsPage";
 
 export default function App() {
   const [apiKey, setApiKey] = useState(() => storage.get("apikey"));
+  const [skipped, setSkipped] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState("checking"); // 'checking' | 'ok' | 'invalid_token' | 'unreachable'
   const [page, setPage] = useState("home");
   const [selected, setSelected] = useState(null);
@@ -229,10 +230,9 @@ export default function App() {
   };
 
   const changeApiKey = () => {
-    if (confirm("Reset TMDB API Read Access Token?")) {
-      storage.remove("apikey");
-      setApiKey(null);
-    }
+    storage.remove("apikey");
+    setApiKey(null);
+    setSkipped(false);
   };
 
   const toggleSave = useCallback(
@@ -353,7 +353,8 @@ export default function App() {
     storage.set("savedOrder", newOrder);
   }, []);
 
-  if (!apiKey) return <SetupScreen onSave={saveApiKey} />;
+  if (!apiKey && !skipped)
+    return <SetupScreen onSave={saveApiKey} onSkip={() => setSkipped(true)} />;
 
   return (
     <>
@@ -373,8 +374,8 @@ export default function App() {
         {apiKeyStatus === "invalid_token" && (
           <div className="api-status-banner api-status-error">
             <span>
-              ⚠ Your TMDB token is invalid or has been revoked. Movies and shows
-              won't load.
+              ⚠ Your TMDB token is invalid, not set or has been revoked. Movies
+              and shows won't load.
             </span>
             <button className="api-status-btn" onClick={changeApiKey}>
               Update Token
