@@ -100,11 +100,12 @@ const ANILIST_API = "https://graphql.anilist.co";
 // Strip "(Source: ...)", "Note: ..." and similar attribution lines from AniList descriptions
 export const cleanAnilistDescription = (desc) => {
   if (!desc) return desc;
-  // Robustly remove HTML: first pass strips well-formed tags, second pass
-  // catches unclosed/malformed tags so nothing executable slips through.
+  // Remove HTML: strip all complete tags, then remove any remaining
+  // opening angle-bracket and everything after it (handles unclosed tags
+  // like <script with no closing >). Finally drop any stray > leftovers.
   let clean = desc.replace(/<[^>]*>/g, "");
-  clean = clean.replace(/<[^<]*/g, "");
-  clean = clean.replace(/javascript\s*:/gi, "");
+  clean = clean.replace(/<[^>]*/g, "");
+  clean = clean.replace(/>/g, "");
   // Remove everything from "(Source:" onwards (including multi-line variants)
   clean = clean.replace(/\(Source:[^)]*\)/gi, "");
   // Remove "Note: ..." sentences/paragraphs at the end
