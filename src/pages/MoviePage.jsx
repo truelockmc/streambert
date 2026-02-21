@@ -1,5 +1,16 @@
 import { useState, useEffect, useRef } from "react";
-import { tmdbFetch, imgUrl, videasyMovieUrl } from "../utils/api";
+import {
+  tmdbFetch,
+  imgUrl,
+  PLAYER_SOURCES,
+  getSourceUrl,
+  sourceSupportsProgress,
+  sourceIsAsync,
+  fetchAnilistData,
+  isAnimeContent,
+  ANIME_DEFAULT_SOURCE,
+  NON_ANIME_DEFAULT_SOURCE,
+} from "../utils/api";
 import {
   PlayIcon,
   BookmarkIcon,
@@ -12,6 +23,7 @@ import {
   TrailerIcon,
   RatingShieldIcon,
   RatingLockIcon,
+  SourceIcon,
 } from "../components/Icons";
 import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
@@ -46,6 +58,20 @@ export default function MoviePage({
   const [trailerKey, setTrailerKey] = useState(null);
   const [showTrailer, setShowTrailer] = useState(false);
   const [m3u8Url, setM3u8Url] = useState(null);
+  const [playerSource, setPlayerSource] = useState(
+    () => storage.get("playerSource") || "videasy",
+  );
+  const [showSourceMenu, setShowSourceMenu] = useState(false);
+  const [anilistData, setAnilistData] = useState(null);
+  const [menuPos, setMenuPos] = useState(null);
+  const sourceRef = useRef(null);
+  // AllManga async URL resolution
+  const [resolvedPlayerUrl, setResolvedPlayerUrl] = useState(null);
+  const [resolvingUrl, setResolvingUrl] = useState(false);
+  const [resolveError, setResolveError] = useState(null);
+
+  // Derived: detect anime before any effects so effects can use it
+  const isAnime = isAnimeContent(item, details);
   const [downloaderFolder, setDownloaderFolder] = useState(
     () => storage.get("downloaderFolder") || "",
   );
@@ -92,11 +118,76 @@ export default function MoviePage({
       .catch(() => {});
   }, [item.id, apiKey]);
 
-  // Reset m3u8 URL whenever the movie changes so a stale URL from a
-  // previously watched film can never be passed to the download modal.
+  // Reset m3u8 URL and source menu whenever the movie or source changes
   useEffect(() => {
     setM3u8Url(null);
-  }, [item.id]);
+    setShowSourceMenu(false);
+    setAnilistData(null);
+    setResolvedPlayerUrl(null);
+    setResolvingUrl(false);
+    setResolveError(null);
+  }, [item.id, playerSource]);
+
+  // Fetch AniList data + auto-set source for anime/non-anime
+  useEffect(() => {
+    if (isAnime) {
+      fetchAnilistData(title, "ANIME").then((data) => {
+        if (data) setAnilistData(data);
+      });
+      // Switch to anime source if current source is not an anime source
+      const currentSrc = PLAYER_SOURCES.find((s) => s.id === playerSource);
+      if (!currentSrc?.tag) {
+        const saved = storage.get("playerSource");
+        const savedSrc = PLAYER_SOURCES.find((s) => s.id === saved);
+        setPlayerSource(savedSrc?.tag ? saved : ANIME_DEFAULT_SOURCE);
+      }
+    } else {
+      // Switch back to non-anime source if current source is anime-only
+      const currentSrc = PLAYER_SOURCES.find((s) => s.id === playerSource);
+      if (currentSrc?.tag) {
+        const saved = storage.get("playerSource");
+        const savedSrc = PLAYER_SOURCES.find((s) => s.id === saved);
+        setPlayerSource(!savedSrc?.tag ? saved : NON_ANIME_DEFAULT_SOURCE);
+      }
+    }
+  }, [item.id, isAnime]);
+
+  // Resolve AllManga movie URL via main-process IPC
+  useEffect(() => {
+    if (!playing || !sourceIsAsync(playerSource)) return;
+    if (resolvedPlayerUrl || resolvingUrl) return;
+    setResolvingUrl(true);
+    setResolveError(null);
+    window.electron
+      .resolveAllManga({
+        title,
+        seasonNumber: 1,
+        episodeNumber: 1,
+        isMovie: true,
+      })
+      .then((res) => {
+        if (res?.ok && res.url) {
+          if (res.isDirectMp4 !== undefined) {
+            window.electron
+              .setPlayerVideo({
+                url: res.url,
+                referer: res.referer || "https://allmanga.to",
+              })
+              .then((r) => {
+                setResolvedPlayerUrl(r.playerUrl);
+                setM3u8Url(res.url);
+              })
+              .catch(() => setResolveError("Failed to start local player"));
+          } else {
+            setResolvedPlayerUrl(res.url);
+          }
+        } else {
+          setResolveError(res?.error || "Movie not found on AllManga");
+        }
+      })
+      .catch((e) => setResolveError(e.message || "Error"))
+      .finally(() => setResolvingUrl(false));
+  }, [playing, playerSource]);
 
   useEffect(() => {
     if (!window.electron) return;
@@ -115,7 +206,7 @@ export default function MoviePage({
 
   // ── Auto-track progress + auto-watched every 5s ──────────────────────────
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || !sourceSupportsProgress(playerSource)) return;
     let interval = null;
     const timer = setTimeout(() => {
       interval = setInterval(async () => {
@@ -202,7 +293,7 @@ export default function MoviePage({
       clearTimeout(timer);
       clearInterval(interval);
     };
-  }, [playing, progressKey, watchedThreshold]);
+  }, [playing, progressKey, watchedThreshold, playerSource]);
 
   const handlePlay = () => {
     setM3u8Url(null);
@@ -219,6 +310,22 @@ export default function MoviePage({
   const title = d.title || d.name;
   const year = (d.release_date || "").slice(0, 4);
   const mediaName = `${title}${year ? " (" + year + ")" : ""}`;
+
+  // Prefer AniList metadata for anime when available
+  const displayOverview =
+    isAnime && anilistData?.description
+      ? anilistData.description.replace(/<[^>]+>/g, "")
+      : d.overview;
+  const displayScore =
+    isAnime && anilistData?.averageScore
+      ? (anilistData.averageScore / 10).toFixed(1)
+      : d.vote_average > 0
+        ? d.vote_average.toFixed(1)
+        : null;
+  const displayGenres =
+    isAnime && anilistData?.genres?.length
+      ? anilistData.genres.map((g, i) => ({ id: i, name: g }))
+      : d.genres || [];
 
   // Unreleased detection
   const todayMovie = new Date();
@@ -285,16 +392,16 @@ export default function MoviePage({
             </div>
             <div className="detail-title">{title}</div>
             <div className="genres">
-              {(d.genres || []).map((g) => (
+              {displayGenres.map((g) => (
                 <span key={g.id} className="genre-tag">
                   {g.name}
                 </span>
               ))}
             </div>
             <div className="detail-meta">
-              {d.vote_average > 0 && (
+              {displayScore && (
                 <span className="detail-rating">
-                  <StarIcon /> {d.vote_average?.toFixed(1)}
+                  <StarIcon /> {displayScore}
                 </span>
               )}
               {year && <span>{year}</span>}
@@ -320,7 +427,7 @@ export default function MoviePage({
                 )}
               </div>
             )}
-            <p className="detail-overview">{d.overview}</p>
+            <p className="detail-overview">{displayOverview}</p>
             <div className="detail-actions">
               {isUnreleased ? (
                 <button
@@ -391,8 +498,69 @@ export default function MoviePage({
       {playing && !restricted && !isUnreleased && (
         <div className="section">
           <div className="player-wrap">
+            {/* AllManga: spinner while resolving */}
+            {sourceIsAsync(playerSource) && resolvingUrl && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 10,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "rgba(0,0,0,0.85)",
+                  gap: 14,
+                  borderRadius: "inherit",
+                }}
+              >
+                <div className="spinner" />
+                <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                  Looking up movie on AllManga…
+                </span>
+              </div>
+            )}
+            {/* AllManga: error if lookup failed */}
+            {sourceIsAsync(playerSource) && resolveError && !resolvingUrl && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 10,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "rgba(0,0,0,0.85)",
+                  gap: 10,
+                  borderRadius: "inherit",
+                }}
+              >
+                <span style={{ fontSize: 28 }}>⚠️</span>
+                <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                  Movie not found on AllManga
+                </span>
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                  {resolveError}
+                </span>
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                  Try a different source.
+                </span>
+              </div>
+            )}
             <webview
-              src={videasyMovieUrl(item.id)}
+              src={
+                sourceIsAsync(playerSource)
+                  ? resolvedPlayerUrl || "about:blank"
+                  : getSourceUrl(
+                      playerSource,
+                      "movie",
+                      item.id,
+                      null,
+                      null,
+                      title,
+                    )
+              }
               partition="persist:videasy"
               allowpopups="false"
               sandbox="allow-scripts allow-same-origin allow-forms"
@@ -402,14 +570,70 @@ export default function MoviePage({
                 width: "100%",
                 height: "100%",
                 border: "none",
+                visibility:
+                  sourceIsAsync(playerSource) && !resolvedPlayerUrl
+                    ? "hidden"
+                    : "visible",
               }}
             />
+            {/* Source button – left side overlay */}
+            <button
+              ref={sourceRef}
+              className="player-overlay-btn"
+              style={{ left: 12, right: "auto" }}
+              onClick={() => {
+                const rect = sourceRef.current?.getBoundingClientRect();
+                if (rect) setMenuPos({ top: rect.bottom + 6, left: rect.left });
+                setShowSourceMenu((v) => !v);
+              }}
+              title="Change source"
+            >
+              <SourceIcon />
+              {PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ??
+                "Source"}
+            </button>
+            {showSourceMenu && menuPos && (
+              <div
+                className="source-dropdown source-dropdown--fixed"
+                style={{ top: menuPos.top, left: menuPos.left }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {PLAYER_SOURCES.map((src) => (
+                  <button
+                    key={src.id}
+                    className={
+                      "source-dropdown__item" +
+                      (playerSource === src.id
+                        ? " source-dropdown__item--active"
+                        : "")
+                    }
+                    onClick={() => {
+                      setPlayerSource(src.id);
+                      storage.set("playerSource", src.id);
+                      setShowSourceMenu(false);
+                      setM3u8Url(null);
+                      setResolvedPlayerUrl(null);
+                      setResolvingUrl(false);
+                      setResolveError(null);
+                    }}
+                  >
+                    <span>{src.label}</span>
+                    {src.tag && (
+                      <span className="source-dropdown__tag">{src.tag}</span>
+                    )}
+                    {src.note && (
+                      <span className="source-dropdown__note">{src.note}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
             <button
               className="player-overlay-btn"
               onClick={() =>
                 movieDownload
                   ? onGoToDownloads?.(movieDownload.id)
-                  : setShowDownload(true)
+                  : (setShowSourceMenu(false), setShowDownload(true))
               }
               title={
                 movieDownload
@@ -436,6 +660,14 @@ export default function MoviePage({
               )}
               {!movieDownload && m3u8Url && (
                 <span className="player-overlay-dot" />
+              )}
+              {!sourceSupportsProgress(playerSource) && (
+                <span
+                  className="player-no-progress-hint"
+                  title="No automatic progress tracking for this source"
+                >
+                  ⚠ no tracking
+                </span>
               )}
             </button>
           </div>

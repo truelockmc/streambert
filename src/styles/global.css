@@ -1599,7 +1599,7 @@ kbd {
 .modal-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 400;
+    z-index: 99999;
     background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(6px);
     display: flex;
@@ -2667,4 +2667,162 @@ kbd {
 .dl-btn--sm-icon {
     padding: 6px 10px;
     font-size: 12px;
+}
+
+.source-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 6px;
+    min-width: 180px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    animation: ctxFadeIn 0.12s ease both;
+}
+
+.source-dropdown__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--text2);
+    text-align: left;
+    padding: 9px 12px;
+    font-size: 13px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition:
+        background 0.12s,
+        color 0.12s;
+}
+
+.source-dropdown__item:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: var(--text);
+}
+
+.source-dropdown__item--active {
+    color: var(--text);
+    background: var(--red-dim);
+}
+
+.source-dropdown__item--active::before {
+    content: "✓";
+    color: var(--red);
+    font-weight: 700;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.source-dropdown__tag {
+    margin-left: auto;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(139, 92, 246, 0.2);
+    color: #a78bfa;
+    border: 1px solid rgba(139, 92, 246, 0.35);
+    flex-shrink: 0;
+}
+
+.source-dropdown__note {
+    font-size: 10px;
+    color: var(--text3);
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.player-outer {
+    position: relative;
+}
+
+.player-source-wrap {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 8px;
+}
+
+.player-overlay-btn--static {
+    position: static;
+    backdrop-filter: none;
+}
+
+.source-dropdown--fixed {
+    position: fixed;
+    top: 0; /* overridden by inline style */
+    left: 0; /* overridden by inline style */
+    z-index: 9999;
+}
+
+.player-no-progress-hint {
+    position: absolute;
+    bottom: 10px;
+    left: 12px;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.45);
+    pointer-events: none;
+    letter-spacing: 0.3px;
+}
+
+.anime-override-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--text2);
+}
+
+.anime-override-label {
+    flex-shrink: 0;
+    color: #a78bfa;
+    font-weight: 500;
+}
+
+.anime-override-field {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.anime-override-input {
+    width: 52px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    font-size: 12px;
+    padding: 3px 6px;
+    text-align: center;
+}
+
+.anime-override-input:focus {
+    outline: none;
+    border-color: rgba(139, 92, 246, 0.6);
+}
+
+.anime-override-reset {
+    margin-left: auto;
+    font-size: 14px;
+    padding: 2px 8px;
+    opacity: 0.6;
+}
+
+.anime-override-reset:hover {
+    opacity: 1;
 }

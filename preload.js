@@ -43,6 +43,11 @@ contextBridge.exposeInMainWorld("electron", {
   offConfirmClose: (h) => ipcRenderer.removeListener("confirm-close", h),
   respondClose: (confirm) => ipcRenderer.send("close-response", confirm),
 
+  // anime episode resolver (main-process HTTP, bypasses CORS/bot-check)
+  resolveAllManga: (args) => ipcRenderer.invoke("resolve-allmanga", args),
+  setPlayerVideo: (args) => ipcRenderer.invoke("set-player-video", args),
+  debugAllManga: (args) => ipcRenderer.invoke("debug-allmanga", args),
+
   // Quit app
   quitApp: () => ipcRenderer.invoke("quit-app"),
 

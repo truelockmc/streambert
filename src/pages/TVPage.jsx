@@ -1,5 +1,18 @@
 import { useState, useEffect, useRef } from "react";
-import { tmdbFetch, imgUrl, videasyTVUrl } from "../utils/api";
+import {
+  tmdbFetch,
+  imgUrl,
+  PLAYER_SOURCES,
+  getSourceUrl,
+  sourceSupportsProgress,
+  sourceIsAsync,
+  fetchAnilistData,
+  buildAnilistSeasons,
+  cleanAnilistDescription,
+  isAnimeContent,
+  ANIME_DEFAULT_SOURCE,
+  NON_ANIME_DEFAULT_SOURCE,
+} from "../utils/api";
 import {
   BookmarkIcon,
   BookmarkFillIcon,
@@ -12,6 +25,7 @@ import {
   TrailerIcon,
   RatingShieldIcon,
   RatingLockIcon,
+  SourceIcon,
 } from "../components/Icons";
 import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
@@ -203,6 +217,24 @@ export default function TVPage({
   const [trailerKey, setTrailerKey] = useState(null);
   const [showTrailer, setShowTrailer] = useState(false);
   const [m3u8Url, setM3u8Url] = useState(null);
+  const [playerSource, setPlayerSource] = useState(
+    () => storage.get("playerSource") || "videasy",
+  );
+  const [showSourceMenu, setShowSourceMenu] = useState(false);
+  // 9anime async URL resolution
+  const [resolvedPlayerUrl, setResolvedPlayerUrl] = useState(null);
+  const [resolvingUrl, setResolvingUrl] = useState(false);
+  const [resolveError, setResolveError] = useState(null);
+  const [resolvedFallback, setResolvedFallback] = useState(false);
+  const [anilistData, setAnilistData] = useState(null);
+  const [anilistSeasons, setAnilistSeasons] = useState(null); // [{seasonNum, title, episodes, year}]
+  const [menuPos, setMenuPos] = useState(null);
+  const sourceRef = useRef(null);
+
+  // Derived: detect anime before any effects so effects can use it
+  const isAnime = isAnimeContent(item, details);
+  const currentSrcObj =
+    PLAYER_SOURCES.find((s) => s.id === playerSource) ?? PLAYER_SOURCES[0];
   const [downloaderFolder, setDownloaderFolder] = useState(
     () => storage.get("downloaderFolder") || "",
   );
@@ -214,45 +246,6 @@ export default function TVPage({
   const [ratingCountry] = useState(() => getRatingCountry(storage));
   const restricted = isRestricted(rating.minAge, ageLimitSetting);
   const [seasonMenu, setSeasonMenu] = useState(null); // { x, y, seasonNum }
-
-  // Check if all episodes of a season are watched
-  const isSeasonWatched = (seasonNum) => {
-    const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
-    const count =
-      seasonNum === selectedSeason
-        ? seasonData?.episodes?.length || seasonInfo?.episode_count || 0
-        : seasonInfo?.episode_count || 0;
-    if (!count) return false;
-    for (let i = 1; i <= count; i++) {
-      if (!watched?.[`tv_${item.id}_s${seasonNum}e${i}`]) return false;
-    }
-    return true;
-  };
-
-  const markSeasonWatched = (seasonNum) => {
-    const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
-    const episodes = seasonNum === selectedSeason ? seasonData?.episodes : null;
-    const count = episodes?.length || seasonInfo?.episode_count || 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    for (let i = 1; i <= count; i++) {
-      // Skip unreleased episodes (only when we have episode data with air_date)
-      if (episodes) {
-        const ep = episodes.find((e) => e.episode_number === i);
-        if (ep?.air_date && new Date(ep.air_date) > today) continue;
-      }
-      onMarkWatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
-    }
-  };
-
-  const markSeasonUnwatched = (seasonNum) => {
-    const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
-    const episodes = seasonNum === selectedSeason ? seasonData?.episodes : null;
-    const count = episodes?.length || seasonInfo?.episode_count || 0;
-    for (let i = 1; i <= count; i++) {
-      onMarkUnwatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
-    }
-  };
 
   // Read threshold from settings (default 20s)
   const watchedThreshold = storage.get("watchedThreshold") ?? 20;
@@ -294,16 +287,98 @@ export default function TVPage({
     setLoadingSeason(true);
     setSelectedEp(null);
     setPlaying(false);
-    tmdbFetch(`/tv/${item.id}/season/${selectedSeason}`, apiKey)
+    // When using AniList seasons on a TMDB single-season show, always fetch TMDB S1
+    // (all episodes live there); slicing into virtual seasons is done client-side.
+    const tmdbSeasonToFetch =
+      isAnime && anilistSeasons?.length > 0 && tmdbSeasons.length <= 1
+        ? 1
+        : selectedSeason;
+    tmdbFetch(`/tv/${item.id}/season/${tmdbSeasonToFetch}`, apiKey)
       .then(setSeasonData)
       .catch(() => {})
       .finally(() => setLoadingSeason(false));
   }, [item.id, selectedSeason, apiKey]);
 
-  // Reset m3u8 URL whenever the series or episode changes
+  // Reset m3u8 URL and source menu whenever the series, episode, or source changes
   useEffect(() => {
     setM3u8Url(null);
-  }, [item.id, selectedEp?.episode_number, selectedSeason]);
+    setShowSourceMenu(false);
+    setResolvedPlayerUrl(null);
+    setResolvingUrl(false);
+    setResolveError(null);
+    setResolvedFallback(false);
+  }, [item.id, selectedEp?.episode_number, selectedSeason, playerSource]);
+
+  // Fetch AniList metadata + auto-set anime source
+  useEffect(() => {
+    setAnilistData(null);
+    setAnilistSeasons(null);
+    if (isAnime) {
+      fetchAnilistData(title, "ANIME").then((data) => {
+        if (data) {
+          setAnilistData(data);
+          const seasons = buildAnilistSeasons(data);
+          if (seasons?.length) setAnilistSeasons(seasons);
+        }
+      });
+      // Switch to anime source if current source is not an anime source
+      const currentSrc = PLAYER_SOURCES.find((s) => s.id === playerSource);
+      if (!currentSrc?.tag) {
+        const saved = storage.get("playerSource");
+        const savedSrc = PLAYER_SOURCES.find((s) => s.id === saved);
+        setPlayerSource(savedSrc?.tag ? saved : ANIME_DEFAULT_SOURCE);
+      }
+    } else {
+      // Switch back to non-anime source if current source is anime-only
+      const currentSrc = PLAYER_SOURCES.find((s) => s.id === playerSource);
+      if (currentSrc?.tag) {
+        const saved = storage.get("playerSource");
+        const savedSrc = PLAYER_SOURCES.find((s) => s.id === saved);
+        setPlayerSource(!savedSrc?.tag ? saved : NON_ANIME_DEFAULT_SOURCE);
+      }
+    }
+  }, [item.id, isAnime]);
+
+  // Resolve allmanga episode URL via main-process IPC (GraphQL, no CORS)
+  useEffect(() => {
+    if (!playing || !selectedEp || !sourceIsAsync(playerSource)) return;
+    if (resolvedPlayerUrl || resolvingUrl) return;
+    setResolvingUrl(true);
+    setResolveError(null);
+    const epNum = selectedEp.episode_number;
+    window.electron
+      .resolveAllManga({
+        title,
+        seasonNumber: selectedSeason,
+        episodeNumber: epNum,
+      })
+      .then((res) => {
+        if (res?.ok && res.url) {
+          if (res.isDirectMp4 !== undefined) {
+            // AllManga: got direct mp4/m3u8 URL — serve via local player page
+            // so the webview plays it as video instead of downloading it
+            window.electron
+              .setPlayerVideo({
+                url: res.url,
+                referer: res.referer || "https://allmanga.to",
+              })
+              .then((r) => {
+                setResolvedPlayerUrl(r.playerUrl);
+                // Also expose raw url so download button can use it
+                setM3u8Url(res.url);
+              })
+              .catch(() => setResolveError("Failed to start local player"));
+          } else {
+            setResolvedPlayerUrl(res.url);
+          }
+          setResolvedFallback(false);
+        } else {
+          setResolveError(res?.error || "Episode not found on AllManga");
+        }
+      })
+      .catch((e) => setResolveError(e.message || "Error"))
+      .finally(() => setResolvingUrl(false));
+  }, [playing, selectedEp, playerSource, selectedSeason]);
 
   useEffect(() => {
     if (!window.electron) return;
@@ -316,7 +391,122 @@ export default function TVPage({
   const d = details || item;
   const title = d.name || d.title;
   const year = (d.first_air_date || "").slice(0, 4);
-  const seasons = (d.seasons || []).filter((s) => s.season_number > 0);
+
+  // ── Season list: prefer AniList structure for anime ───────────────────────
+  // TMDB sometimes collapses all seasons into S1 for anime. AniList correctly
+  // represents each cour/season as a separate entry via SEQUEL relations.
+  // When AniList gives us >1 season but TMDB only has 1, use AniList seasons.
+  const tmdbSeasons = (d.seasons || []).filter((s) => s.season_number > 0);
+  const useAnilistSeasons =
+    isAnime &&
+    anilistSeasons?.length > 0 &&
+    (tmdbSeasons.length <= 1 || anilistSeasons.length > tmdbSeasons.length);
+
+  const seasons = useAnilistSeasons
+    ? anilistSeasons.map((s) => ({
+        season_number: s.seasonNum,
+        name: s.title || `Season ${s.seasonNum}`,
+        episode_count: s.episodes || 0,
+      }))
+    : tmdbSeasons;
+
+  // ── Episode slice: when using AniList seasons with TMDB-single-season data ─
+  // If TMDB only has S1 (all eps in one bucket), we slice that flat list into
+  // per-AniList-season chunks. seasonData (fetched from TMDB) always comes from
+  // TMDB S1 in this case, so we offset by total episodes in prior AniList seasons.
+  const getSeasonEpisodes = (rawEpisodes) => {
+    if (!useAnilistSeasons || !rawEpisodes) return rawEpisodes;
+    // Only slice when TMDB has ≤1 real season (all eps in S1)
+    if (tmdbSeasons.length > 1) return rawEpisodes;
+    // Calculate episode offset: sum of episodes in all prior AniList seasons
+    let offset = 0;
+    for (const s of anilistSeasons) {
+      if (s.seasonNum < selectedSeason) offset += s.episodes || 0;
+    }
+    const count =
+      anilistSeasons.find((s) => s.seasonNum === selectedSeason)?.episodes ||
+      rawEpisodes.length;
+    // Remap episode numbers to start at 1 within this season
+    return rawEpisodes.slice(offset, offset + count).map((ep, i) => ({
+      ...ep,
+      episode_number: i + 1,
+      _tmdbAbsolute: ep.episode_number,
+    }));
+  };
+
+  // ── Player episode mapping ─────────────────────────────────────────────────
+  // When we've sliced AniList seasons from a flat TMDB S1, the player needs the
+  // original absolute TMDB episode number (stored as _tmdbAbsolute), not the
+  // remapped 1-based number. Season always uses AniList season number directly.
+  const getPlayerEp = (ep) => {
+    if (!ep) return { season: selectedSeason, episode: ep?.episode_number };
+    return {
+      season: selectedSeason,
+      episode: ep._tmdbAbsolute ?? ep.episode_number,
+    };
+  };
+
+  // Prefer AniList metadata for anime when available
+  const displayOverview =
+    isAnime && anilistData?.description
+      ? cleanAnilistDescription(anilistData.description)
+      : d.overview;
+  const displayScore =
+    isAnime && anilistData?.averageScore
+      ? (anilistData.averageScore / 10).toFixed(1)
+      : d.vote_average > 0
+        ? d.vote_average.toFixed(1)
+        : null;
+  const displayGenres =
+    isAnime && anilistData?.genres?.length
+      ? anilistData.genres.map((g, i) => ({ id: i, name: g }))
+      : d.genres || [];
+
+  // ── Season watched helpers (depend on seasons + getSeasonEpisodes) ────────
+  const isSeasonWatched = (seasonNum) => {
+    const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
+    const count =
+      seasonNum === selectedSeason
+        ? getSeasonEpisodes(seasonData?.episodes)?.length ||
+          seasonInfo?.episode_count ||
+          0
+        : seasonInfo?.episode_count || 0;
+    if (!count) return false;
+    for (let i = 1; i <= count; i++) {
+      if (!watched?.[`tv_${item.id}_s${seasonNum}e${i}`]) return false;
+    }
+    return true;
+  };
+
+  const markSeasonWatched = (seasonNum) => {
+    const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
+    const episodes =
+      seasonNum === selectedSeason
+        ? getSeasonEpisodes(seasonData?.episodes)
+        : null;
+    const count = episodes?.length || seasonInfo?.episode_count || 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = 1; i <= count; i++) {
+      if (episodes) {
+        const ep = episodes.find((e) => e.episode_number === i);
+        if (ep?.air_date && new Date(ep.air_date) > today) continue;
+      }
+      onMarkWatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
+    }
+  };
+
+  const markSeasonUnwatched = (seasonNum) => {
+    const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
+    const episodes =
+      seasonNum === selectedSeason
+        ? getSeasonEpisodes(seasonData?.episodes)
+        : null;
+    const count = episodes?.length || seasonInfo?.episode_count || 0;
+    for (let i = 1; i <= count; i++) {
+      onMarkUnwatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
+    }
+  };
 
   const currentProgressKey = selectedEp
     ? `tv_${item.id}_s${selectedSeason}e${selectedEp.episode_number}`
@@ -432,10 +622,14 @@ export default function TVPage({
       clearTimeout(timer);
       clearInterval(interval);
     };
-  }, [playing, currentProgressKey, watchedThreshold]);
+  }, [playing, currentProgressKey, watchedThreshold, playerSource]);
 
   const playEpisode = (ep) => {
     setM3u8Url(null);
+    setResolvedPlayerUrl(null);
+    setResolvingUrl(false);
+    setResolveError(null);
+    setResolvedFallback(false);
     setSelectedEp(ep);
     setPlaying(true);
     onHistory({
@@ -500,16 +694,16 @@ export default function TVPage({
                 <div className="detail-type">Series</div>
                 <div className="detail-title">{title}</div>
                 <div className="genres">
-                  {(d.genres || []).map((g) => (
+                  {displayGenres.map((g) => (
                     <span key={g.id} className="genre-tag">
                       {g.name}
                     </span>
                   ))}
                 </div>
                 <div className="detail-meta">
-                  {d.vote_average > 0 && (
+                  {displayScore && (
                     <span className="detail-rating">
-                      <StarIcon /> {d.vote_average?.toFixed(1)}
+                      <StarIcon /> {displayScore}
                     </span>
                   )}
                   {year && <span>{year}</span>}
@@ -537,7 +731,7 @@ export default function TVPage({
                     )}
                   </div>
                 )}
-                <p className="detail-overview">{d.overview}</p>
+                <p className="detail-overview">{displayOverview}</p>
                 <div className="detail-actions">
                   {trailerKey &&
                     (restricted ? (
@@ -603,12 +797,71 @@ export default function TVPage({
                 )}
               </div>
               <div className="player-wrap">
-                <webview
-                  src={videasyTVUrl(
-                    item.id,
-                    selectedSeason,
-                    selectedEp.episode_number,
+                {/* 9anime: spinner while looking up episode */}
+                {sourceIsAsync(playerSource) && resolvingUrl && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      zIndex: 10,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "rgba(0,0,0,0.85)",
+                      gap: 14,
+                      borderRadius: "inherit",
+                    }}
+                  >
+                    <div className="spinner" />
+                    <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                      Looking up episode on AllManga…
+                    </span>
+                  </div>
+                )}
+                {/* 9anime: error if lookup failed */}
+                {sourceIsAsync(playerSource) &&
+                  resolveError &&
+                  !resolvingUrl && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        zIndex: 10,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: "rgba(0,0,0,0.85)",
+                        gap: 10,
+                        borderRadius: "inherit",
+                      }}
+                    >
+                      <span style={{ fontSize: 28 }}>⚠️</span>
+                      <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                        Episode not found on AllManga
+                      </span>
+                      <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                        {resolveError}
+                      </span>
+                      <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                        Try a different source.
+                      </span>
+                    </div>
                   )}
+                <webview
+                  src={
+                    sourceIsAsync(playerSource)
+                      ? resolvedPlayerUrl || "about:blank"
+                      : getSourceUrl(
+                          playerSource,
+                          "tv",
+                          item.id,
+                          getPlayerEp(selectedEp).season,
+                          getPlayerEp(selectedEp).episode,
+                          title,
+                        )
+                  }
                   partition="persist:videasy"
                   allowpopups="false"
                   sandbox="allow-scripts allow-same-origin allow-forms"
@@ -618,14 +871,76 @@ export default function TVPage({
                     width: "100%",
                     height: "100%",
                     border: "none",
+                    visibility:
+                      sourceIsAsync(playerSource) && !resolvedPlayerUrl
+                        ? "hidden"
+                        : "visible",
                   }}
                 />
+                {/* Source button – left side overlay */}
+                <button
+                  ref={sourceRef}
+                  className="player-overlay-btn"
+                  style={{ left: 12, right: "auto" }}
+                  onClick={() => {
+                    const rect = sourceRef.current?.getBoundingClientRect();
+                    if (rect)
+                      setMenuPos({ top: rect.bottom + 6, left: rect.left });
+                    setShowSourceMenu((v) => !v);
+                  }}
+                  title="Change source"
+                >
+                  <SourceIcon />
+                  {PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ??
+                    "Source"}
+                </button>
+                {showSourceMenu && menuPos && (
+                  <div
+                    className="source-dropdown source-dropdown--fixed"
+                    style={{ top: menuPos.top, left: menuPos.left }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {PLAYER_SOURCES.map((src) => (
+                      <button
+                        key={src.id}
+                        className={
+                          "source-dropdown__item" +
+                          (playerSource === src.id
+                            ? " source-dropdown__item--active"
+                            : "")
+                        }
+                        onClick={() => {
+                          setPlayerSource(src.id);
+                          storage.set("playerSource", src.id);
+                          setShowSourceMenu(false);
+                          setM3u8Url(null);
+                          setResolvedPlayerUrl(null);
+                          setResolvingUrl(false);
+                          setResolveError(null);
+                          setResolvedFallback(false);
+                        }}
+                      >
+                        <span>{src.label}</span>
+                        {src.tag && (
+                          <span className="source-dropdown__tag">
+                            {src.tag}
+                          </span>
+                        )}
+                        {src.note && (
+                          <span className="source-dropdown__note">
+                            {src.note}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <button
                   className="player-overlay-btn"
                   onClick={() =>
                     currentEpDownload
                       ? onGoToDownloads?.(currentEpDownload.id)
-                      : setShowDownload(true)
+                      : (setShowSourceMenu(false), setShowDownload(true))
                   }
                   title={
                     currentEpDownload
@@ -653,8 +968,17 @@ export default function TVPage({
                   {!currentEpDownload && m3u8Url && (
                     <span className="player-overlay-dot" />
                   )}
+                  {!sourceSupportsProgress(playerSource) && (
+                    <span
+                      className="player-no-progress-hint"
+                      title="No automatic progress tracking for this source"
+                    >
+                      ⚠ no tracking
+                    </span>
+                  )}
                 </button>
               </div>
+
               {currentProgressKey && (
                 <div className="progress-mark-row">
                   <span
@@ -718,10 +1042,11 @@ export default function TVPage({
             {!loadingSeason && seasonData?.episodes && (
               <div className="episodes-grid">
                 {(() => {
+                  const episodes = getSeasonEpisodes(seasonData.episodes);
                   // Compute today once, outside the per-episode loop
                   const todayEp = new Date();
                   todayEp.setHours(0, 0, 0, 0);
-                  return seasonData.episodes.map((ep) => {
+                  return episodes.map((ep) => {
                     const pk = `tv_${item.id}_s${selectedSeason}e${ep.episode_number}`;
                     const epPct = progress[pk] || 0;
                     const epWatched = !!watched?.[pk];
