@@ -7,7 +7,7 @@ A cross-platform Electron Desktop App to stream and download any Movie or TV Ser
 ---
 ---
 ## Streaming
-The Application gets Video Streams from videasy.net (more Providers will follow). <br></br>
+The Application mainly gets Video Streams from videasy.net (you can also Stream from VidScr and 2Embed). <br></br>
 It fetches Information for Images, Info Texts, Search and Homepage from [tmdb](https://www.themoviedb.org/).
 
 ---
@@ -17,6 +17,11 @@ You can download those Video Streams because the Program sources Links to their 
 Once you click 'Download' these Links are used to download the Full Movie/TV Episode using [this Program](https://github.com/truelockmc/video-downloader). You can then watch them In-App or take the Files on any Storage Medium you want.
 
 ---
+
+## Anime
+You can also watch Anime, the App checks if a Movie or Series is an Anime and then sources its Metadata from [AniList](https://anilist.co/) instead of [tmdb](https://www.themoviedb.org/). <br></br>
+The Media Files for Animes are scraped from AllManga.to (i stole this mechanic from [ani-cli](https://github.com/pystardust/ani-cli). The App directly gets the .mp4 Files and doesnt show you the AllManga website you can also download these Files just like with other Movies and Series.
+
 
 ## Requirements
 
