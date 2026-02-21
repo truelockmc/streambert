@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   tmdbFetch,
   imgUrl,
@@ -393,51 +393,51 @@ export default function TVPage({
   const year = (d.first_air_date || "").slice(0, 4);
 
   // ── Season list: prefer AniList structure for anime ───────────────────────
-  // TMDB sometimes collapses all seasons into S1 for anime. AniList correctly
-  // represents each cour/season as a separate entry via SEQUEL relations.
-  // When AniList gives us >1 season but TMDB only has 1, use AniList seasons.
-  const tmdbSeasons = (d.seasons || []).filter((s) => s.season_number > 0);
-  const useAnilistSeasons =
-    isAnime &&
-    anilistSeasons?.length > 0 &&
-    (tmdbSeasons.length <= 1 || anilistSeasons.length > tmdbSeasons.length);
+  const tmdbSeasons = useMemo(
+    () => (d.seasons || []).filter((s) => s.season_number > 0),
+    [d.seasons],
+  );
+  const useAnilistSeasons = useMemo(
+    () =>
+      isAnime &&
+      anilistSeasons?.length > 0 &&
+      (tmdbSeasons.length <= 1 || anilistSeasons.length > tmdbSeasons.length),
+    [isAnime, anilistSeasons, tmdbSeasons],
+  );
 
-  const seasons = useAnilistSeasons
-    ? anilistSeasons.map((s) => ({
-        season_number: s.seasonNum,
-        name: s.title || `Season ${s.seasonNum}`,
-        episode_count: s.episodes || 0,
-      }))
-    : tmdbSeasons;
+  const seasons = useMemo(
+    () =>
+      useAnilistSeasons
+        ? anilistSeasons.map((s) => ({
+            season_number: s.seasonNum,
+            name: s.title || `Season ${s.seasonNum}`,
+            episode_count: s.episodes || 0,
+          }))
+        : tmdbSeasons,
+    [useAnilistSeasons, anilistSeasons, tmdbSeasons],
+  );
 
-  // ── Episode slice: when using AniList seasons with TMDB-single-season data ─
-  // If TMDB only has S1 (all eps in one bucket), we slice that flat list into
-  // per-AniList-season chunks. seasonData (fetched from TMDB) always comes from
-  // TMDB S1 in this case, so we offset by total episodes in prior AniList seasons.
-  const getSeasonEpisodes = (rawEpisodes) => {
-    if (!useAnilistSeasons || !rawEpisodes) return rawEpisodes;
-    // Only slice when TMDB has ≤1 real season (all eps in S1)
-    if (tmdbSeasons.length > 1) return rawEpisodes;
-    // Calculate episode offset: sum of episodes in all prior AniList seasons
-    let offset = 0;
-    for (const s of anilistSeasons) {
-      if (s.seasonNum < selectedSeason) offset += s.episodes || 0;
-    }
-    const count =
-      anilistSeasons.find((s) => s.seasonNum === selectedSeason)?.episodes ||
-      rawEpisodes.length;
-    // Remap episode numbers to start at 1 within this season
-    return rawEpisodes.slice(offset, offset + count).map((ep, i) => ({
-      ...ep,
-      episode_number: i + 1,
-      _tmdbAbsolute: ep.episode_number,
-    }));
-  };
+  // ── Episode slice ──────────────────────────────────────────────────────────
+  const getSeasonEpisodes = useMemo(() => {
+    return (rawEpisodes) => {
+      if (!useAnilistSeasons || !rawEpisodes) return rawEpisodes;
+      if (tmdbSeasons.length > 1) return rawEpisodes;
+      let offset = 0;
+      for (const s of anilistSeasons) {
+        if (s.seasonNum < selectedSeason) offset += s.episodes || 0;
+      }
+      const count =
+        anilistSeasons.find((s) => s.seasonNum === selectedSeason)?.episodes ||
+        rawEpisodes.length;
+      return rawEpisodes.slice(offset, offset + count).map((ep, i) => ({
+        ...ep,
+        episode_number: i + 1,
+        _tmdbAbsolute: ep.episode_number,
+      }));
+    };
+  }, [useAnilistSeasons, tmdbSeasons.length, anilistSeasons, selectedSeason]);
 
   // ── Player episode mapping ─────────────────────────────────────────────────
-  // When we've sliced AniList seasons from a flat TMDB S1, the player needs the
-  // original absolute TMDB episode number (stored as _tmdbAbsolute), not the
-  // remapped 1-based number. Season always uses AniList season number directly.
   const getPlayerEp = (ep) => {
     if (!ep) return { season: selectedSeason, episode: ep?.episode_number };
     return {
@@ -446,30 +446,60 @@ export default function TVPage({
     };
   };
 
-  // Prefer AniList metadata for anime when available
-  const displayOverview =
-    isAnime && anilistData?.description
-      ? cleanAnilistDescription(anilistData.description)
-      : d.overview;
-  const displayScore =
-    isAnime && anilistData?.averageScore
-      ? (anilistData.averageScore / 10).toFixed(1)
-      : d.vote_average > 0
-        ? d.vote_average.toFixed(1)
-        : null;
-  const displayGenres =
-    isAnime && anilistData?.genres?.length
-      ? anilistData.genres.map((g, i) => ({ id: i, name: g }))
-      : d.genres || [];
+  // ── Memoized current season episodes ──────────────────────────────────────
+  const currentSeasonEpisodes = useMemo(
+    () => getSeasonEpisodes(seasonData?.episodes) || [],
+    [getSeasonEpisodes, seasonData],
+  );
 
-  // ── Season watched helpers (depend on seasons + getSeasonEpisodes) ────────
+  // ── Downloads lookup map: O(1) per episode instead of O(n) ───────────────
+  const downloadsByEpisodeKey = useMemo(() => {
+    const map = new Map();
+    for (const dl of downloads || []) {
+      if (
+        dl.mediaType === "tv" &&
+        (dl.tmdbId === item.id || dl.mediaId === item.id) &&
+        (dl.status === "completed" ||
+          dl.status === "local" ||
+          dl.status === "downloading")
+      ) {
+        map.set(`s${dl.season}e${dl.episode}`, dl);
+      }
+    }
+    return map;
+  }, [downloads, item.id]);
+
+  // Prefer AniList metadata for anime when available
+  const displayOverview = useMemo(
+    () =>
+      isAnime && anilistData?.description
+        ? cleanAnilistDescription(anilistData.description)
+        : d.overview,
+    [isAnime, anilistData?.description, d.overview],
+  );
+  const displayScore = useMemo(
+    () =>
+      isAnime && anilistData?.averageScore
+        ? (anilistData.averageScore / 10).toFixed(1)
+        : d.vote_average > 0
+          ? d.vote_average.toFixed(1)
+          : null,
+    [isAnime, anilistData?.averageScore, d.vote_average],
+  );
+  const displayGenres = useMemo(
+    () =>
+      isAnime && anilistData?.genres?.length
+        ? anilistData.genres.map((g, i) => ({ id: i, name: g }))
+        : d.genres || [],
+    [isAnime, anilistData?.genres, d.genres],
+  );
+
+  // ── Season watched helpers ─────────────────────────────────────────────────
   const isSeasonWatched = (seasonNum) => {
     const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
     const count =
       seasonNum === selectedSeason
-        ? getSeasonEpisodes(seasonData?.episodes)?.length ||
-          seasonInfo?.episode_count ||
-          0
+        ? currentSeasonEpisodes.length || seasonInfo?.episode_count || 0
         : seasonInfo?.episode_count || 0;
     if (!count) return false;
     for (let i = 1; i <= count; i++) {
@@ -481,9 +511,7 @@ export default function TVPage({
   const markSeasonWatched = (seasonNum) => {
     const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
     const episodes =
-      seasonNum === selectedSeason
-        ? getSeasonEpisodes(seasonData?.episodes)
-        : null;
+      seasonNum === selectedSeason ? currentSeasonEpisodes : null;
     const count = episodes?.length || seasonInfo?.episode_count || 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -499,9 +527,7 @@ export default function TVPage({
   const markSeasonUnwatched = (seasonNum) => {
     const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
     const episodes =
-      seasonNum === selectedSeason
-        ? getSeasonEpisodes(seasonData?.episodes)
-        : null;
+      seasonNum === selectedSeason ? currentSeasonEpisodes : null;
     const count = episodes?.length || seasonInfo?.episode_count || 0;
     for (let i = 1; i <= count; i++) {
       onMarkUnwatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
@@ -514,16 +540,9 @@ export default function TVPage({
 
   // Check if currently-playing episode is already downloaded or downloading
   const currentEpDownload = selectedEp
-    ? (downloads || []).find(
-        (dl) =>
-          dl.mediaType === "tv" &&
-          (dl.tmdbId === item.id || dl.mediaId === item.id) &&
-          dl.season === selectedSeason &&
-          dl.episode === selectedEp.episode_number &&
-          (dl.status === "completed" ||
-            dl.status === "local" ||
-            dl.status === "downloading"),
-      )
+    ? (downloadsByEpisodeKey.get(
+        `s${selectedSeason}e${selectedEp.episode_number}`,
+      ) ?? null)
     : null;
 
   // Reset auto-mark guard when episode changes
@@ -1059,7 +1078,7 @@ export default function TVPage({
             {!loadingSeason && seasonData?.episodes && (
               <div className="episodes-grid">
                 {(() => {
-                  const episodes = getSeasonEpisodes(seasonData.episodes);
+                  const episodes = currentSeasonEpisodes;
                   // Compute today once, outside the per-episode loop
                   const todayEp = new Date();
                   todayEp.setHours(0, 0, 0, 0);
@@ -1075,16 +1094,10 @@ export default function TVPage({
                     const epUnreleased = ep.air_date
                       ? new Date(ep.air_date) > todayEp
                       : false;
-                    const epDownload = (downloads || []).find(
-                      (dl) =>
-                        dl.mediaType === "tv" &&
-                        (dl.tmdbId === item.id || dl.mediaId === item.id) &&
-                        dl.season === selectedSeason &&
-                        dl.episode === ep.episode_number &&
-                        (dl.status === "completed" ||
-                          dl.status === "local" ||
-                          dl.status === "downloading"),
-                    );
+                    const epDownload =
+                      downloadsByEpisodeKey.get(
+                        `s${selectedSeason}e${ep.episode_number}`,
+                      ) ?? null;
                     return (
                       <div
                         key={ep.episode_number}
