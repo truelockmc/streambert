@@ -20,7 +20,7 @@ Once you click 'Download' these Links are used to download the Full Movie/TV Epi
 
 ## Anime
 You can also watch Anime, the App checks if a Movie or Series is an Anime and then sources its Metadata from [AniList](https://anilist.co/) instead of [tmdb](https://www.themoviedb.org/). <br></br>
-The Media Files for Animes are scraped from AllManga.to (i stole this mechanic from [ani-cli](https://github.com/pystardust/ani-cli)) The App directly gets the .mp4 Files and doesnt show you the AllManga website you can also download these Files just like with other Movies and Series.
+Media Files for Animes are scraped from AllManga.to (i stole this mechanic from [ani-cli](https://github.com/pystardust/ani-cli)). The App directly gets .mp4 Files and doesnt evem show you the AllManga website, you can also download these Files, just like any other Content.
 
 
 ## Requirements
