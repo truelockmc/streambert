@@ -144,7 +144,45 @@ query ($search: String, $type: MediaType) {
   }
 }`;
 
+// ── AniList cache (localStorage) ─────────────────────────────────────────────
+const ANILIST_CACHE_KEY = "streambert_anilistCache";
+const ANILIST_CACHE_TTL = 1000 * 60 * 60 * 24 * 7; // 7 days
+
+function readAnilistCache() {
+  try {
+    const raw = localStorage.getItem(ANILIST_CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeAnilistCache(cache) {
+  try {
+    localStorage.setItem(ANILIST_CACHE_KEY, JSON.stringify(cache));
+  } catch {}
+}
+
+function evictStaleAnilist(cache) {
+  const now = Date.now();
+  for (const key of Object.keys(cache)) {
+    if (now - cache[key].ts > ANILIST_CACHE_TTL) {
+      delete cache[key];
+    }
+  }
+  return cache;
+}
+
 export const fetchAnilistData = async (title, type = "ANIME") => {
+  const cacheKey = `${type}__${title.toLowerCase().trim()}`;
+
+  // Return cached data if still fresh (also works offline)
+  const cache = evictStaleAnilist(readAnilistCache());
+  const entry = cache[cacheKey];
+  if (entry && Date.now() - entry.ts <= ANILIST_CACHE_TTL) {
+    return entry.data;
+  }
+
   try {
     const res = await fetch(ANILIST_API, {
       method: "POST",
@@ -158,8 +196,16 @@ export const fetchAnilistData = async (title, type = "ANIME") => {
       }),
     });
     const json = await res.json();
-    return json?.data?.Media || null;
+    const data = json?.data?.Media || null;
+
+    // Persist to cache (even null results, so we don't hammer the API)
+    cache[cacheKey] = { data, ts: Date.now() };
+    writeAnilistCache(cache);
+
+    return data;
   } catch {
+    // Offline or network error – return stale cache entry if available
+    if (entry) return entry.data;
     return null;
   }
 };
