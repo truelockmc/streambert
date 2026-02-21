@@ -346,6 +346,8 @@ export default function TVPage({
     setResolvingUrl(true);
     setResolveError(null);
     const epNum = selectedEp.episode_number;
+    const progressKey = `tv_${item.id}_s${selectedSeason}e${epNum}`;
+    const startTime = storage.get("dlTime_" + progressKey) || 0;
     window.electron
       .resolveAllManga({
         title,
@@ -355,12 +357,11 @@ export default function TVPage({
       .then((res) => {
         if (res?.ok && res.url) {
           if (res.isDirectMp4 !== undefined) {
-            // AllManga: got direct mp4/m3u8 URL — serve via local player page
-            // so the webview plays it as video instead of downloading it
             window.electron
               .setPlayerVideo({
                 url: res.url,
                 referer: res.referer || "https://allmanga.to",
+                startTime,
               })
               .then((r) => {
                 setResolvedPlayerUrl(r.playerUrl);

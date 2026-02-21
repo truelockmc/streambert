@@ -377,7 +377,7 @@ ipcMain.handle(
         // Multiple patterns can match the same line (e.g. frag + speed + size).
         const update = {};
 
-        // ── (frag N/total) — THE source of truth for overall progress ────────
+        // ── (frag N/total) — THE source of truth for HLS overall progress ───
         // Appears as: "... (frag 4/672)" or "(frag 4/672)"
         const fragMatch = trimmed.match(/\(frag\s+(\d+)\/(\d+)\)/);
         if (fragMatch) {
@@ -390,6 +390,82 @@ ipcMain.handle(
             Math.round((currentFrag / total) * 100),
           );
           update.lastMessage = `Fragment ${currentFrag} / ${total}`;
+        }
+
+        // ── [download] X% of Y — direct mp4 HTTP download progress ──────────
+        // e.g. "[download]  43.2% of  271.89MiB at  3.05MiB/s ETA 02:30"
+        // Only use when there are no fragments (i.e. not HLS)
+        if (!fragMatch && !downloads[idx].totalFragments) {
+          const dlPctMatch = trimmed.match(
+            /^\[download\]\s+([\d.]+)%\s+of\s+~?\s*([\d.]+\s*(?:[KMGT]i?B|B))/i,
+          );
+          if (dlPctMatch) {
+            const pct = parseFloat(dlPctMatch[1]);
+            update.progress = Math.min(99, Math.round(pct));
+            update.size = dlPctMatch[2].trim();
+            // Extract speed if present: "at X.XMiB/s"
+            const spMatch = trimmed.match(
+              /\bat\s+([\d.]+\s*(?:[KMGT]i?B|B)\/s)/i,
+            );
+            if (spMatch) update.speed = spMatch[1].trim();
+            update.lastMessage = `${Math.round(pct)}% of ${update.size}`;
+          }
+        }
+
+        // ── ffmpeg Duration line: "Duration: HH:MM:SS.xx" ───────────────────
+        // Emitted early in ffmpeg stderr — used to compute % from time=
+        const durationMatch = trimmed.match(/Duration:\s*(\d+):(\d+):([\d.]+)/);
+        if (durationMatch) {
+          const totalSecs =
+            parseInt(durationMatch[1]) * 3600 +
+            parseInt(durationMatch[2]) * 60 +
+            parseFloat(durationMatch[3]);
+          if (totalSecs > 0) {
+            downloads[idx]._ffmpegTotalSecs = totalSecs;
+          }
+          return;
+        }
+
+        // ── ffmpeg progress: "size= 122880kB time=00:10:36.34 bitrate=..." ──
+        const ffmpegMatch = trimmed.match(
+          /size=\s*([\d.]+\s*\w+)\s+time=(\d+):(\d+):([\d.]+)/i,
+        );
+        if (ffmpegMatch) {
+          const elapsedSecs =
+            parseInt(ffmpegMatch[2]) * 3600 +
+            parseInt(ffmpegMatch[3]) * 60 +
+            parseFloat(ffmpegMatch[4]);
+          const totalSecs = downloads[idx]._ffmpegTotalSecs || 0;
+          if (totalSecs > 0) {
+            update.progress = Math.min(
+              99,
+              Math.round((elapsedSecs / totalSecs) * 100),
+            );
+          }
+          // Parse size: "122880kB" → convert to human-readable MiB
+          const rawSize = ffmpegMatch[1].trim();
+          const kbMatch = rawSize.match(/([\d.]+)\s*kB/i);
+          if (kbMatch) {
+            const mb = parseFloat(kbMatch[1]) / 1024;
+            update.size =
+              mb >= 1024
+                ? `${(mb / 1024).toFixed(1)} GiB`
+                : `${mb.toFixed(1)} MiB`;
+          } else {
+            update.size = rawSize;
+          }
+          // Parse speed: "speed=29.4x" → show as multiplier
+          const speedXMatch = trimmed.match(/speed=\s*([\d.]+)x/i);
+          if (speedXMatch) update.speed = `${speedXMatch[1]}x`;
+          // Parse bitrate
+          const bitrateMatch = trimmed.match(
+            /bitrate=\s*([\d.]+\s*\S+bits\/s)/i,
+          );
+          if (bitrateMatch) {
+            update.lastMessage = `Processing… ${update.size}${update.speed ? ` at ${update.speed}` : ""}`;
+          } else {
+            update.lastMessage = `Processing… ${update.size}`;
+          }
         }
 
         // ── speed: "at X.XMiB/s" or "at X.XKiB/s" ──────────────────────────
@@ -1070,6 +1146,7 @@ const EPISODE_GQL = `query($showId:String! $translationType:VaildTranslationType
 let _playerServer = null;
 let _currentVideoUrl = null;
 let _currentVideoReferer = "https://allmanga.to";
+let _currentVideoStartTime = 0;
 
 function getPlayerServer() {
   if (_playerServer) return Promise.resolve(_playerServer);
@@ -1081,6 +1158,7 @@ function getPlayerServer() {
       if (url.pathname === "/player" || url.pathname === "/") {
         const videoUrl = _currentVideoUrl || "";
         const isM3u8 = videoUrl.includes(".m3u8");
+        const startTime = _currentVideoStartTime || 0;
         // For m3u8 we use hls.js; for mp4 a plain <video> suffices
         const html = `<!DOCTYPE html>
 <html>
@@ -1101,16 +1179,26 @@ ${
 <script>
   const video = document.getElementById('v');
   const src = decodeURIComponent("${encodeURIComponent(videoUrl)}");
+  const startTime = ${startTime};
   if (Hls.isSupported()) {
     const hls = new Hls({ xhrSetup: (xhr) => xhr.setRequestHeader('Referer','${_currentVideoReferer}') });
     hls.loadSource(src);
     hls.attachMedia(video);
-    hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(()=>{}));
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      if (startTime > 0) video.currentTime = startTime;
+      video.play().catch(()=>{});
+    });
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
     video.src = src;
+    if (startTime > 0) video.addEventListener('loadedmetadata', () => { video.currentTime = startTime; }, { once: true });
   }
 </script>`
-    : ""
+    : startTime > 0
+      ? `<script>
+  const v = document.getElementById('v');
+  v.addEventListener('loadedmetadata', () => { v.currentTime = ${startTime}; }, { once: true });
+</script>`
+      : ""
 }
 </body>
 </html>`;
@@ -1192,9 +1280,10 @@ ${
   });
 }
 
-ipcMain.handle("set-player-video", async (_, { url, referer }) => {
+ipcMain.handle("set-player-video", async (_, { url, referer, startTime }) => {
   _currentVideoUrl = url;
   _currentVideoReferer = referer || "https://allmanga.to";
+  _currentVideoStartTime = startTime || 0;
   const server = await getPlayerServer();
   const port = server.address().port;
   return { playerUrl: `http://127.0.0.1:${port}/player` };
@@ -1202,13 +1291,17 @@ ipcMain.handle("set-player-video", async (_, { url, referer }) => {
 
 ipcMain.handle(
   "resolve-allmanga",
-  async (_, { title, seasonNumber, episodeNumber }) => {
+  async (_, { title, seasonNumber, episodeNumber, isMovie }) => {
     try {
-      const epStr = String(episodeNumber);
       const season = seasonNumber || 1;
+      // For movies, search AllAnime with episode "1" (movies are listed as single-episode entries)
+      const epStr = isMovie ? "1" : String(episodeNumber);
 
       // ── Step 1: Resolve correct title for this season via AniList ────────
-      const searchTitle = await anilistSeasonTitle(title, season);
+      // For movies, skip sequel resolution (season always 1)
+      const searchTitle = isMovie
+        ? title
+        : await anilistSeasonTitle(title, season);
 
       // ── Step 2: Search allanime for the show ─────────────────────────────
       const searchVars = {
@@ -1279,6 +1372,7 @@ ipcMain.handle(
         .filter((s) => s.sourceUrl && s.sourceUrl.startsWith("--"))
         .map((s) => {
           let path = decodeAllanimeUrl(s.sourceUrl);
+          // Critical: ani-cli applies s|/clock|/clock.json| transform
           path = path.replace("/clock", "/clock.json");
           return {
             sourceName: s.sourceName || "",

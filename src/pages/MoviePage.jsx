@@ -158,6 +158,7 @@ export default function MoviePage({
     if (resolvedPlayerUrl || resolvingUrl) return;
     setResolvingUrl(true);
     setResolveError(null);
+    const startTime = storage.get("dlTime_" + progressKey) || 0;
     window.electron
       .resolveAllManga({
         title,
@@ -172,6 +173,7 @@ export default function MoviePage({
               .setPlayerVideo({
                 url: res.url,
                 referer: res.referer || "https://allmanga.to",
+                startTime,
               })
               .then((r) => {
                 setResolvedPlayerUrl(r.playerUrl);
