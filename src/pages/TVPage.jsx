@@ -314,13 +314,15 @@ export default function TVPage({
     setAnilistData(null);
     setAnilistSeasons(null);
     if (isAnime) {
-      fetchAnilistData(title, "ANIME").then((data) => {
-        if (data) {
-          setAnilistData(data);
-          const seasons = buildAnilistSeasons(data);
-          if (seasons?.length) setAnilistSeasons(seasons);
-        }
-      });
+      fetchAnilistData(item.name || item.title, "ANIME", item.id).then(
+        (data) => {
+          if (data) {
+            setAnilistData(data);
+            const seasons = buildAnilistSeasons(data);
+            if (seasons?.length) setAnilistSeasons(seasons);
+          }
+        },
+      );
       // Switch to anime source if current source is not an anime source
       const currentSrc = PLAYER_SOURCES.find((s) => s.id === playerSource);
       if (!currentSrc?.tag) {

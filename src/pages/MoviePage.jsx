@@ -7,6 +7,7 @@ import {
   sourceSupportsProgress,
   sourceIsAsync,
   fetchAnilistData,
+  cleanAnilistDescription,
   isAnimeContent,
   ANIME_DEFAULT_SOURCE,
   NON_ANIME_DEFAULT_SOURCE,
@@ -131,9 +132,11 @@ export default function MoviePage({
   // Fetch AniList data + auto-set source for anime/non-anime
   useEffect(() => {
     if (isAnime) {
-      fetchAnilistData(title, "ANIME").then((data) => {
-        if (data) setAnilistData(data);
-      });
+      fetchAnilistData(item.title || item.name, "ANIME", item.id).then(
+        (data) => {
+          if (data) setAnilistData(data);
+        },
+      );
       // Switch to anime source if current source is not an anime source
       const currentSrc = PLAYER_SOURCES.find((s) => s.id === playerSource);
       if (!currentSrc?.tag) {
@@ -316,7 +319,7 @@ export default function MoviePage({
   // Prefer AniList metadata for anime when available
   const displayOverview =
     isAnime && anilistData?.description
-      ? anilistData.description.replace(/<[^>]+>/g, "")
+      ? cleanAnilistDescription(anilistData.description)
       : d.overview;
   const displayScore =
     isAnime && anilistData?.averageScore

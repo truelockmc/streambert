@@ -100,8 +100,11 @@ const ANILIST_API = "https://graphql.anilist.co";
 // Strip "(Source: ...)", "Note: ..." and similar attribution lines from AniList descriptions
 export const cleanAnilistDescription = (desc) => {
   if (!desc) return desc;
-  // Remove HTML tags first
-  let clean = desc.replace(/<[^>]+>/g, "");
+  // Robustly remove HTML: first pass strips well-formed tags, second pass
+  // catches unclosed/malformed tags so nothing executable slips through.
+  let clean = desc.replace(/<[^>]*>/g, "");
+  clean = clean.replace(/<[^<]*/g, "");
+  clean = clean.replace(/javascript\s*:/gi, "");
   // Remove everything from "(Source:" onwards (including multi-line variants)
   clean = clean.replace(/\(Source:[^)]*\)/gi, "");
   // Remove "Note: ..." sentences/paragraphs at the end
@@ -173,14 +176,39 @@ function evictStaleAnilist(cache) {
   return cache;
 }
 
-export const fetchAnilistData = async (title, type = "ANIME") => {
-  const cacheKey = `${type}__${title.toLowerCase().trim()}`;
+// tmdbId is used as the cache key (unique per show) while title is used for the AniList search query.
+export const fetchAnilistData = async (
+  title,
+  type = "ANIME",
+  tmdbId = null,
+) => {
+  const cacheKey = tmdbId
+    ? `${type}__tmdb_${tmdbId}`
+    : `${type}__${title.toLowerCase().trim()}`;
 
   // Return cached data if still fresh (also works offline)
   const cache = evictStaleAnilist(readAnilistCache());
   const entry = cache[cacheKey];
   if (entry && Date.now() - entry.ts <= ANILIST_CACHE_TTL) {
-    return entry.data;
+    // Sanity-check: make sure cached data actually belongs to this title.
+    const cachedTitles = [
+      entry.data?.title?.romaji,
+      entry.data?.title?.english,
+      entry.data?.title?.native,
+    ]
+      .filter(Boolean)
+      .map((t) => t.toLowerCase());
+    const searchTitle = title.toLowerCase();
+    const isMismatch =
+      entry.data !== null &&
+      cachedTitles.length > 0 &&
+      !cachedTitles.some(
+        (t) => t.includes(searchTitle) || searchTitle.includes(t),
+      );
+    if (!isMismatch) return entry.data;
+    // Mismatch detected
+    delete cache[cacheKey];
+    writeAnilistCache(cache);
   }
 
   try {

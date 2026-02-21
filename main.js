@@ -115,9 +115,13 @@ function createWindow() {
       }
 
       const isBlocked = BLOCKED_HOSTS.some((pattern) => {
-        const regex = new RegExp(
-          "^" + pattern.replace(/\./g, "\\.").replace(/\*/g, ".*") + "$",
-        );
+        // Escape all regex special chars in the pattern (including backslashes)
+        // before building the RegExp so no user-controlled chars break the regex.
+        const escaped = pattern
+          .replace(/\\/g, "\\\\")
+          .replace(/[.+?^${}()|[\]]/g, "\\$&")
+          .replace(/\*/g, ".*");
+        const regex = new RegExp("^" + escaped + "$");
         return regex.test(details.url);
       });
       callback(isBlocked ? { cancel: true } : {});
