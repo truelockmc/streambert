@@ -979,6 +979,23 @@ export default function TVPage({
                 </button>
               </div>
 
+              {currentProgressKey &&
+                (() => {
+                  const epPct = progress[currentProgressKey] || 0;
+                  return epPct > 0 ? (
+                    <div className="progress-bar-row">
+                      <div className="progress-bar-outer">
+                        <div
+                          className="progress-bar-fill"
+                          style={{ width: `${Math.min(epPct, 100)}%` }}
+                        />
+                      </div>
+                      <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                        {epPct.toFixed(0)}% watched
+                      </span>
+                    </div>
+                  ) : null;
+                })()}
               {currentProgressKey && (
                 <div className="progress-mark-row">
                   <span
