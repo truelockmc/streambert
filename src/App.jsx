@@ -11,7 +11,7 @@ import HomePage from "./pages/HomePage";
 import MoviePage from "./pages/MoviePage";
 import TVPage from "./pages/TVPage";
 import LibraryPage from "./pages/LibraryPage";
-import SettingsPage from "./pages/SettingsPage";
+import SettingsPage, { checkForUpdates } from "./pages/SettingsPage";
 import DownloadsPage from "./pages/DownloadsPage";
 
 export default function App() {
@@ -34,11 +34,23 @@ export default function App() {
   const [history, setHistory] = useState(() => storage.get("history") || []);
   const [watched, setWatched] = useState(() => storage.get("watched") || {});
   const [toast, setToast] = useState(null);
+  const [updateBanner, setUpdateBanner] = useState(null); // { latest, url }
 
   const [trending, setTrending] = useState([]);
   const [trendingTV, setTrendingTV] = useState([]);
   const [loadingHome, setLoadingHome] = useState(false);
   const [offline, setOffline] = useState(() => !navigator.onLine);
+
+  // ── Startup update check ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!storage.get("autoCheckUpdates")) return;
+    checkForUpdates()
+      .then((r) => {
+        if (r.hasUpdate) setUpdateBanner({ latest: r.latest, url: r.url });
+      })
+      .catch(() => {}); // silently ignore network errors on startup
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Downloads state ──────────────────────────────────────────────────────
   const [downloads, setDownloads] = useState([]);
@@ -498,6 +510,62 @@ export default function App() {
           onClose={() => setShowSearch(false)}
           offline={offline}
         />
+      )}
+      {updateBanner && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            background: "rgba(229,9,20,0.92)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 16,
+            padding: "10px 24px",
+            boxShadow: "0 2px 16px rgba(0,0,0,0.4)",
+            fontSize: 14,
+            fontWeight: 500,
+            color: "#fff",
+          }}
+        >
+          <span>🎉 Streambert v{updateBanner.latest} is available!</span>
+          <a
+            href={updateBanner.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: "#fff",
+              fontWeight: 700,
+              background: "rgba(255,255,255,0.18)",
+              border: "1px solid rgba(255,255,255,0.4)",
+              borderRadius: 6,
+              padding: "4px 12px",
+              textDecoration: "none",
+              fontSize: 13,
+            }}
+          >
+            Download
+          </a>
+          <button
+            onClick={() => setUpdateBanner(null)}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "rgba(255,255,255,0.7)",
+              cursor: "pointer",
+              fontSize: 18,
+              lineHeight: 1,
+              padding: "0 4px",
+            }}
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
       )}
       {toast && <div className="toast">{toast}</div>}
       {closeConfirm && (

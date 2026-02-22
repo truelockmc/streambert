@@ -4,6 +4,39 @@ import { DEFAULT_INVIDIOUS_BASE } from "../components/TrailerModal";
 import { RATING_COUNTRIES } from "../utils/ageRating";
 import { WarningIcon } from "../components/Icons";
 
+export const APP_VERSION = "1.3.0";
+const GITHUB_REPO = "truelockmc/streambert";
+
+// Normalise "1.3" → "1.3.0" so "1.3.0" === "1.3" after normalisation
+function normaliseVersion(v) {
+  const parts = String(v).replace(/^v/i, "").split(".");
+  while (parts.length < 3) parts.push("0");
+  return parts.slice(0, 3).map(Number).join(".");
+}
+
+export async function checkForUpdates() {
+  const res = await fetch(
+    `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+    {
+      headers: { Accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(8000),
+    },
+  );
+  if (!res.ok) throw new Error(`GitHub API error ${res.status}`);
+  const data = await res.json();
+  const latestRaw = (data.tag_name || "").replace(/^v/i, "");
+  const latest = normaliseVersion(latestRaw);
+  const current = normaliseVersion(APP_VERSION);
+  const url =
+    data.html_url || `https://github.com/${GITHUB_REPO}/releases/latest`;
+  return {
+    latest: latestRaw || APP_VERSION,
+    current: APP_VERSION,
+    url,
+    hasUpdate: latest !== current && latestRaw !== "",
+  };
+}
+
 // ── Home row config ───────────────────────────────────────────────────────────
 export const HOME_ROWS = [
   { id: "continue", label: "Continue Watching" },
@@ -277,6 +310,175 @@ function formatBytes(bytes) {
   if (bytes < 1024 * 1024 * 1024)
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+}
+
+// ── Version & Update Section ──────────────────────────────────────────────────
+function VersionSection() {
+  const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState(null); // { latest, current, url, hasUpdate } | { error }
+  const [autoCheck, setAutoCheck] = useState(
+    () => !!storage.get("autoCheckUpdates"),
+  );
+  const [autoSaved, setAutoSaved] = useState(false);
+
+  const runCheck = async () => {
+    setChecking(true);
+    setResult(null);
+    try {
+      const r = await checkForUpdates();
+      setResult(r);
+    } catch (e) {
+      setResult({ error: e.message || "Could not reach GitHub." });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const toggleAuto = (val) => {
+    setAutoCheck(val);
+    storage.set("autoCheckUpdates", val ? 1 : 0);
+    setAutoSaved(true);
+    setTimeout(() => setAutoSaved(false), 1800);
+  };
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">App Version</div>
+
+      {/* Version row */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          flexWrap: "wrap",
+          marginBottom: 20,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 13, color: "var(--text3)" }}>
+            Current version
+          </span>
+          <code
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: "var(--text)",
+              background: "var(--surface2)",
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              padding: "4px 12px",
+            }}
+          >
+            v{APP_VERSION}
+          </code>
+        </div>
+
+        <button
+          className="btn btn-ghost"
+          disabled={checking}
+          onClick={runCheck}
+          style={{ opacity: checking ? 0.6 : 1 }}
+        >
+          {checking ? "Checking…" : "Check for Updates"}
+        </button>
+
+        {result && !result.error && result.hasUpdate && (
+          <a
+            href={result.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: "rgba(229,9,20,0.12)",
+              border: "1px solid rgba(229,9,20,0.4)",
+              color: "var(--red)",
+              borderRadius: 8,
+              padding: "6px 14px",
+              fontSize: 13,
+              fontWeight: 600,
+              textDecoration: "none",
+              transition: "background 0.2s",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = "rgba(229,9,20,0.22)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "rgba(229,9,20,0.12)")
+            }
+          >
+            🎉 v{result.latest} available — Download
+          </a>
+        )}
+
+        {result && !result.error && !result.hasUpdate && (
+          <span style={{ fontSize: 13, color: "#48c774", fontWeight: 500 }}>
+            ✓ You're up to date
+          </span>
+        )}
+
+        {result?.error && (
+          <span style={{ fontSize: 13, color: "var(--red)" }}>
+            ✕ {result.error}
+          </span>
+        )}
+      </div>
+
+      {/* Auto-check toggle */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          onClick={() => toggleAuto(!autoCheck)}
+          style={{
+            background: autoCheck ? "var(--red)" : "var(--surface2)",
+            border: "1px solid " + (autoCheck ? "var(--red)" : "var(--border)"),
+            borderRadius: 20,
+            width: 40,
+            height: 22,
+            cursor: "pointer",
+            position: "relative",
+            flexShrink: 0,
+            transition: "background 0.2s, border-color 0.2s",
+          }}
+          title={autoCheck ? "Disable auto-check" : "Enable auto-check"}
+        >
+          <span
+            style={{
+              position: "absolute",
+              top: 2,
+              left: autoCheck ? 20 : 2,
+              width: 16,
+              height: 16,
+              background: "#fff",
+              borderRadius: "50%",
+              transition: "left 0.2s",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+            }}
+          />
+        </button>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>
+            Check for updates on startup
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
+            Shows a notification banner if a new version is available. Off by
+            default.
+          </div>
+        </div>
+        {autoSaved && (
+          <span style={{ fontSize: 12, color: "#48c774" }}>✓ Saved</span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ── Home Layout Section ───────────────────────────────────────────────────────
@@ -713,6 +915,13 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
         <div style={{ color: "var(--text3)", fontSize: 14, marginBottom: 48 }}>
           App configuration for Streambert
         </div>
+
+        {/* ── Version & Updates ── */}
+        <VersionSection />
+
+        <div
+          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
+        />
 
         {/* ── TMDB API Key/Read Access Token ── */}
         <div style={{ marginBottom: 40 }}>
