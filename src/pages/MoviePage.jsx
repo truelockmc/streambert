@@ -63,6 +63,9 @@ export default function MoviePage({
     () => storage.get("playerSource") || "videasy",
   );
   const [showSourceMenu, setShowSourceMenu] = useState(false);
+  const [dubMode, setDubMode] = useState(
+    () => storage.get("allmangaDubMode") || "sub",
+  );
   const [anilistData, setAnilistData] = useState(null);
   const [menuPos, setMenuPos] = useState(null);
   const sourceRef = useRef(null);
@@ -127,7 +130,7 @@ export default function MoviePage({
     setResolvedPlayerUrl(null);
     setResolvingUrl(false);
     setResolveError(null);
-  }, [item.id, playerSource]);
+  }, [item.id, playerSource, dubMode]);
 
   // Fetch AniList data + auto-set source for anime/non-anime
   useEffect(() => {
@@ -168,6 +171,7 @@ export default function MoviePage({
         seasonNumber: 1,
         episodeNumber: 1,
         isMovie: true,
+        translationType: dubMode,
       })
       .then((res) => {
         if (res?.ok && res.url) {
@@ -192,12 +196,12 @@ export default function MoviePage({
       })
       .catch((e) => setResolveError(e.message || "Error"))
       .finally(() => setResolvingUrl(false));
-  }, [playing, playerSource]);
+  }, [playing, playerSource, dubMode]);
 
   useEffect(() => {
     if (!window.electron) return;
     const handler = window.electron.onM3u8Found((url) => {
-      setM3u8Url((prev) => prev || url);
+      setM3u8Url(url);
     });
     return () => window.electron.offM3u8Found(handler);
   }, []);
@@ -597,6 +601,25 @@ export default function MoviePage({
               {PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ??
                 "Source"}
             </button>
+            {/* Sub/Dub toggle, only for AllManga */}
+            {playerSource === "allmanga" && (
+              <button
+                className="player-overlay-btn"
+                style={{ left: 120, right: "auto" }}
+                onClick={() => {
+                  const next = dubMode === "sub" ? "dub" : "sub";
+                  setDubMode(next);
+                  storage.set("allmangaDubMode", next);
+                  setM3u8Url(null);
+                  setResolvedPlayerUrl(null);
+                  setResolvingUrl(false);
+                  setResolveError(null);
+                }}
+                title="Toggle Sub/Dub"
+              >
+                {dubMode === "sub" ? "SUB" : "DUB"}
+              </button>
+            )}
             {showSourceMenu && menuPos && (
               <div
                 className="source-dropdown source-dropdown--fixed"

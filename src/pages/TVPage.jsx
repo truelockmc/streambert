@@ -221,6 +221,9 @@ export default function TVPage({
     () => storage.get("playerSource") || "videasy",
   );
   const [showSourceMenu, setShowSourceMenu] = useState(false);
+  const [dubMode, setDubMode] = useState(
+    () => storage.get("allmangaDubMode") || "sub",
+  );
   // 9anime async URL resolution
   const [resolvedPlayerUrl, setResolvedPlayerUrl] = useState(null);
   const [resolvingUrl, setResolvingUrl] = useState(false);
@@ -307,7 +310,13 @@ export default function TVPage({
     setResolvingUrl(false);
     setResolveError(null);
     setResolvedFallback(false);
-  }, [item.id, selectedEp?.episode_number, selectedSeason, playerSource]);
+  }, [
+    item.id,
+    selectedEp?.episode_number,
+    selectedSeason,
+    playerSource,
+    dubMode,
+  ]);
 
   // Fetch AniList metadata + auto-set anime source
   useEffect(() => {
@@ -355,6 +364,7 @@ export default function TVPage({
         title,
         seasonNumber: selectedSeason,
         episodeNumber: epNum,
+        translationType: dubMode,
       })
       .then((res) => {
         if (res?.ok && res.url) {
@@ -381,12 +391,12 @@ export default function TVPage({
       })
       .catch((e) => setResolveError(e.message || "Error"))
       .finally(() => setResolvingUrl(false));
-  }, [playing, selectedEp, playerSource, selectedSeason]);
+  }, [playing, selectedEp, playerSource, selectedSeason, dubMode]);
 
   useEffect(() => {
     if (!window.electron) return;
     const handler = window.electron.onM3u8Found((url) => {
-      setM3u8Url((prev) => prev || url);
+      setM3u8Url(url);
     });
     return () => window.electron.offM3u8Found(handler);
   }, []);
@@ -916,6 +926,26 @@ export default function TVPage({
                   {PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ??
                     "Source"}
                 </button>
+                {/* Sub/Dub toggle, only for AllManga */}
+                {playerSource === "allmanga" && (
+                  <button
+                    className="player-overlay-btn"
+                    style={{ left: 120, right: "auto" }}
+                    onClick={() => {
+                      const next = dubMode === "sub" ? "dub" : "sub";
+                      setDubMode(next);
+                      storage.set("allmangaDubMode", next);
+                      setM3u8Url(null);
+                      setResolvedPlayerUrl(null);
+                      setResolvingUrl(false);
+                      setResolveError(null);
+                      setResolvedFallback(false);
+                    }}
+                    title="Toggle Sub/Dub"
+                  >
+                    {dubMode === "sub" ? "SUB" : "DUB"}
+                  </button>
+                )}
                 {showSourceMenu && menuPos && (
                   <div
                     className="source-dropdown source-dropdown--fixed"

@@ -1318,9 +1318,13 @@ ipcMain.handle("set-player-video", async (_, { url, referer, startTime }) => {
 
 ipcMain.handle(
   "resolve-allmanga",
-  async (_, { title, seasonNumber, episodeNumber, isMovie }) => {
+  async (
+    _,
+    { title, seasonNumber, episodeNumber, isMovie, translationType },
+  ) => {
     try {
       const season = seasonNumber || 1;
+      const dubSub = translationType === "dub" ? "dub" : "sub";
       // For movies, search AllAnime with episode "1" (movies are listed as single-episode entries)
       const epStr = isMovie ? "1" : String(episodeNumber);
 
@@ -1350,7 +1354,7 @@ ipcMain.handle(
           search: { allowAdult: false, allowUnknown: false, query },
           limit: 40,
           page: 1,
-          translationType: "sub",
+          translationType: dubSub,
           countryOrigin: "ALL",
         };
         const res = await allanimeGQL(vars, SEARCH_GQL);
@@ -1384,7 +1388,7 @@ ipcMain.handle(
       const showId = anime._id;
 
       // ── Step 3: Get episode sourceUrls ────────────────────────────────────
-      const epVars = { showId, translationType: "sub", episodeString: epStr };
+      const epVars = { showId, translationType: dubSub, episodeString: epStr };
       const epRes = await allanimeGQL(epVars, EPISODE_GQL);
       if (!epRes.body) return { ok: false, error: "Empty episode response" };
 
