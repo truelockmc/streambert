@@ -26,7 +26,7 @@ Media Files for Animes are scraped from AllManga.to (i stole this mechanic from 
 ## Requirements
 
 - [Node.js](https://nodejs.org/) (>=22.12.0) installed (only if you aren't using [prebuilt Binaries](https://github.com/truelockmc/streambert/releases/latest))
-- A free [TMDB API key](https://www.themoviedb.org/settings/api)
+- A free [TMDB API Read Access Token](https://www.themoviedb.org/settings/api)
 - For downloading, [this Program](https://github.com/truelockmc/video-downloader/releases/latest) somewhere on your PC and [ffmpeg](https://ffmpeg.org/download.html) installed
 
 ---
