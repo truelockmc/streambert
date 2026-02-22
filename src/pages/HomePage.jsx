@@ -5,6 +5,8 @@ import { PlayIcon, StarIcon } from "../components/Icons";
 import { imgUrl, tmdbFetch } from "../utils/api";
 import { useRatings, getRatingForItem } from "../utils/useRatings";
 import { isRestricted } from "../utils/ageRating";
+import { storage } from "../utils/storage";
+import { loadHomeLayout } from "./SettingsPage";
 
 function getRecentHistoryItem(history) {
   if (!history || history.length === 0) return null;
@@ -36,7 +38,11 @@ export default function HomePage({
   const [similarItems, setSimilarItems] = useState([]);
   const [similarSource, setSimilarSource] = useState(null);
 
-  // Memoised so useRatings doesn't re-fire on every render
+  // Load layout config (order + visibility) once on mount
+  const [layout] = useState(() => loadHomeLayout());
+  const { order: rowOrder, visible: rowVisible } = layout;
+
+  // All items for batch ratings fetch
   const allItems = useMemo(
     () => [
       ...inProgress,
@@ -65,7 +71,7 @@ export default function HomePage({
     [ratingsMap, ageLimitSetting],
   );
 
-  // Enrich ratingsMap with `restricted` flag so the carousel can use it directly
+  // Enrich ratingsMap with restricted flag for carousels
   const enrichedRatingsMap = useMemo(() => {
     const out = {};
     for (const [k, v] of Object.entries(ratingsMap)) {
@@ -82,14 +88,12 @@ export default function HomePage({
     if (!source) return;
     setSimilarSource(source);
     const type = source.media_type === "tv" ? "tv" : "movie";
-
     const tryFetch = (endpoint) =>
       tmdbFetch(`/${type}/${source.id}/${endpoint}`, apiKey).then((data) =>
         (data.results || [])
           .slice(0, 20)
           .map((item) => ({ ...item, media_type: type })),
       );
-
     tryFetch("similar")
       .then((results) => {
         if (results.length > 0) {
@@ -106,7 +110,7 @@ export default function HomePage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey, offline, history?.length]);
 
-  // Pre-built item arrays for carousels (stable references via useMemo)
+  // Stable pre-built item arrays for carousels
   const trendingMovieItems = useMemo(
     () => trending.map((i) => ({ ...i, media_type: "movie" })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,9 +122,92 @@ export default function HomePage({
     [trendingTV.length],
   );
 
+  // ── Row renderers ──────────────────────────────────────────────────────────
+
+  const renderContinueWatching = () => {
+    if (!rowVisible.continue || inProgress.length === 0) return null;
+    return (
+      <div key="continue" className="section">
+        <div className="section-title">Continue Watching</div>
+        <div className="cards-grid">
+          {inProgress.map((item) => {
+            const pk =
+              item.media_type === "movie"
+                ? `movie_${item.id}`
+                : `tv_${item.id}_s${item.season}e${item.episode}`;
+            const r = getRating(item);
+            const restr = itemRestricted(item);
+            return (
+              <MediaCard
+                key={`${item.media_type}_${item.id}`}
+                item={item}
+                onClick={() => onSelect(item)}
+                progress={progress[pk] || 0}
+                watched={watched}
+                onMarkWatched={onMarkWatched}
+                onMarkUnwatched={onMarkUnwatched}
+                ageRating={r.cert}
+                restricted={restr}
+              />
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderSimilar = () => {
+    if (!rowVisible.similar || !similarSource || similarItems.length === 0)
+      return null;
+    return (
+      <TrendingCarousel
+        key="similar"
+        items={similarItems}
+        title="Similar to"
+        titleHighlight={similarSource.title || similarSource.name}
+        onSelect={onSelect}
+        ratingsMap={enrichedRatingsMap}
+      />
+    );
+  };
+
+  const renderTrendingMovies = () => {
+    if (!rowVisible.trendingMovies || trendingMovieItems.length === 0)
+      return null;
+    return (
+      <TrendingCarousel
+        key="trendingMovies"
+        items={trendingMovieItems}
+        title="Trending Movies"
+        onSelect={onSelect}
+        ratingsMap={enrichedRatingsMap}
+      />
+    );
+  };
+
+  const renderTrendingTV = () => {
+    if (!rowVisible.trendingTV || trendingTVItems.length === 0) return null;
+    return (
+      <TrendingCarousel
+        key="trendingTV"
+        items={trendingTVItems}
+        title="Trending Series"
+        onSelect={onSelect}
+        ratingsMap={enrichedRatingsMap}
+      />
+    );
+  };
+
+  const rowRenderers = {
+    continue: renderContinueWatching,
+    similar: renderSimilar,
+    trendingMovies: renderTrendingMovies,
+    trendingTV: renderTrendingTV,
+  };
+
   return (
     <div className="fade-in">
-      {/* ── Offline state ── */}
+      {/* ── Offline ── */}
       {offline && (
         <div
           style={{
@@ -157,7 +244,7 @@ export default function HomePage({
         </div>
       )}
 
-      {/* ── Hero ── */}
+      {/* ── Hero (always first) ── */}
       {!loading && hero && (
         <div className="hero">
           <div
@@ -195,66 +282,8 @@ export default function HomePage({
         </div>
       )}
 
-      {/* ── Continue Watching ── */}
-      {inProgress.length > 0 && (
-        <div className="section">
-          <div className="section-title">Continue Watching</div>
-          <div className="cards-grid">
-            {inProgress.map((item) => {
-              const pk =
-                item.media_type === "movie"
-                  ? `movie_${item.id}`
-                  : `tv_${item.id}_s${item.season}e${item.episode}`;
-              const r = getRating(item);
-              const restr = itemRestricted(item);
-              return (
-                <MediaCard
-                  key={`${item.media_type}_${item.id}`}
-                  item={item}
-                  onClick={() => onSelect(item)}
-                  progress={progress[pk] || 0}
-                  watched={watched}
-                  onMarkWatched={onMarkWatched}
-                  onMarkUnwatched={onMarkUnwatched}
-                  ageRating={r.cert}
-                  restricted={restr}
-                />
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── Similar to [recent watch] — carousel ── */}
-      {similarSource && similarItems.length > 0 && (
-        <TrendingCarousel
-          items={similarItems}
-          title="Similar to"
-          titleHighlight={similarSource.title || similarSource.name}
-          onSelect={onSelect}
-          ratingsMap={enrichedRatingsMap}
-        />
-      )}
-
-      {/* ── Trending Movies — carousel ── */}
-      {trendingMovieItems.length > 0 && (
-        <TrendingCarousel
-          items={trendingMovieItems}
-          title="Trending Movies"
-          onSelect={onSelect}
-          ratingsMap={enrichedRatingsMap}
-        />
-      )}
-
-      {/* ── Trending Series — carousel ── */}
-      {trendingTVItems.length > 0 && (
-        <TrendingCarousel
-          items={trendingTVItems}
-          title="Trending Series"
-          onSelect={onSelect}
-          ratingsMap={enrichedRatingsMap}
-        />
-      )}
+      {/* ── Rows in user-configured order ── */}
+      {rowOrder.map((id) => rowRenderers[id]?.())}
     </div>
   );
 }

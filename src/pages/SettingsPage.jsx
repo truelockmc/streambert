@@ -1,8 +1,43 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { storage } from "../utils/storage";
 import { DEFAULT_INVIDIOUS_BASE } from "../components/TrailerModal";
 import { RATING_COUNTRIES } from "../utils/ageRating";
 import { WarningIcon } from "../components/Icons";
+
+// ── Home row config ───────────────────────────────────────────────────────────
+export const HOME_ROWS = [
+  { id: "continue", label: "Continue Watching" },
+  { id: "similar", label: "Similar to…" },
+  { id: "trendingMovies", label: "Trending Movies" },
+  { id: "trendingTV", label: "Trending Series" },
+];
+
+const DEFAULT_ROW_ORDER = HOME_ROWS.map((r) => r.id);
+const DEFAULT_ROW_VISIBLE = Object.fromEntries(
+  HOME_ROWS.map((r) => [r.id, true]),
+);
+
+export function loadHomeLayout() {
+  const order = storage.get("homeRowOrder") || DEFAULT_ROW_ORDER;
+  const visible = storage.get("homeRowVisible") || DEFAULT_ROW_VISIBLE;
+  return { order, visible };
+}
+
+function saveHomeLayout(order, visible) {
+  storage.set("homeRowOrder", order);
+  storage.set("homeRowVisible", visible);
+}
+
+// ── Start page config ─────────────────────────────────────────────────────────
+const START_PAGE_OPTIONS = [
+  { value: "home", label: "🏠  Home" },
+  { value: "history", label: "🕐  Library / History" },
+  { value: "downloads", label: "⬇  Downloads" },
+];
+
+export function loadStartPage() {
+  return storage.get("startPage") || "home";
+}
 
 // Age limit options: null = none, or specific ages
 const AGE_LIMIT_OPTIONS = [
@@ -242,6 +277,240 @@ function formatBytes(bytes) {
   if (bytes < 1024 * 1024 * 1024)
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+}
+
+// ── Home Layout Section ───────────────────────────────────────────────────────
+function HomeLayoutSection() {
+  const [order, setOrder] = useState(
+    () => storage.get("homeRowOrder") || HOME_ROWS.map((r) => r.id),
+  );
+  const [visible, setVisible] = useState(
+    () =>
+      storage.get("homeRowVisible") ||
+      Object.fromEntries(HOME_ROWS.map((r) => [r.id, true])),
+  );
+  const [saved, setSaved] = useState(false);
+  const dragItem = useRef(null);
+  const dragOver = useRef(null);
+
+  const handleDragStart = (idx) => {
+    dragItem.current = idx;
+  };
+  const handleDragEnter = (idx) => {
+    dragOver.current = idx;
+  };
+  const handleDragEnd = () => {
+    const newOrder = [...order];
+    const dragged = newOrder.splice(dragItem.current, 1)[0];
+    newOrder.splice(dragOver.current, 0, dragged);
+    dragItem.current = null;
+    dragOver.current = null;
+    setOrder(newOrder);
+  };
+
+  const toggleVisible = (id) => {
+    setVisible((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleSave = () => {
+    storage.set("homeRowOrder", order);
+    storage.set("homeRowVisible", visible);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const rowLabels = Object.fromEntries(HOME_ROWS.map((r) => [r.id, r.label]));
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">Home Page Layout</div>
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--text3)",
+          marginBottom: 16,
+          lineHeight: 1.6,
+        }}
+      >
+        Choose which rows appear on the Home page and drag to reorder them. The
+        hero banner is always shown at the top.
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          maxWidth: 480,
+        }}
+      >
+        {order.map((id, idx) => (
+          <div
+            key={id}
+            draggable
+            onDragStart={() => handleDragStart(idx)}
+            onDragEnter={() => handleDragEnter(idx)}
+            onDragEnd={handleDragEnd}
+            onDragOver={(e) => e.preventDefault()}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              padding: "10px 14px",
+              cursor: "grab",
+              opacity: visible[id] ? 1 : 0.45,
+              transition: "opacity 0.2s",
+              userSelect: "none",
+            }}
+          >
+            {/* Drag handle */}
+            <span
+              style={{
+                color: "var(--text3)",
+                fontSize: 16,
+                lineHeight: 1,
+                flexShrink: 0,
+              }}
+            >
+              ⠿
+            </span>
+
+            {/* Label */}
+            <span
+              style={{
+                flex: 1,
+                fontSize: 14,
+                fontWeight: 500,
+                color: "var(--text)",
+              }}
+            >
+              {rowLabels[id] || id}
+            </span>
+
+            {/* Toggle */}
+            <button
+              onClick={() => toggleVisible(id)}
+              style={{
+                background: visible[id] ? "var(--red)" : "var(--surface2)",
+                border:
+                  "1px solid " + (visible[id] ? "var(--red)" : "var(--border)"),
+                borderRadius: 20,
+                width: 40,
+                height: 22,
+                cursor: "pointer",
+                position: "relative",
+                flexShrink: 0,
+                transition: "background 0.2s, border-color 0.2s",
+              }}
+              title={visible[id] ? "Hide row" : "Show row"}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  top: 2,
+                  left: visible[id] ? 20 : 2,
+                  width: 16,
+                  height: 16,
+                  background: "#fff",
+                  borderRadius: "50%",
+                  transition: "left 0.2s",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                }}
+              />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div
+        style={{
+          marginTop: 16,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        <button className="btn btn-primary" onClick={handleSave}>
+          Save Layout
+        </button>
+        {saved && (
+          <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Start Page Section ────────────────────────────────────────────────────────
+function StartPageSection() {
+  const [startPage, setStartPage] = useState(
+    () => storage.get("startPage") || "home",
+  );
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    storage.set("startPage", startPage);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">Start Page</div>
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--text3)",
+          marginBottom: 16,
+          lineHeight: 1.6,
+        }}
+      >
+        Choose which page opens when you launch Streambert.
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <select
+          value={startPage}
+          onChange={(e) => setStartPage(e.target.value)}
+          style={{
+            background: "var(--surface2)",
+            color: "var(--text)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            padding: "9px 14px",
+            fontSize: 14,
+            cursor: "pointer",
+            minWidth: 220,
+          }}
+        >
+          {[
+            { value: "home", label: "🏠  Home" },
+            { value: "history", label: "🕐  Library / History" },
+            { value: "downloads", label: "⬇  Downloads" },
+          ].map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <button className="btn btn-primary" onClick={handleSave}>
+          Save
+        </button>
+        {saved && (
+          <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -783,6 +1052,21 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
             </div>
           )}
         </div>
+
+        {/* ══ HOME PAGE LAYOUT ═════════════════════════════════════════════════ */}
+        <div
+          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
+        />
+        <HomeLayoutSection />
+
+        <div
+          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
+        />
+        <StartPageSection />
+
+        <div
+          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
+        />
 
         {/* ══ STORAGE & DATA ══════════════════════════════════════════════════ */}
         <div

@@ -18,7 +18,7 @@ export default function App() {
   const [apiKey, setApiKey] = useState(() => storage.get("apikey"));
   const [skipped, setSkipped] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState("checking"); // 'checking' | 'ok' | 'invalid_token' | 'unreachable'
-  const [page, setPage] = useState("home");
+  const [page, setPage] = useState(() => storage.get("startPage") || "home");
   const [selected, setSelected] = useState(null);
   const [showSearch, setShowSearch] = useState(false);
 
