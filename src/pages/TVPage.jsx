@@ -396,7 +396,7 @@ export default function TVPage({
   useEffect(() => {
     if (!window.electron) return;
     const handler = window.electron.onM3u8Found((url) => {
-      setM3u8Url(url);
+      setM3u8Url((prev) => (prev !== url ? url : prev));
     });
     return () => window.electron.offM3u8Found(handler);
   }, []);
