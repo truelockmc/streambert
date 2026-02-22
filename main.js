@@ -1075,11 +1075,21 @@ function allanimeGQL(variables, query) {
   return httpsGet("https://api.allanime.day/api?" + qs);
 }
 
+// Normalize a title for fuzzy matching / alternate search attempts:
+// strips curly/straight apostrophes, colons, dots and collapses spaces.
+function sanitizeTitle(t) {
+  return t
+    .replace(/[''`´]/g, "") // remove apostrophes (JoJo's → JoJos)
+    .replace(/[:!.]/g, "") // remove punctuation that breaks queries
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // AniList GQL to look up the correct season title for S2+
 // Returns e.g. "Jujutsu Kaisen 2nd Season" for (title="Jujutsu Kaisen", season=2)
 function anilistSeasonTitle(baseTitle, seasonNumber) {
   return new Promise((resolve) => {
-    if (seasonNumber <= 1) return resolve(baseTitle);
+    const resolveS1 = seasonNumber <= 1;
 
     const query = `query($search:String){Media(search:$search,type:ANIME,sort:SEARCH_MATCH){title{english romaji}relations{edges{relationType node{type format title{english romaji}startDate{year}seasonYear}}}}}`;
     const body = JSON.stringify({ query, variables: { search: baseTitle } });
@@ -1102,7 +1112,16 @@ function anilistSeasonTitle(baseTitle, seasonNumber) {
         try {
           const json = JSON.parse(data);
           const media = json?.data?.Media;
-          if (!media) return resolve(baseTitle);
+          // Always capture the S1 romaji as a fallback candidate
+          const s1Romaji = media?.title?.romaji || null;
+
+          if (!media) return resolve({ title: baseTitle, romaji: null });
+
+          // For S1 just return the english title + romaji
+          if (resolveS1) {
+            const eng = media.title?.english || baseTitle;
+            return resolve({ title: eng, romaji: s1Romaji });
+          }
 
           // Collect sequels sorted by air year
           const sequels = (media.relations?.edges || [])
@@ -1120,21 +1139,22 @@ function anilistSeasonTitle(baseTitle, seasonNumber) {
 
           // seasonNumber=2 -> sequels[0], seasonNumber=3 -> sequels[1], etc.
           const target = sequels[seasonNumber - 2];
-          if (!target) return resolve(baseTitle);
+          if (!target) return resolve({ title: baseTitle, romaji: s1Romaji });
           const t =
             target.node.title?.english ||
             target.node.title?.romaji ||
             baseTitle;
-          resolve(t);
+          const romaji = target.node.title?.romaji || s1Romaji;
+          resolve({ title: t, romaji });
         } catch {
-          resolve(baseTitle);
+          resolve({ title: baseTitle, romaji: null });
         }
       });
     });
-    req.on("error", () => resolve(baseTitle));
+    req.on("error", () => resolve({ title: baseTitle, romaji: null }));
     req.setTimeout(8000, () => {
       req.destroy();
-      resolve(baseTitle);
+      resolve({ title: baseTitle, romaji: null });
     });
     req.write(body);
     req.end();
@@ -1306,37 +1326,58 @@ ipcMain.handle(
 
       // ── Step 1: Resolve correct title for this season via AniList ────────
       // For movies, skip sequel resolution (season always 1)
-      const searchTitle = isMovie
-        ? title
+      const anilistResult = isMovie
+        ? { title, romaji: null }
         : await anilistSeasonTitle(title, season);
 
-      // ── Step 2: Search allanime for the show ─────────────────────────────
-      const searchVars = {
-        search: { allowAdult: false, allowUnknown: false, query: searchTitle },
-        limit: 40,
-        page: 1,
-        translationType: "sub",
-        countryOrigin: "ALL",
-      };
-      const searchRes = await allanimeGQL(searchVars, SEARCH_GQL);
-      if (!searchRes.body) return { ok: false, error: "Empty search response" };
+      const searchTitle = anilistResult.title;
 
-      let searchJson;
-      try {
-        searchJson = JSON.parse(searchRes.body);
-      } catch {
-        return {
-          ok: false,
-          error: "Search parse error: " + searchRes.body.slice(0, 200),
+      // Build ordered list of title candidates to try if the first search fails.
+      // Deduplication via Set keeps the list clean.
+      const candidateSet = new Set([
+        searchTitle,
+        sanitizeTitle(searchTitle), // strip apostrophes etc.
+        ...(anilistResult.romaji ? [anilistResult.romaji] : []),
+        title, // original TMDB title as last resort
+        sanitizeTitle(title),
+      ]);
+      const candidates = [...candidateSet].filter(Boolean);
+
+      // ── Step 2: Search allanime for the show (try each candidate) ─────────
+      // Helper: run one search and return edges or null
+      async function searchAllmanga(query) {
+        const vars = {
+          search: { allowAdult: false, allowUnknown: false, query },
+          limit: 40,
+          page: 1,
+          translationType: "sub",
+          countryOrigin: "ALL",
         };
+        const res = await allanimeGQL(vars, SEARCH_GQL);
+        if (!res.body) return null;
+        try {
+          const json = JSON.parse(res.body);
+          const edges = json?.data?.shows?.edges;
+          return edges?.length ? edges : null;
+        } catch {
+          return null;
+        }
       }
 
-      const edges = searchJson?.data?.shows?.edges;
-      if (!edges?.length)
-        return { ok: false, error: "No results for: " + searchTitle };
+      let edges = null;
+      let matchedTitle = searchTitle;
+      for (const candidate of candidates) {
+        edges = await searchAllmanga(candidate);
+        if (edges) {
+          matchedTitle = candidate;
+          break;
+        }
+      }
 
-      // Best match: exact name, else first result
-      const titleLower = searchTitle.toLowerCase();
+      if (!edges) return { ok: false, error: "No results for: " + searchTitle };
+
+      // Best match: exact name match on the winning candidate, else first result
+      const titleLower = matchedTitle.toLowerCase();
       const anime =
         edges.find((e) => (e.name || "").toLowerCase() === titleLower) ||
         edges[0];
