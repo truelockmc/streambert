@@ -48,6 +48,9 @@ contextBridge.exposeInMainWorld("electron", {
   setPlayerVideo: (args) => ipcRenderer.invoke("set-player-video", args),
   debugAllManga: (args) => ipcRenderer.invoke("debug-allmanga", args),
 
+  // App version (from package.json via Electron)
+  getAppVersion: () => ipcRenderer.invoke("get-app-version"),
+
   // Quit app
   quitApp: () => ipcRenderer.invoke("quit-app"),
 

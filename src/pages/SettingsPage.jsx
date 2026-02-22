@@ -4,7 +4,14 @@ import { DEFAULT_INVIDIOUS_BASE } from "../components/TrailerModal";
 import { RATING_COUNTRIES } from "../utils/ageRating";
 import { WarningIcon } from "../components/Icons";
 
-export const APP_VERSION = "1.3.0";
+// Dynamically fetched from Electron (package.json → app.getVersion())
+// Falls back to a placeholder until the async call resolves.
+export let APP_VERSION = "0.0.0";
+if (window.electron?.getAppVersion) {
+  window.electron.getAppVersion().then((v) => {
+    APP_VERSION = v;
+  });
+}
 const GITHUB_REPO = "truelockmc/streambert";
 
 // Normalise "1.3" → "1.3.0" so "1.3.0" === "1.3" after normalisation
@@ -320,6 +327,16 @@ function VersionSection() {
     () => !!storage.get("autoCheckUpdates"),
   );
   const [autoSaved, setAutoSaved] = useState(false);
+  const [currentVersion, setCurrentVersion] = useState(APP_VERSION);
+
+  useEffect(() => {
+    if (window.electron?.getAppVersion) {
+      window.electron.getAppVersion().then((v) => {
+        APP_VERSION = v;
+        setCurrentVersion(v);
+      });
+    }
+  }, []);
 
   const runCheck = async () => {
     setChecking(true);
@@ -370,7 +387,7 @@ function VersionSection() {
               padding: "4px 12px",
             }}
           >
-            v{APP_VERSION}
+            v{currentVersion}
           </code>
         </div>
 

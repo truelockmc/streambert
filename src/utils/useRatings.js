@@ -35,7 +35,7 @@ function evictStale(cache) {
       changed = true;
     }
   }
-  return changed ? cache : cache;
+  return cache; // mutated in-place; caller uses return value as signal via changed flag
 }
 
 /**

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { storage } from "./utils/storage";
 import { tmdbFetch, setApiErrorHandlers } from "./utils/api";
 
@@ -143,12 +143,13 @@ export default function App() {
   }, []);
 
   // Active download count for sidebar badge
-  const activeDownloadCount = downloads.filter(
-    (d) => d.status === "downloading",
-  ).length;
+  const activeDownloadCount = useMemo(
+    () => downloads.filter((d) => d.status === "downloading").length,
+    [downloads],
+  );
 
-  // ── Trending ─────────────────────────────────────────────────────────────
-  useEffect(() => {
+  // ── Trending, single shared fetch fn avoids code duplication ────────────
+  const fetchTrending = useCallback(() => {
     if (!apiKey) return;
     setLoadingHome(true);
     Promise.all([
@@ -163,6 +164,15 @@ export default function App() {
       .finally(() => setLoadingHome(false));
   }, [apiKey]);
 
+  useEffect(() => {
+    fetchTrending();
+  }, [fetchTrending]);
+
+  const retryHome = useCallback(() => {
+    if (offline) return;
+    fetchTrending();
+  }, [offline, fetchTrending]);
+
   // ── Network status ───────────────────────────────────────────────────────
   useEffect(() => {
     const goOnline = () => setOffline(false);
@@ -176,6 +186,16 @@ export default function App() {
   }, []);
 
   // ── Navigation ────────────────────────────────────────────────────────────
+  // Refs so navigate/navigateBack never need page/selected as deps
+  const pageRef = useRef(page);
+  const selectedRef = useRef(selected);
+  useEffect(() => {
+    pageRef.current = page;
+  }, [page]);
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
+
   const navigateBack = useCallback(() => {
     setNavStack((prev) => {
       if (prev.length === 0) return prev;
@@ -186,12 +206,15 @@ export default function App() {
     });
   }, []);
 
-  const navigate = (pg, data = null) => {
-    setNavStack((prev) => [...prev, { page, selected }]);
+  const navigate = useCallback((pg, data = null) => {
+    setNavStack((prev) => [
+      ...prev,
+      { page: pageRef.current, selected: selectedRef.current },
+    ]);
     setSelected(data);
     setPage(pg);
     setShowSearch(false);
-  };
+  }, []);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
@@ -212,50 +235,47 @@ export default function App() {
   }, [navigateBack]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  const showToast = (msg) => {
+  const showToast = useCallback((msg) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
-  };
+  }, []);
 
-  const retryHome = () => {
-    if (!apiKey || offline) return;
-    setLoadingHome(true);
-    Promise.all([
-      tmdbFetch("/trending/movie/week", apiKey),
-      tmdbFetch("/trending/tv/week", apiKey),
-    ])
-      .then(([m, t]) => {
-        setTrending(m.results || []);
-        setTrendingTV(t.results || []);
-      })
-      .catch(() => {})
-      .finally(() => setLoadingHome(false));
-  };
+  const handleSelectResult = useCallback(
+    (item) => {
+      navigate(item.media_type === "tv" ? "tv" : "movie", item);
+    },
+    [navigate],
+  );
 
-  const handleSelectResult = (item) => {
-    navigate(item.media_type === "tv" ? "tv" : "movie", item);
-  };
-
-  const saveApiKey = (key) => {
+  const saveApiKey = useCallback((key) => {
     storage.set("apikey", key);
     setApiKey(key);
-  };
+  }, []);
 
-  const changeApiKey = () => {
+  const changeApiKey = useCallback(() => {
     storage.remove("apikey");
     setApiKey(null);
     setSkipped(false);
-  };
+  }, []);
+
+  // Ref so toggleSave never needs `saved` as a dep (avoids recreation on every save)
+  const savedRef = useRef(saved);
+  useEffect(() => {
+    savedRef.current = saved;
+  }, [saved]);
 
   const toggleSave = useCallback(
     (item) => {
       const id = `${item.media_type || (item.first_air_date ? "tv" : "movie")}_${item.id}`;
-      const next = { ...saved };
-      if (next[id]) {
+      const currentSaved = savedRef.current;
+      const isRemoving = !!currentSaved[id];
+      const next = { ...currentSaved };
+
+      if (isRemoving) {
         delete next[id];
         showToast("Removed from watchlist");
         setSavedOrder((prev) => {
-          const currentOrder = prev || Object.keys(saved);
+          const currentOrder = prev || Object.keys(currentSaved);
           const newOrder = currentOrder.filter((k) => k !== id);
           storage.set("savedOrder", newOrder);
           return newOrder;
@@ -271,7 +291,7 @@ export default function App() {
         };
         showToast("Added to watchlist");
         setSavedOrder((prev) => {
-          const currentOrder = prev || Object.keys(saved);
+          const currentOrder = prev || Object.keys(currentSaved);
           const newOrder = [...currentOrder, id];
           storage.set("savedOrder", newOrder);
           return newOrder;
@@ -280,13 +300,16 @@ export default function App() {
       setSaved(next);
       storage.set("saved", next);
     },
-    [saved],
+    [showToast],
   );
 
-  const isSaved = (item) => {
-    const id = `${item.media_type || (item.first_air_date ? "tv" : "movie")}_${item.id}`;
-    return !!saved[id];
-  };
+  const isSaved = useCallback(
+    (item) => {
+      const id = `${item.media_type || (item.first_air_date ? "tv" : "movie")}_${item.id}`;
+      return !!saved[id];
+    },
+    [saved],
+  );
 
   const addHistory = useCallback((item) => {
     const entry = {
@@ -309,7 +332,7 @@ export default function App() {
       storage.set("history", next);
       return next;
     });
-  }, []); // no deps needed — functional update always sees latest state
+  }, []); // no deps needed
 
   const saveProgress = useCallback((key, pct) => {
     // Functional update — without this, TVPage's setInterval keeps spreading
@@ -340,25 +363,32 @@ export default function App() {
     });
   }, []);
 
-  const inProgress = history.filter((h) => {
-    // Guard: TV entries must have valid season + episode to form a matchable key
-    if (h.media_type === "tv" && (h.season == null || h.episode == null))
-      return false;
-    const pk =
-      h.media_type === "movie"
-        ? `movie_${h.id}`
-        : `tv_${h.id}_s${h.season}e${h.episode}`;
-    const pct = progress[pk];
-    // Exclude watched items and items not meaningfully started or already finished
-    if (watched[pk]) return false;
-    return pct != null && pct > 2 && pct < 98;
-  });
+  // Memoized, avoids re-filtering on every download-progress event
+  const inProgress = useMemo(
+    () =>
+      history.filter((h) => {
+        // Guard: TV entries must have valid season + episode to form a matchable key
+        if (h.media_type === "tv" && (h.season == null || h.episode == null))
+          return false;
+        const pk =
+          h.media_type === "movie"
+            ? `movie_${h.id}`
+            : `tv_${h.id}_s${h.season}e${h.episode}`;
+        const pct = progress[pk];
+        // Exclude watched items and items not meaningfully started or already finished
+        if (watched[pk]) return false;
+        return pct != null && pct > 2 && pct < 98;
+      }),
+    [history, progress, watched],
+  );
 
-  // Build savedList respecting drag-and-drop order
-  const orderedKeys = savedOrder
-    ? savedOrder.filter((k) => saved[k])
-    : Object.keys(saved);
-  const savedList = orderedKeys.map((k) => saved[k]).filter(Boolean);
+  // Memoized, avoids re-mapping on every download-progress event
+  const savedList = useMemo(() => {
+    const orderedKeys = savedOrder
+      ? savedOrder.filter((k) => saved[k])
+      : Object.keys(saved);
+    return orderedKeys.map((k) => saved[k]).filter(Boolean);
+  }, [saved, savedOrder]);
 
   const handleReorderSaved = useCallback((newOrder) => {
     setSavedOrder(newOrder);

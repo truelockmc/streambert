@@ -885,6 +885,9 @@ ipcMain.handle("get-downloads-size", () => {
   return { bytes };
 });
 
+// ── IPC: App version ──────────────────────
+ipcMain.handle("get-app-version", () => app.getVersion());
+
 // ── IPC: Quit app ─────────────────────────
 ipcMain.handle("quit-app", () => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
