@@ -5,6 +5,7 @@ import { storage } from "../utils/storage";
 export default function DownloadModal({
   onClose,
   m3u8Url,
+  subtitleUrl,
   mediaName,
   downloaderFolder,
   setDownloaderFolder,
@@ -68,6 +69,7 @@ export default function DownloadModal({
     const result = await window.electron.runDownload({
       binaryPath: downloader.binaryPath,
       m3u8Url,
+      subtitleUrl: subtitleUrl || null,
       name: mediaName,
       downloadPath,
       mediaId,

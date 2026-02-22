@@ -108,9 +108,14 @@ function createWindow() {
   videasySession.webRequest.onBeforeRequest(
     { urls: ["*://*/*"] },
     (details, callback) => {
-      if (details.url.includes(".m3u8")) {
+      const { url } = details;
+      if (url.includes(".m3u8")) {
         if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send("m3u8-found", details.url);
+          mainWindow.webContents.send("m3u8-found", url);
+        }
+      } else if (url.includes(".vtt") || url.includes(".srt")) {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("subtitle-found", url);
         }
       }
 
@@ -262,6 +267,67 @@ app.on("activate", () => {
   if (mainWindow === null) createWindow();
 });
 
+// ── Subtitle file downloader ──────────────────────────────────────────────────
+// Downloads a .vtt or .srt file to destPath. Returns true on success.
+function downloadSubtitleFile(url, destPath) {
+  return new Promise((resolve) => {
+    try {
+      const parsedUrl = new URL(url);
+      const lib = parsedUrl.protocol === "https:" ? https : http;
+      const req = lib.get(
+        url,
+        {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0",
+            Referer: parsedUrl.origin,
+            Accept: "*/*",
+          },
+        },
+        (res) => {
+          // Follow one level of redirect
+          if (
+            res.statusCode >= 300 &&
+            res.statusCode < 400 &&
+            res.headers.location
+          ) {
+            const loc = res.headers.location.startsWith("http")
+              ? res.headers.location
+              : parsedUrl.origin + res.headers.location;
+            downloadSubtitleFile(loc, destPath).then(resolve);
+            return;
+          }
+          if (res.statusCode !== 200) {
+            res.resume();
+            resolve(false);
+            return;
+          }
+          const file = fs.createWriteStream(destPath);
+          res.pipe(file);
+          file.on("finish", () => {
+            file.close();
+            resolve(true);
+          });
+          file.on("error", () => {
+            try {
+              fs.unlinkSync(destPath);
+            } catch {}
+            resolve(false);
+          });
+          res.on("error", () => resolve(false));
+        },
+      );
+      req.on("error", () => resolve(false));
+      req.setTimeout(20000, () => {
+        req.destroy();
+        resolve(false);
+      });
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
 // ── IPC: downloader binary detection ─────────────────────────────────────────
 ipcMain.handle("check-downloader", (_, folderPath) => {
   if (!folderPath) return { exists: false };
@@ -300,6 +366,7 @@ ipcMain.handle(
       episode,
       posterPath,
       tmdbId,
+      subtitleUrl,
     },
   ) => {
     try {
@@ -326,6 +393,8 @@ ipcMain.handle(
         episode: episode || null,
         posterPath: posterPath || null,
         tmdbId: tmdbId || mediaId || null,
+        subtitleUrl: subtitleUrl || null,
+        subtitlePath: null,
       };
       downloads.push(entry);
       // Do NOT call sendProgress here. The renderer adds the initial entry via
@@ -606,6 +675,27 @@ ipcMain.handle(
             } catch {}
           }
 
+          // Download subtitle file if a URL was captured
+          if (
+            code === 0 &&
+            downloads[idx].subtitleUrl &&
+            downloads[idx].filePath
+          ) {
+            const subUrl = downloads[idx].subtitleUrl;
+            const subExt = subUrl.toLowerCase().includes(".srt")
+              ? ".srt"
+              : ".vtt";
+            const videoBase = downloads[idx].filePath.replace(/\.[^.]+$/, "");
+            const subDestPath = videoBase + subExt;
+            downloadSubtitleFile(subUrl, subDestPath).then((ok) => {
+              const i2 = downloads.findIndex((d) => d.id === id);
+              if (i2 !== -1 && ok) {
+                downloads[i2].subtitlePath = subDestPath;
+                saveDownloads();
+              }
+            });
+          }
+
           sendProgress({
             id,
             status: downloads[idx].status,
@@ -634,6 +724,13 @@ ipcMain.handle("get-downloads", () => downloads);
 ipcMain.handle("delete-download", (_, { id, filePath }) => {
   try {
     if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    // Also delete subtitle file if it was downloaded alongside the video
+    const dlEntry = downloads.find((d) => d.id === id);
+    if (dlEntry?.subtitlePath && fs.existsSync(dlEntry.subtitlePath)) {
+      try {
+        fs.unlinkSync(dlEntry.subtitlePath);
+      } catch {}
+    }
     downloads = downloads.filter((d) => d.id !== id);
     saveDownloads();
     return { ok: true };
@@ -846,6 +943,11 @@ ipcMain.handle("delete-all-downloads", async () => {
         } catch {
           errors++;
         }
+      }
+      if (dl.subtitlePath) {
+        try {
+          if (fs.existsSync(dl.subtitlePath)) fs.unlinkSync(dl.subtitlePath);
+        } catch {}
       }
     }
     downloads = [];

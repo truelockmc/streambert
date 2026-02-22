@@ -217,6 +217,7 @@ export default function TVPage({
   const [trailerKey, setTrailerKey] = useState(null);
   const [showTrailer, setShowTrailer] = useState(false);
   const [m3u8Url, setM3u8Url] = useState(null);
+  const [subtitleUrl, setSubtitleUrl] = useState(null);
   const [playerSource, setPlayerSource] = useState(
     () => storage.get("playerSource") || "videasy",
   );
@@ -302,9 +303,10 @@ export default function TVPage({
       .finally(() => setLoadingSeason(false));
   }, [item.id, selectedSeason, apiKey]);
 
-  // Reset m3u8 URL and source menu whenever the series, episode, or source changes
+  // Reset m3u8 URL, subtitle URL and source menu whenever the series, episode, or source changes
   useEffect(() => {
     setM3u8Url(null);
+    setSubtitleUrl(null);
     setShowSourceMenu(false);
     setResolvedPlayerUrl(null);
     setResolvingUrl(false);
@@ -399,6 +401,14 @@ export default function TVPage({
       setM3u8Url((prev) => (prev !== url ? url : prev));
     });
     return () => window.electron.offM3u8Found(handler);
+  }, []);
+
+  useEffect(() => {
+    if (!window.electron) return;
+    const handler = window.electron.onSubtitleFound((url) => {
+      setSubtitleUrl((prev) => (prev !== url ? url : prev));
+    });
+    return () => window.electron.offSubtitleFound(handler);
   }, []);
 
   const d = details || item;
@@ -658,6 +668,7 @@ export default function TVPage({
 
   const playEpisode = (ep) => {
     setM3u8Url(null);
+    setSubtitleUrl(null);
     setResolvedPlayerUrl(null);
     setResolvingUrl(false);
     setResolveError(null);
@@ -936,6 +947,7 @@ export default function TVPage({
                       setDubMode(next);
                       storage.set("allmangaDubMode", next);
                       setM3u8Url(null);
+                      setSubtitleUrl(null);
                       setResolvedPlayerUrl(null);
                       setResolvingUrl(false);
                       setResolveError(null);
@@ -966,6 +978,7 @@ export default function TVPage({
                           storage.set("playerSource", src.id);
                           setShowSourceMenu(false);
                           setM3u8Url(null);
+                          setSubtitleUrl(null);
                           setResolvedPlayerUrl(null);
                           setResolvingUrl(false);
                           setResolveError(null);
@@ -1288,6 +1301,7 @@ export default function TVPage({
         <DownloadModal
           onClose={() => setShowDownload(false)}
           m3u8Url={m3u8Url}
+          subtitleUrl={subtitleUrl}
           mediaName={mediaName}
           downloaderFolder={downloaderFolder}
           setDownloaderFolder={handleSetDownloaderFolder}

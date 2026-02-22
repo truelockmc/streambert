@@ -9,6 +9,14 @@ contextBridge.exposeInMainWorld("electron", {
   },
   offM3u8Found: (h) => ipcRenderer.removeListener("m3u8-found", h),
 
+  // subtitle capture (.vtt / .srt)
+  onSubtitleFound: (cb) => {
+    const h = (_, url) => cb(url);
+    ipcRenderer.on("subtitle-found", h);
+    return h;
+  },
+  offSubtitleFound: (h) => ipcRenderer.removeListener("subtitle-found", h),
+
   // Download progress events
   onDownloadProgress: (cb) => {
     const h = (_, d) => cb(d);
