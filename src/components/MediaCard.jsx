@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { imgUrl } from "../utils/api";
 import {
   PlayIcon,
@@ -9,7 +9,7 @@ import {
   RatingLockIcon,
 } from "./Icons";
 
-export default function MediaCard({
+const MediaCard = memo(function MediaCard({
   item,
   onClick,
   progress,
@@ -172,4 +172,5 @@ export default function MediaCard({
       )}
     </>
   );
-}
+});
+export default MediaCard;

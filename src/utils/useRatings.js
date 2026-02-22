@@ -43,9 +43,11 @@ function evictStale(cache) {
  */
 export function useRatings(items) {
   const [ratingsMap, setRatingsMap] = useState({});
-  const ageLimitSetting = getAgeLimitSetting(storage);
-  const ratingCountry = getRatingCountry(storage);
-  const apiKey = getApiKey();
+  // Read stable settings once — these only change when user visits Settings,
+  // which unmounts/remounts affected pages anyway, so useState(init) is correct.
+  const [ageLimitSetting] = useState(() => getAgeLimitSetting(storage));
+  const [ratingCountry] = useState(() => getRatingCountry(storage));
+  const [apiKey] = useState(() => getApiKey());
 
   const itemsKey = useMemo(() => {
     if (!items?.length) return "";

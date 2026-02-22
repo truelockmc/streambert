@@ -231,6 +231,7 @@ export default function DownloadsPage({
                   dl={dl}
                   fileExists={dl.isLocalOnly ? true : fileExistsCache[dl.id]}
                   onWatch={() => window.electron.openPath(dl.filePath)}
+                  onHistory={onHistory}
                   onShowFolder={() =>
                     window.electron?.showInFolder(dl.filePath)
                   }
@@ -358,6 +359,7 @@ function LocalFileCard({
   onMarkUnwatched,
   onSelect,
   watchedKey,
+  onHistory,
 }) {
   const isDownload = !dl.isLocalOnly;
   const canWatch = !!fileExists && !!dl.filePath;
@@ -404,12 +406,24 @@ function LocalFileCard({
 
   const handleWatch = useCallback(() => {
     if (!dl.filePath) return;
+    // Update watch history when playing from downloads
+    if (onHistory && dl.tmdbId && dl.mediaType) {
+      onHistory({
+        id: dl.tmdbId,
+        title: dl.mediaType === "movie" ? dl.name : undefined,
+        name: dl.mediaType === "tv" ? dl.name : undefined,
+        poster_path: dl.posterPath || null,
+        media_type: dl.mediaType,
+        season: dl.season != null ? Number(dl.season) : null,
+        episode: dl.episode != null ? Number(dl.episode) : null,
+      });
+    }
     if (savedSecs > 0 && window.electron?.openPathAtTime) {
       window.electron.openPathAtTime(dl.filePath, savedSecs);
     } else {
       onWatch();
     }
-  }, [dl.filePath, savedSecs, onWatch]);
+  }, [dl.filePath, savedSecs, onWatch, onHistory, dl]);
 
   const progressLabel = (() => {
     if (isWatched) return null;

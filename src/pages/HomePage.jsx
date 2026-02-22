@@ -1,8 +1,20 @@
+import { useState, useEffect, useMemo, useCallback } from "react";
 import MediaCard from "../components/MediaCard";
+import TrendingCarousel from "../components/TrendingCarousel";
 import { PlayIcon, StarIcon } from "../components/Icons";
-import { imgUrl } from "../utils/api";
+import { imgUrl, tmdbFetch } from "../utils/api";
 import { useRatings, getRatingForItem } from "../utils/useRatings";
 import { isRestricted } from "../utils/ageRating";
+
+function getRecentHistoryItem(history) {
+  if (!history || history.length === 0) return null;
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const recent = history.filter(
+    (h) => h.watchedAt && h.watchedAt > sevenDaysAgo,
+  );
+  if (recent.length === 0) return null;
+  return recent[Math.floor(Math.random() * recent.length)];
+}
 
 export default function HomePage({
   trending,
@@ -16,23 +28,99 @@ export default function HomePage({
   watched,
   onMarkWatched,
   onMarkUnwatched,
+  history,
+  apiKey,
 }) {
   const hero = trending[0];
 
-  // Collect all items for batch rating fetch
-  const allItems = [
-    ...inProgress,
-    ...trending.map((i) => ({ ...i, media_type: "movie" })),
-    ...trendingTV.map((i) => ({ ...i, media_type: "tv" })),
-  ];
+  const [similarItems, setSimilarItems] = useState([]);
+  const [similarSource, setSimilarSource] = useState(null);
+
+  // Memoised so useRatings doesn't re-fire on every render
+  const allItems = useMemo(
+    () => [
+      ...inProgress,
+      ...trending.map((i) => ({ ...i, media_type: "movie" })),
+      ...trendingTV.map((i) => ({ ...i, media_type: "tv" })),
+      ...similarItems,
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    ],
+    [
+      inProgress.length,
+      trending.length,
+      trendingTV.length,
+      similarItems.length,
+    ],
+  );
+
   const { ratingsMap, ageLimitSetting } = useRatings(allItems);
 
-  const getRating = (item) => getRatingForItem(item, ratingsMap);
-  const itemRestricted = (item) =>
-    isRestricted(getRating(item).minAge, ageLimitSetting);
+  const getRating = useCallback(
+    (item) => getRatingForItem(item, ratingsMap),
+    [ratingsMap],
+  );
+  const itemRestricted = useCallback(
+    (item) =>
+      isRestricted(getRatingForItem(item, ratingsMap).minAge, ageLimitSetting),
+    [ratingsMap, ageLimitSetting],
+  );
+
+  // Enrich ratingsMap with `restricted` flag so the carousel can use it directly
+  const enrichedRatingsMap = useMemo(() => {
+    const out = {};
+    for (const [k, v] of Object.entries(ratingsMap)) {
+      out[k] = { ...v, restricted: isRestricted(v.minAge, ageLimitSetting) };
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ratingsMap, ageLimitSetting]);
+
+  // Fetch similar items based on recent watch history
+  useEffect(() => {
+    if (!apiKey || offline || !history || history.length === 0) return;
+    const source = getRecentHistoryItem(history);
+    if (!source) return;
+    setSimilarSource(source);
+    const type = source.media_type === "tv" ? "tv" : "movie";
+
+    const tryFetch = (endpoint) =>
+      tmdbFetch(`/${type}/${source.id}/${endpoint}`, apiKey).then((data) =>
+        (data.results || [])
+          .slice(0, 20)
+          .map((item) => ({ ...item, media_type: type })),
+      );
+
+    tryFetch("similar")
+      .then((results) => {
+        if (results.length > 0) {
+          setSimilarItems(results);
+          return;
+        }
+        return tryFetch("recommendations").then(setSimilarItems);
+      })
+      .catch(() =>
+        tryFetch("recommendations")
+          .then(setSimilarItems)
+          .catch(() => {}),
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKey, offline, history?.length]);
+
+  // Pre-built item arrays for carousels (stable references via useMemo)
+  const trendingMovieItems = useMemo(
+    () => trending.map((i) => ({ ...i, media_type: "movie" })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [trending.length],
+  );
+  const trendingTVItems = useMemo(
+    () => trendingTV.map((i) => ({ ...i, media_type: "tv" })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [trendingTV.length],
+  );
 
   return (
     <div className="fade-in">
+      {/* ── Offline state ── */}
       {offline && (
         <div
           style={{
@@ -62,12 +150,14 @@ export default function HomePage({
           </button>
         </div>
       )}
+
       {!offline && loading && (
         <div className="loader">
           <div className="spinner" />
         </div>
       )}
 
+      {/* ── Hero ── */}
       {!loading && hero && (
         <div className="hero">
           <div
@@ -105,6 +195,7 @@ export default function HomePage({
         </div>
       )}
 
+      {/* ── Continue Watching ── */}
       {inProgress.length > 0 && (
         <div className="section">
           <div className="section-title">Continue Watching</div>
@@ -134,54 +225,35 @@ export default function HomePage({
         </div>
       )}
 
-      {trending.length > 0 && (
-        <div className="section">
-          <div className="section-title">Trending Movies</div>
-          <div className="scroll-row">
-            {trending.map((item) => {
-              const withType = { ...item, media_type: "movie" };
-              const r = getRating(withType);
-              const restr = itemRestricted(withType);
-              return (
-                <MediaCard
-                  key={item.id}
-                  item={withType}
-                  onClick={() => onSelect(withType)}
-                  watched={watched}
-                  onMarkWatched={onMarkWatched}
-                  onMarkUnwatched={onMarkUnwatched}
-                  ageRating={r.cert}
-                  restricted={restr}
-                />
-              );
-            })}
-          </div>
-        </div>
+      {/* ── Similar to [recent watch] — carousel ── */}
+      {similarSource && similarItems.length > 0 && (
+        <TrendingCarousel
+          items={similarItems}
+          title="Similar to"
+          titleHighlight={similarSource.title || similarSource.name}
+          onSelect={onSelect}
+          ratingsMap={enrichedRatingsMap}
+        />
       )}
 
-      {trendingTV.length > 0 && (
-        <div className="section">
-          <div className="section-title">Trending Series</div>
-          <div className="scroll-row">
-            {trendingTV.map((item) => {
-              const withType = { ...item, media_type: "tv" };
-              const r = getRating(withType);
-              const restr = itemRestricted(withType);
-              return (
-                <MediaCard
-                  key={item.id}
-                  item={withType}
-                  onClick={() => onSelect(withType)}
-                  watched={watched}
-                  onMarkWatched={onMarkWatched}
-                  onMarkUnwatched={onMarkUnwatched}
-                  ageRating={r.cert}
-                  restricted={restr}
-                />
-              );
-            })}
-          </div>
-        </div>
+      {/* ── Trending Movies — carousel ── */}
+      {trendingMovieItems.length > 0 && (
+        <TrendingCarousel
+          items={trendingMovieItems}
+          title="Trending Movies"
+          onSelect={onSelect}
+          ratingsMap={enrichedRatingsMap}
+        />
+      )}
+
+      {/* ── Trending Series — carousel ── */}
+      {trendingTVItems.length > 0 && (
+        <TrendingCarousel
+          items={trendingTVItems}
+          title="Trending Series"
+          onSelect={onSelect}
+          ratingsMap={enrichedRatingsMap}
+        />
       )}
     </div>
   );

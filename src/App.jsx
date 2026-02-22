@@ -411,6 +411,8 @@ export default function App() {
             watched={watched}
             onMarkWatched={markWatched}
             onMarkUnwatched={markUnwatched}
+            history={history}
+            apiKey={apiKey}
           />
         )}
         {page === "movie" && selected && (
