@@ -229,7 +229,6 @@ export default function TVPage({
   const [resolvedPlayerUrl, setResolvedPlayerUrl] = useState(null);
   const [resolvingUrl, setResolvingUrl] = useState(false);
   const [resolveError, setResolveError] = useState(null);
-  const [resolvedFallback, setResolvedFallback] = useState(false);
   const [anilistData, setAnilistData] = useState(null);
   const [anilistSeasons, setAnilistSeasons] = useState(null); // [{seasonNum, title, episodes, year}]
   const [menuPos, setMenuPos] = useState(null);
@@ -237,8 +236,6 @@ export default function TVPage({
 
   // Derived: detect anime before any effects so effects can use it
   const isAnime = isAnimeContent(item, details);
-  const currentSrcObj =
-    PLAYER_SOURCES.find((s) => s.id === playerSource) ?? PLAYER_SOURCES[0];
   const [downloaderFolder, setDownloaderFolder] = useState(
     () => storage.get("downloaderFolder") || "",
   );
@@ -311,7 +308,6 @@ export default function TVPage({
     setResolvedPlayerUrl(null);
     setResolvingUrl(false);
     setResolveError(null);
-    setResolvedFallback(false);
   }, [
     item.id,
     selectedEp?.episode_number,
@@ -386,7 +382,6 @@ export default function TVPage({
           } else {
             setResolvedPlayerUrl(res.url);
           }
-          setResolvedFallback(false);
         } else {
           setResolveError(res?.error || "Episode not found on AllManga");
         }
@@ -672,7 +667,6 @@ export default function TVPage({
     setResolvedPlayerUrl(null);
     setResolvingUrl(false);
     setResolveError(null);
-    setResolvedFallback(false);
     setSelectedEp(ep);
     setPlaying(true);
     onHistory({
@@ -951,7 +945,6 @@ export default function TVPage({
                       setResolvedPlayerUrl(null);
                       setResolvingUrl(false);
                       setResolveError(null);
-                      setResolvedFallback(false);
                     }}
                     title="Toggle Sub/Dub"
                   >
@@ -982,7 +975,6 @@ export default function TVPage({
                           setResolvedPlayerUrl(null);
                           setResolvingUrl(false);
                           setResolveError(null);
-                          setResolvedFallback(false);
                         }}
                       >
                         <span>{src.label}</span>

@@ -221,7 +221,14 @@ body,
     border: 1px solid var(--border);
 }
 
-.saved-thumb img,
+.saved-thumb img {
+    border-radius: 5px;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
 .saved-thumb > .no-img {
     border-radius: 5px;
     overflow: hidden;
@@ -233,10 +240,6 @@ body,
     border-color: var(--red);
     transform: scale(1.05);
     box-shadow: var(--red-glow);
-}
-
-.saved-thumb img {
-    object-fit: cover;
 }
 
 .saved-thumb-tooltip {

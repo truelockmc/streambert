@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from "react";
 import MediaCard from "../components/MediaCard";
 import { imgUrl } from "../utils/api";
 import { EyeIcon, WatchedIcon } from "../components/Icons";
@@ -14,12 +15,20 @@ export default function LibraryPage({
   onMarkWatched,
   onMarkUnwatched,
 }) {
-  const allItems = [...inProgress, ...saved];
+  const allItems = useMemo(
+    () => [...inProgress, ...saved],
+    [inProgress, saved],
+  );
   const { ratingsMap, ageLimitSetting } = useRatings(allItems);
 
-  const getRating = (item) => getRatingForItem(item, ratingsMap);
-  const itemRestricted = (item) =>
-    isRestricted(getRating(item).minAge, ageLimitSetting);
+  const getRating = useCallback(
+    (item) => getRatingForItem(item, ratingsMap),
+    [ratingsMap],
+  );
+  const itemRestricted = useCallback(
+    (item) => isRestricted(getRating(item).minAge, ageLimitSetting),
+    [getRating, ageLimitSetting],
+  );
 
   return (
     <div className="fade-in">
@@ -43,7 +52,7 @@ export default function LibraryPage({
               const restr = itemRestricted(item);
               return (
                 <MediaCard
-                  key={i}
+                  key={pk}
                   item={item}
                   onClick={() => onSelect(item)}
                   progress={progress[pk] || 0}
@@ -97,7 +106,7 @@ export default function LibraryPage({
               const isWatched = !!watched?.[pk];
               return (
                 <div
-                  key={i}
+                  key={pk}
                   className="history-row"
                   onClick={() => onSelect(item)}
                 >

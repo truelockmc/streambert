@@ -49,14 +49,8 @@ export default function HomePage({
       ...trending.map((i) => ({ ...i, media_type: "movie" })),
       ...trendingTV.map((i) => ({ ...i, media_type: "tv" })),
       ...similarItems,
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     ],
-    [
-      inProgress.length,
-      trending.length,
-      trendingTV.length,
-      similarItems.length,
-    ],
+    [inProgress, trending, trendingTV, similarItems],
   );
 
   const { ratingsMap, ageLimitSetting } = useRatings(allItems);
@@ -113,13 +107,11 @@ export default function HomePage({
   // Stable pre-built item arrays for carousels
   const trendingMovieItems = useMemo(
     () => trending.map((i) => ({ ...i, media_type: "movie" })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [trending.length],
+    [trending],
   );
   const trendingTVItems = useMemo(
     () => trendingTV.map((i) => ({ ...i, media_type: "tv" })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [trendingTV.length],
+    [trendingTV],
   );
 
   // ── Row renderers ──────────────────────────────────────────────────────────

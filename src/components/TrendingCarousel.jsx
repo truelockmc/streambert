@@ -422,7 +422,7 @@ export default function TrendingCarousel({
       <div className="carousel-dots">
         {Array.from({ length: dotCount }, (_, i) => (
           <button
-            key={i}
+            key={`dot-${i}`}
             className={`carousel-dot${active === i ? " carousel-dot--active" : ""}`}
             onClick={() => handleDot(i)}
             aria-label={`Go to ${i + 1}`}

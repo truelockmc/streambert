@@ -110,7 +110,8 @@ export default function DownloadsPage({
         });
       }
     });
-  }, [finished.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finished.length, onDeleteDownload]);
 
   const handleScanFolder = useCallback(async () => {
     if (!isElectron || !scanFolder) return;
