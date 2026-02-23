@@ -1,5 +1,5 @@
 # Streambert
-A cross-platform Electron Desktop App to stream and download any Movie or TV Series in the World. <br></br>
+A cross-platform Electron Desktop App to stream and download any Movie, TV Series or Anime in the World. Zero Ads and Tracking <br></br>
 ![Logo](public/logo.svg)
 
 ![Explore new Stuff](screenshots/trending.png)
