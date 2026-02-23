@@ -477,6 +477,7 @@ export default function App() {
               setHighlightDownload(id || null);
               navigate("downloads");
             }}
+            onSelect={handleSelectResult}
           />
         )}
         {page === "tv" && selected && (

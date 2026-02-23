@@ -1,11 +1,24 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { tmdbFetch, imgUrl } from "../utils/api";
 import { SearchIcon, CloseIcon } from "./Icons";
+import { storage } from "../utils/storage";
+
+const HISTORY_KEY = "searchHistory";
+const MAX_HISTORY = 12;
+
+function loadHistory() {
+  return storage.get(HISTORY_KEY) || [];
+}
+
+function saveHistory(history) {
+  storage.set(HISTORY_KEY, history);
+}
 
 export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState(loadHistory);
   const inputRef = useRef();
 
   useEffect(() => {
@@ -35,9 +48,53 @@ export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
     return () => clearTimeout(timer);
   }, [query, apiKey]);
 
+  const addToHistory = useCallback((term) => {
+    const trimmed = term.trim();
+    if (!trimmed) return;
+    setHistory((prev) => {
+      const next = [trimmed, ...prev.filter((h) => h !== trimmed)].slice(
+        0,
+        MAX_HISTORY,
+      );
+      saveHistory(next);
+      return next;
+    });
+  }, []);
+
+  const removeFromHistory = useCallback((e, term) => {
+    e.stopPropagation();
+    setHistory((prev) => {
+      const next = prev.filter((h) => h !== term);
+      saveHistory(next);
+      return next;
+    });
+  }, []);
+
+  const clearHistory = useCallback(() => {
+    setHistory([]);
+    saveHistory([]);
+  }, []);
+
+  const handleSelect = useCallback(
+    (r) => {
+      addToHistory(r.title || r.name);
+      onSelect(r);
+      onClose();
+    },
+    [addToHistory, onSelect, onClose],
+  );
+
+  const handleHistoryClick = useCallback((term) => {
+    setQuery(term);
+    inputRef.current?.focus();
+  }, []);
+
   const handleKey = (e) => {
     if (e.key === "Escape") onClose();
+    if (e.key === "Enter" && query.trim()) addToHistory(query);
   };
+
+  const showHistory = !query && history.length > 0;
 
   return (
     <div
@@ -86,6 +143,7 @@ export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
               🌐 No internet, search is unavailable offline.
             </div>
           )}
+
           {!offline && loading && (
             <div className="loader">
               <div className="spinner" />
@@ -101,10 +159,7 @@ export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
               <div
                 key={r.id}
                 className="search-result"
-                onClick={() => {
-                  onSelect(r);
-                  onClose();
-                }}
+                onClick={() => handleSelect(r)}
               >
                 <img
                   src={
@@ -129,7 +184,37 @@ export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
               </div>
             ))}
 
-          {!query && (
+          {showHistory && (
+            <div className="search-history">
+              <div className="search-history-header">
+                <span className="search-history-label">Recent searches</span>
+                <button className="search-history-clear" onClick={clearHistory}>
+                  Clear all
+                </button>
+              </div>
+              {history.map((term) => (
+                <div
+                  key={term}
+                  className="search-history-item"
+                  onClick={() => handleHistoryClick(term)}
+                >
+                  <span className="search-history-icon">
+                    <SearchIcon />
+                  </span>
+                  <span className="search-history-term">{term}</span>
+                  <button
+                    className="search-history-remove"
+                    onClick={(e) => removeFromHistory(e, term)}
+                    title="Remove"
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!query && history.length === 0 && (
             <div className="search-hint">
               Search for movies and series &nbsp;·&nbsp; <kbd>ESC</kbd> to close
             </div>

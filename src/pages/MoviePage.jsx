@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo, useCallback } from "react";
 import {
   tmdbFetch,
   imgUrl,
@@ -28,6 +28,7 @@ import {
 } from "../components/Icons";
 import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
+import MediaCard from "../components/MediaCard";
 import { storage } from "../utils/storage";
 import {
   fetchMovieRating,
@@ -52,6 +53,7 @@ export default function MoviePage({
   onMarkUnwatched,
   downloads,
   onGoToDownloads,
+  onSelect,
 }) {
   const [details, setDetails] = useState(null);
   const [playing, setPlaying] = useState(false);
@@ -74,6 +76,7 @@ export default function MoviePage({
   const [resolvedPlayerUrl, setResolvedPlayerUrl] = useState(null);
   const [resolvingUrl, setResolvingUrl] = useState(false);
   const [resolveError, setResolveError] = useState(null);
+  const [collection, setCollection] = useState(null); // { name, parts }
 
   // Derived: detect anime before any effects so effects can use it
   const isAnime = isAnimeContent(item, details);
@@ -122,6 +125,24 @@ export default function MoviePage({
       })
       .catch(() => {});
   }, [item.id, apiKey]);
+
+  // Fetch movie collection (sequels/prequels)
+  useEffect(() => {
+    setCollection(null);
+    if (!details?.belongs_to_collection?.id) return;
+    tmdbFetch(`/collection/${details.belongs_to_collection.id}`, apiKey)
+      .then((data) => {
+        const parts = (data.parts || [])
+          .map((p) => ({ ...p, media_type: "movie" }))
+          .sort((a, b) =>
+            (a.release_date || "").localeCompare(b.release_date || ""),
+          );
+        if (parts.length > 1) {
+          setCollection({ name: data.name, parts });
+        }
+      })
+      .catch(() => {});
+  }, [details?.belongs_to_collection?.id, apiKey]);
 
   // Reset m3u8 URL, subtitle URL and source menu whenever the movie or source changes
   useEffect(() => {
@@ -746,6 +767,31 @@ export default function MoviePage({
         </div>
       )}
 
+      {collection && onSelect && (
+        <div className="section">
+          <div className="section-title">{collection.name}</div>
+          <div className="scroll-row">
+            {collection.parts.map((part) => {
+              const pk = `movie_${part.id}`;
+              const isCurrent = part.id === item.id;
+              return (
+                <CollectionCard
+                  key={part.id}
+                  part={part}
+                  pk={pk}
+                  isCurrent={isCurrent}
+                  onSelect={onSelect}
+                  progress={progress[pk] || 0}
+                  watched={watched}
+                  onMarkWatched={onMarkWatched}
+                  onMarkUnwatched={onMarkUnwatched}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {showTrailer && trailerKey && (
         <TrailerModal
           trailerKey={trailerKey}
@@ -773,3 +819,35 @@ export default function MoviePage({
     </div>
   );
 }
+
+// ── CollectionCard ─────────────────────────────────────────────────────────
+// Isolated memo'd wrapper so the onClick for each collection part is stable
+// and doesn't cause MediaCard to re-render on every progress tick.
+const CollectionCard = memo(function CollectionCard({
+  part,
+  isCurrent,
+  onSelect,
+  progress,
+  watched,
+  onMarkWatched,
+  onMarkUnwatched,
+}) {
+  const handleClick = useCallback(() => onSelect(part), [onSelect, part]);
+  return (
+    <div
+      style={{
+        opacity: isCurrent ? 0.5 : 1,
+        pointerEvents: isCurrent ? "none" : "auto",
+      }}
+    >
+      <MediaCard
+        item={part}
+        onClick={handleClick}
+        progress={progress}
+        watched={watched}
+        onMarkWatched={onMarkWatched}
+        onMarkUnwatched={onMarkUnwatched}
+      />
+    </div>
+  );
+});
