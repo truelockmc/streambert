@@ -26,6 +26,8 @@ export default function Sidebar({
   const dragItem = useRef(null);
   const dragNode = useRef(null);
 
+  const [tooltip, setTooltip] = useState(null); // { title, y }
+
   const handleDragStart = (e, index) => {
     dragItem.current = index;
     dragNode.current = e.currentTarget;
@@ -64,6 +66,15 @@ export default function Sidebar({
   const handleDragOver = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleMouseEnter = (e, title) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setTooltip({ title, y: rect.top + rect.height / 2 });
+  };
+
+  const handleMouseLeave = () => {
+    setTooltip(null);
   };
 
   return (
@@ -106,6 +117,7 @@ export default function Sidebar({
       <div className="sidebar-saved">
         {savedList.map((item, index) => {
           const key = `${item.media_type}_${item.id}`;
+          const title = item.title || item.name;
           return (
             <div
               key={key}
@@ -119,11 +131,12 @@ export default function Sidebar({
               onClick={() =>
                 onNavigate(item.media_type === "tv" ? "tv" : "movie", item)
               }
-              title={item.title}
+              onMouseEnter={(e) => handleMouseEnter(e, title)}
+              onMouseLeave={handleMouseLeave}
               style={{ cursor: "grab", position: "relative" }}
             >
               {item.poster_path ? (
-                <img src={imgUrl(item.poster_path, "w200")} alt={item.title} />
+                <img src={imgUrl(item.poster_path, "w200")} alt={title} />
               ) : (
                 <div className="no-img">
                   <FilmIcon />
@@ -147,6 +160,12 @@ export default function Sidebar({
           );
         })}
       </div>
+
+      {tooltip && (
+        <div className="saved-thumb-tooltip" style={{ top: tooltip.y }}>
+          {tooltip.title}
+        </div>
+      )}
 
       <div className="sidebar-bottom">
         <SideBtn

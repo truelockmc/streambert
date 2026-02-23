@@ -213,12 +213,20 @@ body,
     width: 44px;
     height: 64px;
     border-radius: 5px;
-    overflow: hidden;
+    overflow: visible;
     cursor: pointer;
     transition: all 0.2s;
     flex-shrink: 0;
     position: relative;
     border: 1px solid var(--border);
+}
+
+.saved-thumb img,
+.saved-thumb > .no-img {
+    border-radius: 5px;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
 }
 
 .saved-thumb:hover {
@@ -228,9 +236,26 @@ body,
 }
 
 .saved-thumb img {
-    width: 100%;
-    height: 100%;
     object-fit: cover;
+}
+
+.saved-thumb-tooltip {
+    position: fixed;
+    left: 70px;
+    transform: translateY(-50%);
+    background: var(--surface3);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 10px;
+    border-radius: 5px;
+    white-space: normal;
+    max-width: 180px;
+    pointer-events: none;
+    border: 1px solid var(--border);
+    z-index: 9999;
+    line-height: 1.3;
+    text-align: left;
 }
 
 .saved-thumb .no-img {
