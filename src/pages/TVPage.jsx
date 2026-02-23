@@ -882,7 +882,7 @@ export default function TVPage({
                         {resolveError}
                       </span>
                       <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                        Try a different source.
+                        Try a different source, or switch sub/dub.
                       </span>
                     </div>
                   )}
