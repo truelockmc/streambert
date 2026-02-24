@@ -13,7 +13,7 @@ A cross-platform Electron Desktop App to stream and download any Movie, TV Serie
 ![Watch Anime](screenshots/anime.png)
 ![Download Everything](screenshots/download.png)
 ---
-[![Stargazers repo roster for @truelockmc/streambert](https://reporoster.com/stars/dark/truelockmc/streambert)](https://github.com/truelockmc/streambert/stargazers)
+[![Stargazers](https://reporoster.com/stars/dark/truelockmc/streambert)](https://github.com/truelockmc/streambert/stargazers)
 ---
 ## Streaming
 The Application mainly gets Video Streams from videasy.net (you can also Stream from VidScr and 2Embed). <br></br>
