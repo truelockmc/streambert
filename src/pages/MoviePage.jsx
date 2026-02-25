@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo, useCallback } from "react";
+import { useState, useEffect, useRef, memo, useCallback, useMemo } from "react";
 import {
   tmdbFetch,
   imgUrl,
@@ -73,6 +73,12 @@ export default function MoviePage({
   const [menuPos, setMenuPos] = useState(null);
   const sourceRef = useRef(null);
   const playerWrapRef = useRef(null);
+  const webviewRef = useRef(null);
+  // Always-current refs for interval callbacks, avoids stale closures without restarting the interval
+  const saveProgressRef = useRef(saveProgress);
+  saveProgressRef.current = saveProgress;
+  const onMarkWatchedRef = useRef(onMarkWatched);
+  onMarkWatchedRef.current = onMarkWatched;
   // AllManga async URL resolution
   const [resolvedPlayerUrl, setResolvedPlayerUrl] = useState(null);
   const [resolvingUrl, setResolvingUrl] = useState(false);
@@ -80,27 +86,29 @@ export default function MoviePage({
   const [collection, setCollection] = useState(null); // { name, parts }
 
   // Derived: detect anime before any effects so effects can use it
-  const isAnime = isAnimeContent(item, details);
+  const isAnime = useMemo(() => isAnimeContent(item, details), [item, details]);
   const [downloaderFolder, setDownloaderFolder] = useState(
     () => storage.get("downloaderFolder") || "",
   );
 
   // Age rating
   const [rating, setRating] = useState({ cert: null, minAge: null });
-  const [ageLimitSetting] = useState(() => getAgeLimitSetting(storage));
-  const [ratingCountry] = useState(() => getRatingCountry(storage));
+  const ageLimitSetting = useMemo(() => getAgeLimitSetting(storage), []);
+  const ratingCountry = useMemo(() => getRatingCountry(storage), []);
   const restricted = isRestricted(rating.minAge, ageLimitSetting);
 
   const progressKey = `movie_${item.id}`;
   const pct = progress[progressKey] || 0;
   const isWatched = !!watched?.[progressKey];
 
-  // Read threshold from settings (default 20s)
-  const watchedThreshold = storage.get("watchedThreshold") ?? 20;
+  // Read threshold from settings (default 20s), stable across renders
+  const [watchedThreshold] = useState(
+    () => storage.get("watchedThreshold") ?? 20,
+  );
 
   // Ref to prevent double-marking
   const autoMarkedRef = useRef(false);
-  // Tracks last known playback position — used to detect resolution-change resets
+  // Tracks last known playback position, used to detect resolution-change resets
   const lastKnownTimeRef = useRef(0);
   // Timestamp until which we ignore reset detection (post-seekback cooldown)
   const seekBackCooldownRef = useRef(0);
@@ -252,7 +260,7 @@ export default function MoviePage({
     const timer = setTimeout(() => {
       interval = setInterval(async () => {
         try {
-          const wv = document.querySelector("webview");
+          const wv = webviewRef.current;
           if (!wv) return;
           const result = await wv.executeJavaScript(`
             (() => {
@@ -312,7 +320,7 @@ export default function MoviePage({
               lastKnownTimeRef.current = ct;
             }
             const p = Math.floor((ct / result.duration) * 100);
-            saveProgress(progressKey, Math.min(p, 100));
+            saveProgressRef.current(progressKey, Math.min(p, 100));
             // Also persist actual seconds so DownloadsPage can show resume position
             storage.set("dlTime_" + progressKey, Math.floor(ct));
 
@@ -324,7 +332,7 @@ export default function MoviePage({
               remaining >= 0
             ) {
               autoMarkedRef.current = true;
-              onMarkWatched?.(progressKey);
+              onMarkWatchedRef.current?.(progressKey);
             }
           }
         } catch {}
@@ -389,11 +397,12 @@ export default function MoviePage({
       : d.genres || [];
 
   // Unreleased detection
-  const todayMovie = new Date();
-  todayMovie.setHours(0, 0, 0, 0);
-  const isUnreleased = d.release_date
-    ? new Date(d.release_date) > todayMovie
-    : false;
+  const isUnreleased = useMemo(() => {
+    if (!d.release_date) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return new Date(d.release_date) > today;
+  }, [d.release_date]);
 
   // Check if this movie is already downloaded or currently downloading
   const movieDownload = (downloads || []).find(
@@ -610,6 +619,7 @@ export default function MoviePage({
               </div>
             )}
             <webview
+              ref={webviewRef}
               src={
                 sourceIsAsync(playerSource)
                   ? resolvedPlayerUrl || "about:blank"
@@ -637,7 +647,7 @@ export default function MoviePage({
                     : "visible",
               }}
             />
-            {/* Source button – left side overlay */}
+            {/* Source button, left side overlay */}
             <button
               ref={sourceRef}
               className="player-overlay-btn"
@@ -720,8 +730,8 @@ export default function MoviePage({
               title={
                 movieDownload
                   ? movieDownload.status === "downloading"
-                    ? "Downloading… – view in Downloads"
-                    : "Already downloaded – view in Downloads"
+                    ? "Downloading… - view in Downloads"
+                    : "Already downloaded - view in Downloads"
                   : "Download"
               }
             >

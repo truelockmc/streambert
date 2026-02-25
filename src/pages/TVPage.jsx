@@ -234,6 +234,12 @@ export default function TVPage({
   const [menuPos, setMenuPos] = useState(null);
   const sourceRef = useRef(null);
   const playerWrapRef = useRef(null);
+  const webviewRef = useRef(null);
+  // Always-current refs for interval callbacks, avoids stale closures without restarting the interval
+  const saveProgressRef = useRef(saveProgress);
+  saveProgressRef.current = saveProgress;
+  const onMarkWatchedRef = useRef(onMarkWatched);
+  onMarkWatchedRef.current = onMarkWatched;
 
   // Derived: detect anime before any effects so effects can use it
   const isAnime = isAnimeContent(item, details);
@@ -244,13 +250,15 @@ export default function TVPage({
 
   // Age rating
   const [rating, setRating] = useState({ cert: null, minAge: null });
-  const [ageLimitSetting] = useState(() => getAgeLimitSetting(storage));
-  const [ratingCountry] = useState(() => getRatingCountry(storage));
+  const ageLimitSetting = useMemo(() => getAgeLimitSetting(storage), []);
+  const ratingCountry = useMemo(() => getRatingCountry(storage), []);
   const restricted = isRestricted(rating.minAge, ageLimitSetting);
   const [seasonMenu, setSeasonMenu] = useState(null); // { x, y, seasonNum }
 
-  // Read threshold from settings (default 20s)
-  const watchedThreshold = storage.get("watchedThreshold") ?? 20;
+  // Read threshold from settings (default 20s), stable across renders
+  const [watchedThreshold] = useState(
+    () => storage.get("watchedThreshold") ?? 20,
+  );
   const autoMarkedRef = useRef(false);
   const lastKnownTimeRef = useRef(0);
   const seekBackCooldownRef = useRef(0);
@@ -578,7 +586,7 @@ export default function TVPage({
     const timer = setTimeout(() => {
       interval = setInterval(async () => {
         try {
-          const wv = document.querySelector("webview");
+          const wv = webviewRef.current;
           if (!wv) return;
           const result = await wv.executeJavaScript(`
             (() => {
@@ -638,7 +646,7 @@ export default function TVPage({
               lastKnownTimeRef.current = ct;
             }
             const p = Math.floor((ct / result.duration) * 100);
-            saveProgress(currentProgressKey, Math.min(p, 100));
+            saveProgressRef.current(currentProgressKey, Math.min(p, 100));
             // Also persist actual seconds so DownloadsPage can show resume position
             storage.set("dlTime_" + currentProgressKey, Math.floor(ct));
 
@@ -650,7 +658,7 @@ export default function TVPage({
               remaining >= 0
             ) {
               autoMarkedRef.current = true;
-              onMarkWatched?.(currentProgressKey);
+              onMarkWatchedRef.current?.(currentProgressKey);
             }
           }
         } catch {}
@@ -907,6 +915,7 @@ export default function TVPage({
                     </div>
                   )}
                 <webview
+                  ref={webviewRef}
                   src={
                     sourceIsAsync(playerSource)
                       ? resolvedPlayerUrl || "about:blank"
@@ -934,7 +943,7 @@ export default function TVPage({
                         : "visible",
                   }}
                 />
-                {/* Source button – left side overlay */}
+                {/* Source button, left side overlay */}
                 <button
                   ref={sourceRef}
                   className="player-overlay-btn"
@@ -1022,8 +1031,8 @@ export default function TVPage({
                   title={
                     currentEpDownload
                       ? currentEpDownload.status === "downloading"
-                        ? "Downloading… – view in Downloads"
-                        : "Already downloaded – view in Downloads"
+                        ? "Downloading… - view in Downloads"
+                        : "Already downloaded - view in Downloads"
                       : "Download"
                   }
                 >
@@ -1227,8 +1236,8 @@ export default function TVPage({
                                 className="ep-downloaded-badge"
                                 title={
                                   epDownload.status === "downloading"
-                                    ? "Downloading… – click to view in Downloads"
-                                    : "Downloaded – click to view in Downloads"
+                                    ? "Downloading… - click to view in Downloads"
+                                    : "Downloaded - click to view in Downloads"
                                 }
                                 style={{
                                   borderColor:
