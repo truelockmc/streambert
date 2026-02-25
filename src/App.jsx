@@ -114,7 +114,9 @@ export default function App() {
       setDownloads((prev) => {
         const idx = prev.findIndex((d) => d.id === update.id);
         if (idx === -1) {
-          // Entry not yet added by handleDownloadStarted (race on first event) — add it now
+          // Unknown id: either the entry was deleted (stale event after SIGKILL)
+          // or a genuine race on first event.
+          if (!update.name) return prev;
           return [update, ...prev];
         }
         const updated = [...prev];

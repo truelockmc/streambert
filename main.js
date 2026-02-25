@@ -731,6 +731,14 @@ ipcMain.handle("get-downloads", () => downloads);
 // ── IPC: delete a download ────────────────────────────────────────────────────
 ipcMain.handle("delete-download", (_, { id, filePath }) => {
   try {
+    // Kill the running process first so it stops sending progress events
+    const proc = activeProcs.get(id);
+    if (proc) {
+      try {
+        proc.kill("SIGKILL");
+      } catch {}
+      activeProcs.delete(id);
+    }
     if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
     // Also delete subtitle file if it was downloaded alongside the video
     const dlEntry = downloads.find((d) => d.id === id);
