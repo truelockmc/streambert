@@ -72,6 +72,7 @@ export default function MoviePage({
   const [anilistData, setAnilistData] = useState(null);
   const [menuPos, setMenuPos] = useState(null);
   const sourceRef = useRef(null);
+  const playerWrapRef = useRef(null);
   // AllManga async URL resolution
   const [resolvedPlayerUrl, setResolvedPlayerUrl] = useState(null);
   const [resolvingUrl, setResolvingUrl] = useState(false);
@@ -342,6 +343,25 @@ export default function MoviePage({
     onHistory({ ...d, media_type: "movie" });
   };
 
+  // Intercept fullscreen requests from embedded players (vidsrc / 2embed use
+  // the native Fullscreen API which would otherwise fullscreen the entire app).
+  // Videasy and AllManga handle fullscreen internally via CSS, skip those.
+  useEffect(() => {
+    if (!playing) return;
+    const NEEDS_INTERCEPT = ["vidsrc", "2embed"];
+    if (!NEEDS_INTERCEPT.includes(playerSource)) return;
+    const enterH = window.electron?.onWebviewEnterFullscreen?.(() => {
+      playerWrapRef.current?.requestFullscreen?.();
+    });
+    const leaveH = window.electron?.onWebviewLeaveFullscreen?.(() => {
+      if (document.fullscreenElement) document.exitFullscreen?.();
+    });
+    return () => {
+      if (enterH) window.electron?.offWebviewEnterFullscreen?.(enterH);
+      if (leaveH) window.electron?.offWebviewLeaveFullscreen?.(leaveH);
+    };
+  }, [playing, playerSource]);
+
   const handleSetDownloaderFolder = (folder) => {
     setDownloaderFolder(folder);
     storage.set("downloaderFolder", folder);
@@ -538,7 +558,7 @@ export default function MoviePage({
 
       {playing && !restricted && !isUnreleased && (
         <div className="section">
-          <div className="player-wrap">
+          <div className="player-wrap" ref={playerWrapRef}>
             {/* AllManga: spinner while resolving */}
             {sourceIsAsync(playerSource) && resolvingUrl && (
               <div

@@ -225,8 +225,16 @@ function createWindow() {
   }
 
   // Block any popup windows spawned by webviews in trailer view
+  // Also intercept fullscreen requests so only the player goes fullscreen,
   mainWindow.webContents.on("did-attach-webview", (_, webviewContents) => {
     webviewContents.setWindowOpenHandler(() => ({ action: "deny" }));
+
+    webviewContents.on("enter-html-full-screen", () => {
+      mainWindow.webContents.send("webview-enter-fullscreen");
+    });
+    webviewContents.on("leave-html-full-screen", () => {
+      mainWindow.webContents.send("webview-leave-fullscreen");
+    });
   });
 
   mainWindow.loadFile(path.join(__dirname, "dist/index.html"));

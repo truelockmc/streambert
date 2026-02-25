@@ -59,6 +59,22 @@ contextBridge.exposeInMainWorld("electron", {
   // App version (from package.json via Electron)
   getAppVersion: () => ipcRenderer.invoke("get-app-version"),
 
+  // Webview fullscreen
+  onWebviewEnterFullscreen: (cb) => {
+    const h = () => cb();
+    ipcRenderer.on("webview-enter-fullscreen", h);
+    return h;
+  },
+  offWebviewEnterFullscreen: (h) =>
+    ipcRenderer.removeListener("webview-enter-fullscreen", h),
+  onWebviewLeaveFullscreen: (cb) => {
+    const h = () => cb();
+    ipcRenderer.on("webview-leave-fullscreen", h);
+    return h;
+  },
+  offWebviewLeaveFullscreen: (h) =>
+    ipcRenderer.removeListener("webview-leave-fullscreen", h),
+
   // Quit app
   quitApp: () => ipcRenderer.invoke("quit-app"),
 

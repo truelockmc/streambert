@@ -233,6 +233,7 @@ export default function TVPage({
   const [anilistSeasons, setAnilistSeasons] = useState(null); // [{seasonNum, title, episodes, year}]
   const [menuPos, setMenuPos] = useState(null);
   const sourceRef = useRef(null);
+  const playerWrapRef = useRef(null);
 
   // Derived: detect anime before any effects so effects can use it
   const isAnime = isAnimeContent(item, details);
@@ -683,6 +684,25 @@ export default function TVPage({
     storage.set("downloaderFolder", folder);
   };
 
+  // Intercept fullscreen requests from embedded players (vidsrc / 2embed use
+  // the native Fullscreen API which would otherwise fullscreen the entire app).
+  // Videasy and AllManga handle fullscreen internally via CSS, skip those.
+  useEffect(() => {
+    if (!playing) return;
+    const NEEDS_INTERCEPT = ["vidsrc", "2embed"];
+    if (!NEEDS_INTERCEPT.includes(playerSource)) return;
+    const enterH = window.electron?.onWebviewEnterFullscreen?.(() => {
+      playerWrapRef.current?.requestFullscreen?.();
+    });
+    const leaveH = window.electron?.onWebviewLeaveFullscreen?.(() => {
+      if (document.fullscreenElement) document.exitFullscreen?.();
+    });
+    return () => {
+      if (enterH) window.electron?.offWebviewEnterFullscreen?.(enterH);
+      if (leaveH) window.electron?.offWebviewLeaveFullscreen?.(leaveH);
+    };
+  }, [playing, playerSource]);
+
   const mediaName = selectedEp
     ? `${title} (${year}) S${String(selectedSeason).padStart(2, "0")} E${String(selectedEp.episode_number).padStart(2, "0")}`
     : title;
@@ -833,7 +853,7 @@ export default function TVPage({
                   </button>
                 )}
               </div>
-              <div className="player-wrap">
+              <div className="player-wrap" ref={playerWrapRef}>
                 {/* 9anime: spinner while looking up episode */}
                 {sourceIsAsync(playerSource) && resolvingUrl && (
                   <div
