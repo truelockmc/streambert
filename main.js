@@ -1279,6 +1279,112 @@ function anilistSeasonTitle(baseTitle, seasonNumber) {
   });
 }
 
+// Hardcoded AllAnime show IDs for franchises where title search is unreliable.
+// Key: lowercase TMDB title. Value: array of show IDs indexed by season (0-based).
+const HARDCODED_SHOW_IDS = {
+  "jojo's bizarre adventure": [
+    "MeX4czvkwKGo3zdDp", // S1
+    "zyqDjR8te4z6taKyk", // S2
+    "GTAQH8Z9K6WbAdXsS", // S3
+    "JS9PzKiPanesGRvs5", // S4
+    "b6xFsr7MDSMcJArB9", // S5
+    "pwduJkjBLytqiWCvM", // S6
+  ],
+};
+
+// Resolve video URL directly from a known AllAnime show ID + episode string.
+// Returns a result object on success or null if nothing worked.
+async function resolveEpisodeFromId(showId, epStr, dubSub) {
+  const PROVIDER_PRIORITY = ["S-mp4", "Luf-Mp4", "Yt-mp4", "Default", "Sl-Hls"];
+
+  const epStrCandidates = [epStr];
+  if (!epStr.includes(".")) epStrCandidates.push(epStr + ".0");
+
+  let sourceUrls = null;
+  for (const attempt of epStrCandidates) {
+    const epRes = await allanimeGQL(
+      { showId, translationType: dubSub, episodeString: attempt },
+      EPISODE_GQL,
+    );
+    if (!epRes.body) continue;
+    try {
+      const epJson = JSON.parse(epRes.body);
+      const urls = epJson?.data?.episode?.sourceUrls;
+      if (urls?.length) {
+        sourceUrls = urls;
+        break;
+      }
+    } catch {
+      continue;
+    }
+  }
+  if (!sourceUrls) return null;
+
+  const decodedSources = sourceUrls
+    .filter((s) => s.sourceUrl && s.sourceUrl.startsWith("--"))
+    .map((s) => {
+      let path = decodeAllanimeUrl(s.sourceUrl);
+      path = path.replace("/clock", "/clock.json");
+      return {
+        sourceName: s.sourceName || "",
+        priority: s.priority || 0,
+        path,
+      };
+    });
+
+  decodedSources.sort((a, b) => {
+    const ai = PROVIDER_PRIORITY.indexOf(a.sourceName);
+    const bi = PROVIDER_PRIORITY.indexOf(b.sourceName);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+
+  for (const src of decodedSources) {
+    let fetchUrl = src.path;
+    if (fetchUrl.startsWith("//")) fetchUrl = "https:" + fetchUrl;
+    else if (fetchUrl.startsWith("/"))
+      fetchUrl = "https://allanime.day" + fetchUrl;
+    else if (!fetchUrl.startsWith("http"))
+      fetchUrl = "https://allanime.day/" + fetchUrl;
+
+    try {
+      const linkRes = await httpsGet(fetchUrl, {
+        Referer: "https://allmanga.to",
+      });
+      if (linkRes.status !== 200 || !linkRes.body) continue;
+      let linkJson;
+      try {
+        linkJson = JSON.parse(linkRes.body);
+      } catch {
+        continue;
+      }
+      const links = linkJson?.links;
+      if (!links?.length) continue;
+      const allLinks = links.filter((l) => l.link);
+      const mp4Links = allLinks.filter(
+        (l) => !l.link.includes(".m3u8") && !l.link.includes("master."),
+      );
+      const candidates = mp4Links.length ? mp4Links : allLinks;
+      if (!candidates.length) continue;
+      candidates.sort(
+        (a, b) =>
+          (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0),
+      );
+      const best = candidates[0];
+      return {
+        ok: true,
+        url: best.link,
+        resolution: best.resolutionStr || "?",
+        sourceName: src.sourceName,
+        isDirectMp4: !best.link.includes(".m3u8"),
+        referer: "https://allmanga.to",
+      };
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
 const SEARCH_GQL = `query($search:SearchInput $limit:Int $page:Int $translationType:VaildTranslationTypeEnumType $countryOrigin:VaildCountryOriginEnumType){shows(search:$search limit:$limit page:$page translationType:$translationType countryOrigin:$countryOrigin){edges{_id name availableEpisodes __typename}}}`;
 
 const EPISODE_GQL = `query($showId:String! $translationType:VaildTranslationTypeEnumType! $episodeString:String!){episode(showId:$showId translationType:$translationType episodeString:$episodeString){episodeString sourceUrls}}`;
@@ -1445,6 +1551,17 @@ ipcMain.handle(
       const dubSub = translationType === "dub" ? "dub" : "sub";
       // For movies, search AllAnime with episode "1" (movies are listed as single-episode entries)
       const epStr = isMovie ? "1" : String(episodeNumber);
+
+      // ── Hardcoded lookup for franchises where AllAnime search is unreliable ─
+      if (!isMovie) {
+        const hardcodedIds = HARDCODED_SHOW_IDS[title.toLowerCase()];
+        if (hardcodedIds) {
+          const showId =
+            hardcodedIds[season - 1] ?? hardcodedIds[hardcodedIds.length - 1];
+          const result = await resolveEpisodeFromId(showId, epStr, dubSub);
+          if (result) return result;
+        }
+      }
 
       // ── Step 1: Resolve correct title for this season via AniList ────────
       // For movies, skip sequel resolution (season always 1)
