@@ -12,6 +12,75 @@ const fs = require("fs");
 const https = require("https");
 const http = require("http");
 
+// ── Block stats store ─────────────────────────────────────────────────────────
+const blockStatsFile = () =>
+  path.join(app.getPath("userData"), "blockStats.json");
+
+let allBlockStats = { total: 0, domains: {} };
+let pendingBlockBatch = null; // { total, domains } or null
+let blockBatchTimer = null;
+let blockSaveTimer = null;
+
+function loadBlockStats() {
+  try {
+    const raw = fs.readFileSync(blockStatsFile(), "utf8");
+    const parsed = JSON.parse(raw);
+    allBlockStats = {
+      total: parsed.total || 0,
+      domains: parsed.domains || {},
+    };
+  } catch {
+    allBlockStats = { total: 0, domains: {} };
+  }
+}
+
+function saveBlockStats() {
+  try {
+    fs.writeFileSync(
+      blockStatsFile(),
+      JSON.stringify({
+        total: allBlockStats.total,
+        domains: allBlockStats.domains,
+      }),
+    );
+  } catch {}
+}
+
+function recordBlockedRequest(url) {
+  let domain;
+  try {
+    domain = new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return;
+  }
+
+  // Update alltime in-memory
+  allBlockStats.total++;
+  allBlockStats.domains[domain] = (allBlockStats.domains[domain] || 0) + 1;
+
+  // Accumulate into pending batch
+  if (!pendingBlockBatch) {
+    pendingBlockBatch = { total: 0, domains: {} };
+  }
+  pendingBlockBatch.total++;
+  pendingBlockBatch.domains[domain] =
+    (pendingBlockBatch.domains[domain] || 0) + 1;
+
+  // Debounced IPC send to renderer (250ms after last block in burst)
+  if (blockBatchTimer) clearTimeout(blockBatchTimer);
+  blockBatchTimer = setTimeout(() => {
+    blockBatchTimer = null;
+    if (mainWindow && !mainWindow.isDestroyed() && pendingBlockBatch) {
+      mainWindow.webContents.send("blocked-stats-update", pendingBlockBatch);
+    }
+    pendingBlockBatch = null;
+  }, 250);
+
+  // Debounced disk write (3s to reduce I/O during active playback)
+  if (blockSaveTimer) clearTimeout(blockSaveTimer);
+  blockSaveTimer = setTimeout(saveBlockStats, 3000);
+}
+
 // ── Download store ────────────────────────────────────────────────────────────
 let downloads = [];
 const downloadsFile = () =>
@@ -47,6 +116,7 @@ let mainWindow;
 
 function createWindow() {
   loadDownloads();
+  loadBlockStats();
 
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -131,6 +201,15 @@ function createWindow() {
     "*://tmstr4.neonhorizonworkshops.com/*",
   ];
 
+  // Pre-compile blocked patterns once
+  const BLOCKED_REGEXES = BLOCKED_HOSTS.map((pattern) => {
+    const escaped = pattern
+      .replace(/\\/g, "\\\\")
+      .replace(/[.+?^${}()|[\]]/g, "\\$&")
+      .replace(/\*/g, ".*");
+    return new RegExp("^" + escaped + "$");
+  });
+
   videasySession.webRequest.onBeforeRequest(
     { urls: ["*://*/*"] },
     (details, callback) => {
@@ -145,16 +224,8 @@ function createWindow() {
         }
       }
 
-      const isBlocked = BLOCKED_HOSTS.some((pattern) => {
-        // Escape all regex special chars in the pattern (including backslashes)
-        // before building the RegExp so no user-controlled chars break the regex.
-        const escaped = pattern
-          .replace(/\\/g, "\\\\")
-          .replace(/[.+?^${}()|[\]]/g, "\\$&")
-          .replace(/\*/g, ".*");
-        const regex = new RegExp("^" + escaped + "$");
-        return regex.test(details.url);
-      });
+      const isBlocked = BLOCKED_REGEXES.some((r) => r.test(url));
+      if (isBlocked) recordBlockedRequest(url);
       callback(isBlocked ? { cancel: true } : {});
     },
   );
@@ -1028,6 +1099,12 @@ ipcMain.handle("get-downloads-size", () => {
   }
   return { bytes };
 });
+
+// ── IPC: Block stats ─────────────────────────────────────────────────────────
+ipcMain.handle("get-block-stats", () => ({
+  total: allBlockStats.total,
+  domains: allBlockStats.domains,
+}));
 
 // ── IPC: App version ──────────────────────
 ipcMain.handle("get-app-version", () => app.getVersion());

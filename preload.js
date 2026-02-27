@@ -75,6 +75,16 @@ contextBridge.exposeInMainWorld("electron", {
   offWebviewLeaveFullscreen: (h) =>
     ipcRenderer.removeListener("webview-leave-fullscreen", h),
 
+  // Block stats
+  onBlockedUpdate: (cb) => {
+    const h = (_, data) => cb(data);
+    ipcRenderer.on("blocked-stats-update", h);
+    return h;
+  },
+  offBlockedUpdate: (h) =>
+    ipcRenderer.removeListener("blocked-stats-update", h),
+  getBlockStats: () => ipcRenderer.invoke("get-block-stats"),
+
   // Quit app
   quitApp: () => ipcRenderer.invoke("quit-app"),
 

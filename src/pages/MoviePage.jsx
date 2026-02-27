@@ -25,9 +25,12 @@ import {
   RatingShieldIcon,
   RatingLockIcon,
   SourceIcon,
+  ShieldBlockIcon,
 } from "../components/Icons";
 import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
+import BlockedStatsModal from "../components/BlockedStatsModal";
+import { useBlockedStats } from "../utils/useBlockedStats";
 import MediaCard from "../components/MediaCard";
 import { storage } from "../utils/storage";
 import {
@@ -90,6 +93,15 @@ export default function MoviePage({
   const [downloaderFolder, setDownloaderFolder] = useState(
     () => storage.get("downloaderFolder") || "",
   );
+
+  // Blocked request stats
+  const {
+    sessionTotal: blockedSession,
+    alltimeTotal: blockedAlltime,
+    showModal: showBlockedModal,
+    setShowModal: setShowBlockedModal,
+    getSessionDomains: getBlockedDomains,
+  } = useBlockedStats(item.id);
 
   // Age rating
   const [rating, setRating] = useState({ cert: null, minAge: null });
@@ -647,42 +659,54 @@ export default function MoviePage({
                     : "visible",
               }}
             />
-            {/* Source button, left side overlay */}
-            <button
-              ref={sourceRef}
-              className="player-overlay-btn"
-              style={{ left: 12, right: "auto" }}
-              onClick={() => {
-                const rect = sourceRef.current?.getBoundingClientRect();
-                if (rect) setMenuPos({ top: rect.bottom + 6, left: rect.left });
-                setShowSourceMenu((v) => !v);
-              }}
-              title="Change source"
-            >
-              <SourceIcon />
-              {PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ??
-                "Source"}
-            </button>
-            {/* Sub/Dub toggle, only for AllManga */}
-            {playerSource === "allmanga" && (
+            {/* Left-side overlay button group, flex row, no fixed px offsets */}
+            <div className="player-overlay-group">
+              <button
+                ref={sourceRef}
+                className="player-overlay-btn"
+                onClick={() => {
+                  const rect = sourceRef.current?.getBoundingClientRect();
+                  if (rect)
+                    setMenuPos({ top: rect.bottom + 6, left: rect.left });
+                  setShowSourceMenu((v) => !v);
+                }}
+                title="Change source"
+              >
+                <SourceIcon />
+                {PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ??
+                  "Source"}
+              </button>
+              {/* Sub/Dub toggle, only for AllManga */}
+              {playerSource === "allmanga" && (
+                <button
+                  className="player-overlay-btn"
+                  onClick={() => {
+                    const next = dubMode === "sub" ? "dub" : "sub";
+                    setDubMode(next);
+                    storage.set("allmangaDubMode", next);
+                    setM3u8Url(null);
+                    setSubtitleUrl(null);
+                    setResolvedPlayerUrl(null);
+                    setResolvingUrl(false);
+                    setResolveError(null);
+                  }}
+                  title="Toggle Sub/Dub"
+                >
+                  {dubMode === "sub" ? "SUB" : "DUB"}
+                </button>
+              )}
+              {/* Blocked ads & trackers button */}
               <button
                 className="player-overlay-btn"
-                style={{ left: 120, right: "auto" }}
-                onClick={() => {
-                  const next = dubMode === "sub" ? "dub" : "sub";
-                  setDubMode(next);
-                  storage.set("allmangaDubMode", next);
-                  setM3u8Url(null);
-                  setSubtitleUrl(null);
-                  setResolvedPlayerUrl(null);
-                  setResolvingUrl(false);
-                  setResolveError(null);
-                }}
-                title="Toggle Sub/Dub"
+                onClick={() => setShowBlockedModal(true)}
+                title="Blocked ads & trackers"
               >
-                {dubMode === "sub" ? "SUB" : "DUB"}
+                <ShieldBlockIcon />
+                {blockedSession > 0 && (
+                  <span className="player-blocked-badge">{blockedSession}</span>
+                )}
               </button>
-            )}
+            </div>
             {showSourceMenu && menuPos && (
               <div
                 className="source-dropdown source-dropdown--fixed"
@@ -827,6 +851,15 @@ export default function MoviePage({
           trailerKey={trailerKey}
           title={title}
           onClose={() => setShowTrailer(false)}
+        />
+      )}
+
+      {showBlockedModal && (
+        <BlockedStatsModal
+          sessionDomains={getBlockedDomains()}
+          sessionTotal={blockedSession}
+          alltimeTotal={blockedAlltime}
+          onClose={() => setShowBlockedModal(false)}
         />
       )}
 
