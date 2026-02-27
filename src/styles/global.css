@@ -1099,7 +1099,7 @@ body,
     }
 }
 
-/* Season button – fully watched */
+/* Season button - fully watched */
 .season-btn.season-watched {
     border-color: rgba(72, 199, 116, 0.6);
     color: rgb(72, 199, 116);

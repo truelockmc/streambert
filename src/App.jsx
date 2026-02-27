@@ -325,7 +325,7 @@ export default function App() {
       episode: item.episode != null ? Number(item.episode) : null,
       episodeName: item.episodeName || null,
     };
-    // Functional update — never reads stale history from closure
+    // Functional update - never reads stale history from closure
     setHistory((prev) => {
       const filtered = prev.filter(
         (h) => !(h.id === entry.id && h.media_type === entry.media_type),
@@ -337,11 +337,11 @@ export default function App() {
   }, []); // no deps needed
 
   const saveProgress = useCallback((key, pct) => {
-    // Functional update — without this, TVPage's setInterval keeps spreading
+    // Functional update - without this, TVPage's setInterval keeps spreading
     // the progress object from when the interval was created, overwriting
     // saves from other episodes (classic stale closure bug).
     setProgress((prev) => {
-      if (prev[key] === pct) return prev; // no change — skip write
+      if (prev[key] === pct) return prev; // no change - skip write
       const next = { ...prev, [key]: pct };
       storage.set("progress", next);
       return next;
