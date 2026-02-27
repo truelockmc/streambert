@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { imgUrl } from "../utils/api";
 import {
   StreambertLogo,
@@ -19,6 +19,7 @@ export default function Sidebar({
   savedList,
   activeDownloads,
   onReorderSaved,
+  onRemoveSaved,
   canGoBack,
   onBack,
 }) {
@@ -27,6 +28,24 @@ export default function Sidebar({
   const dragNode = useRef(null);
 
   const [tooltip, setTooltip] = useState(null); // { title, y }
+  const [contextMenu, setContextMenu] = useState(null); // { item, x, y }
+
+  useEffect(() => {
+    const close = () => setContextMenu(null);
+    window.addEventListener("click", close);
+    window.addEventListener("contextmenu", close);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("contextmenu", close);
+    };
+  }, []);
+
+  const handleContextMenu = (e, item) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setTooltip(null);
+    setContextMenu({ item, x: e.clientX, y: e.clientY });
+  };
 
   const handleDragStart = (e, index) => {
     dragItem.current = index;
@@ -131,6 +150,7 @@ export default function Sidebar({
               onClick={() =>
                 onNavigate(item.media_type === "tv" ? "tv" : "movie", item)
               }
+              onContextMenu={(e) => handleContextMenu(e, item)}
               onMouseEnter={(e) => handleMouseEnter(e, title)}
               onMouseLeave={handleMouseLeave}
               style={{ cursor: "grab", position: "relative" }}
@@ -164,6 +184,29 @@ export default function Sidebar({
       {tooltip && (
         <div className="saved-thumb-tooltip" style={{ top: tooltip.y }}>
           {tooltip.title}
+        </div>
+      )}
+
+      {contextMenu && (
+        <div
+          className="sidebar-context-menu"
+          style={{
+            position: "fixed",
+            top: contextMenu.y,
+            left: contextMenu.x,
+            zIndex: 9999,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className="sidebar-context-menu-item"
+            onClick={() => {
+              onRemoveSaved && onRemoveSaved(contextMenu.item);
+              setContextMenu(null);
+            }}
+          >
+            Remove
+          </div>
         </div>
       )}
 

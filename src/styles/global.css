@@ -3251,3 +3251,26 @@ kbd {
     color: var(--text3);
     margin-left: 4px;
 }
+
+.sidebar-context-menu {
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 0;
+    min-width: 180px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    user-select: none;
+}
+
+.sidebar-context-menu-item {
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.sidebar-context-menu-item:hover {
+    background: var(--surface2);
+    color: #e53e3e;
+}

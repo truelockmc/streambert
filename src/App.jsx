@@ -409,6 +409,7 @@ export default function App() {
         savedList={savedList}
         activeDownloads={activeDownloadCount}
         onReorderSaved={handleReorderSaved}
+        onRemoveSaved={toggleSave}
         canGoBack={navStack.length > 0}
         onBack={navigateBack}
       />
