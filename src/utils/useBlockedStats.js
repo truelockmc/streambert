@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 /**
  * Tracks blocked request stats from the Electron main process.
@@ -47,20 +47,16 @@ export function useBlockedStats(resetKey) {
       }
     });
     return () => {
-      if (window.electron?.offBlockedUpdate) window.electron.offBlockedUpdate(handler);
+      if (window.electron?.offBlockedUpdate)
+        window.electron.offBlockedUpdate(handler);
     };
   }, []);
 
-  /**
-   * Returns a snapshot of session domains sorted by count (desc).
-   * Call this when opening the modal to get a fresh sorted list.
-   * @returns {Array<[domain: string, count: number]>}
-   */
-  function getSessionDomains() {
-    return Object.entries(sessionDomainsRef.current).sort(
-      (a, b) => b[1] - a[1],
-    );
-  }
+  // Stable reference
+  const getSessionDomains = useCallback(
+    () => Object.entries(sessionDomainsRef.current).sort((a, b) => b[1] - a[1]),
+    [],
+  );
 
   return {
     sessionTotal,

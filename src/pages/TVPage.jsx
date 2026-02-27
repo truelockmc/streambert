@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from "react";
 import {
   tmdbFetch,
   imgUrl,
@@ -225,6 +225,16 @@ export default function TVPage({
     () => storage.get("playerSource") || "videasy",
   );
   const [showSourceMenu, setShowSourceMenu] = useState(false);
+  // Derived from playerSource, computed once per render instead of 5-6× inline
+  const isAsync = useMemo(() => sourceIsAsync(playerSource), [playerSource]);
+  const supportsProgress = useMemo(
+    () => sourceSupportsProgress(playerSource),
+    [playerSource],
+  );
+  const currentSourceLabel = useMemo(
+    () => PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "Source",
+    [playerSource],
+  );
   const [dubMode, setDubMode] = useState(
     () => storage.get("allmangaDubMode") || "sub",
   );
@@ -245,7 +255,10 @@ export default function TVPage({
   onMarkWatchedRef.current = onMarkWatched;
 
   // Derived: detect anime before any effects so effects can use it
-  const isAnime = isAnimeContent(item, details);
+  const isAnime = useMemo(
+    () => isAnimeContent(item, details),
+    [item.id, details],
+  );
   const [downloaderFolder, setDownloaderFolder] = useState(
     () => storage.get("downloaderFolder") || "",
   );
@@ -372,7 +385,7 @@ export default function TVPage({
 
   // Resolve allmanga episode URL via main-process IPC (GraphQL, no CORS)
   useEffect(() => {
-    if (!playing || !selectedEp || !sourceIsAsync(playerSource)) return;
+    if (!playing || !selectedEp || !isAsync) return;
     if (resolvedPlayerUrl || resolvingUrl) return;
     setResolvingUrl(true);
     setResolveError(null);
@@ -477,14 +490,14 @@ export default function TVPage({
     };
   }, [useAnilistSeasons, tmdbSeasons.length, anilistSeasons, selectedSeason]);
 
-  // ── Player episode mapping ─────────────────────────────────────────────────
-  const getPlayerEp = (ep) => {
-    if (!ep) return { season: selectedSeason, episode: ep?.episode_number };
+  // ── Player episode mapping
+  const playerEp = useMemo(() => {
+    if (!selectedEp) return { season: selectedSeason, episode: undefined };
     return {
       season: selectedSeason,
-      episode: ep._tmdbAbsolute ?? ep.episode_number,
+      episode: selectedEp._tmdbAbsolute ?? selectedEp.episode_number,
     };
-  };
+  }, [selectedEp, selectedSeason]);
 
   // ── Memoized current season episodes ──────────────────────────────────────
   const currentSeasonEpisodes = useMemo(
@@ -535,44 +548,68 @@ export default function TVPage({
   );
 
   // ── Season watched helpers ─────────────────────────────────────────────────
-  const isSeasonWatched = (seasonNum) => {
-    const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
-    const count =
-      seasonNum === selectedSeason
-        ? currentSeasonEpisodes.length || seasonInfo?.episode_count || 0
-        : seasonInfo?.episode_count || 0;
-    if (!count) return false;
-    for (let i = 1; i <= count; i++) {
-      if (!watched?.[`tv_${item.id}_s${seasonNum}e${i}`]) return false;
-    }
-    return true;
-  };
-
-  const markSeasonWatched = (seasonNum) => {
-    const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
-    const episodes =
-      seasonNum === selectedSeason ? currentSeasonEpisodes : null;
-    const count = episodes?.length || seasonInfo?.episode_count || 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    for (let i = 1; i <= count; i++) {
-      if (episodes) {
-        const ep = episodes.find((e) => e.episode_number === i);
-        if (ep?.air_date && new Date(ep.air_date) > today) continue;
+  // Memoized map: seasonNum → boolean. Recomputed only when watched/seasons change,
+  // not on every render from the 5s progress interval.
+  const seasonWatchedMap = useMemo(() => {
+    const map = {};
+    for (const s of seasons) {
+      const num = s.season_number;
+      const count =
+        num === selectedSeason
+          ? currentSeasonEpisodes.length || s.episode_count || 0
+          : s.episode_count || 0;
+      if (!count) {
+        map[num] = false;
+        continue;
       }
-      onMarkWatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
+      let allWatched = true;
+      for (let i = 1; i <= count; i++) {
+        if (!watched?.[`tv_${item.id}_s${num}e${i}`]) {
+          allWatched = false;
+          break;
+        }
+      }
+      map[num] = allWatched;
     }
-  };
+    return map;
+  }, [seasons, selectedSeason, currentSeasonEpisodes, watched, item.id]);
 
-  const markSeasonUnwatched = (seasonNum) => {
-    const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
-    const episodes =
-      seasonNum === selectedSeason ? currentSeasonEpisodes : null;
-    const count = episodes?.length || seasonInfo?.episode_count || 0;
-    for (let i = 1; i <= count; i++) {
-      onMarkUnwatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
-    }
-  };
+  const isSeasonWatched = useCallback(
+    (seasonNum) => seasonWatchedMap[seasonNum] ?? false,
+    [seasonWatchedMap],
+  );
+
+  const markSeasonWatched = useCallback(
+    (seasonNum) => {
+      const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
+      const episodes =
+        seasonNum === selectedSeason ? currentSeasonEpisodes : null;
+      const count = episodes?.length || seasonInfo?.episode_count || 0;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      for (let i = 1; i <= count; i++) {
+        if (episodes) {
+          const ep = episodes.find((e) => e.episode_number === i);
+          if (ep?.air_date && new Date(ep.air_date) > today) continue;
+        }
+        onMarkWatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
+      }
+    },
+    [seasons, selectedSeason, currentSeasonEpisodes, item.id, onMarkWatched],
+  );
+
+  const markSeasonUnwatched = useCallback(
+    (seasonNum) => {
+      const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
+      const episodes =
+        seasonNum === selectedSeason ? currentSeasonEpisodes : null;
+      const count = episodes?.length || seasonInfo?.episode_count || 0;
+      for (let i = 1; i <= count; i++) {
+        onMarkUnwatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
+      }
+    },
+    [seasons, selectedSeason, currentSeasonEpisodes, item.id, onMarkUnwatched],
+  );
 
   const currentProgressKey = selectedEp
     ? `tv_${item.id}_s${selectedSeason}e${selectedEp.episode_number}`
@@ -683,22 +720,26 @@ export default function TVPage({
     };
   }, [playing, currentProgressKey, watchedThreshold, playerSource]);
 
-  const playEpisode = (ep) => {
-    setM3u8Url(null);
-    setSubtitleUrl(null);
-    setResolvedPlayerUrl(null);
-    setResolvingUrl(false);
-    setResolveError(null);
-    setSelectedEp(ep);
-    setPlaying(true);
-    onHistory({
-      ...d,
-      media_type: "tv",
-      season: selectedSeason,
-      episode: ep.episode_number,
-      episodeName: ep.name,
-    });
-  };
+  const playEpisode = useCallback(
+    (ep) => {
+      setM3u8Url(null);
+      setSubtitleUrl(null);
+      setResolvedPlayerUrl(null);
+      setResolvingUrl(false);
+      setResolveError(null);
+      setSelectedEp(ep);
+      setPlaying(true);
+      onHistory({
+        ...d,
+        media_type: "tv",
+        season: selectedSeason,
+        episode: ep.episode_number,
+        episodeName: ep.name,
+      });
+      // d and selectedSeason are stable within a season view; onHistory is useCallback in App
+    },
+    [d, selectedSeason, onHistory],
+  );
 
   const handleSetDownloaderFolder = (folder) => {
     setDownloaderFolder(folder);
@@ -876,7 +917,7 @@ export default function TVPage({
               </div>
               <div className="player-wrap" ref={playerWrapRef}>
                 {/* 9anime: spinner while looking up episode */}
-                {sourceIsAsync(playerSource) && resolvingUrl && (
+                {isAsync && resolvingUrl && (
                   <div
                     style={{
                       position: "absolute",
@@ -898,46 +939,44 @@ export default function TVPage({
                   </div>
                 )}
                 {/* 9anime: error if lookup failed */}
-                {sourceIsAsync(playerSource) &&
-                  resolveError &&
-                  !resolvingUrl && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        zIndex: 10,
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: "rgba(0,0,0,0.85)",
-                        gap: 10,
-                        borderRadius: "inherit",
-                      }}
-                    >
-                      <span style={{ fontSize: 28 }}>⚠️</span>
-                      <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                        Episode not found on AllManga
-                      </span>
-                      <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                        {resolveError}
-                      </span>
-                      <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                        Try a different source, or switch sub/dub.
-                      </span>
-                    </div>
-                  )}
+                {isAsync && resolveError && !resolvingUrl && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      zIndex: 10,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "rgba(0,0,0,0.85)",
+                      gap: 10,
+                      borderRadius: "inherit",
+                    }}
+                  >
+                    <span style={{ fontSize: 28 }}>⚠️</span>
+                    <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                      Episode not found on AllManga
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                      {resolveError}
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                      Try a different source, or switch sub/dub.
+                    </span>
+                  </div>
+                )}
                 <webview
                   ref={webviewRef}
                   src={
-                    sourceIsAsync(playerSource)
+                    isAsync
                       ? resolvedPlayerUrl || "about:blank"
                       : getSourceUrl(
                           playerSource,
                           "tv",
                           item.id,
-                          getPlayerEp(selectedEp).season,
-                          getPlayerEp(selectedEp).episode,
+                          playerEp.season,
+                          playerEp.episode,
                           title,
                         )
                   }
@@ -951,9 +990,7 @@ export default function TVPage({
                     height: "100%",
                     border: "none",
                     visibility:
-                      sourceIsAsync(playerSource) && !resolvedPlayerUrl
-                        ? "hidden"
-                        : "visible",
+                      isAsync && !resolvedPlayerUrl ? "hidden" : "visible",
                   }}
                 />
                 {/* Left-side overlay button group, flex row, no fixed px offsets */}
@@ -1080,7 +1117,7 @@ export default function TVPage({
                   {!currentEpDownload && m3u8Url && (
                     <span className="player-overlay-dot" />
                   )}
-                  {!sourceSupportsProgress(playerSource) && (
+                  {!supportsProgress && (
                     <span
                       className="player-no-progress-hint"
                       title="No automatic progress tracking for this source"
@@ -1170,144 +1207,23 @@ export default function TVPage({
             )}
             {!loadingSeason && seasonData?.episodes && (
               <div className="episodes-grid">
-                {(() => {
-                  const episodes = currentSeasonEpisodes;
-                  // Compute today once, outside the per-episode loop
-                  const todayEp = new Date();
-                  todayEp.setHours(0, 0, 0, 0);
-                  return episodes.map((ep) => {
-                    const pk = `tv_${item.id}_s${selectedSeason}e${ep.episode_number}`;
-                    const epPct = progress[pk] || 0;
-                    const epWatched = !!watched?.[pk];
-                    const isPlaying =
-                      playing &&
-                      selectedEp?.episode_number === ep.episode_number;
-
-                    // Unreleased: only if air_date exists and is strictly in the future
-                    const epUnreleased = ep.air_date
-                      ? new Date(ep.air_date) > todayEp
-                      : false;
-                    const epDownload =
-                      downloadsByEpisodeKey.get(
-                        `s${selectedSeason}e${ep.episode_number}`,
-                      ) ?? null;
-                    return (
-                      <div
-                        key={ep.episode_number}
-                        className={`episode-card ${isPlaying ? "playing" : ""} ${epWatched ? "ep-watched" : ""} ${restricted ? "episode-card--restricted" : ""} ${epUnreleased ? "episode-card--unreleased" : ""}`}
-                        onClick={() =>
-                          restricted || epUnreleased ? null : playEpisode(ep)
-                        }
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (!restricted && !epUnreleased)
-                            setEpMenu({ x: e.clientX, y: e.clientY, pk });
-                        }}
-                        style={epUnreleased ? { cursor: "default" } : undefined}
-                      >
-                        <div className="episode-thumb">
-                          {ep.still_path ? (
-                            <img
-                              src={imgUrl(ep.still_path, "w300")}
-                              alt={ep.name}
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                color: "var(--text3)",
-                              }}
-                            >
-                              <PlayIcon />
-                            </div>
-                          )}
-                          {restricted ? (
-                            <div className="episode-restricted-overlay">
-                              🔒<span>Inappropriate for your age</span>
-                            </div>
-                          ) : epUnreleased ? (
-                            <div className="episode-restricted-overlay">
-                              🔒<span>Unreleased</span>
-                            </div>
-                          ) : isPlaying ? (
-                            <div className="episode-playing-badge">
-                              <span className="episode-playing-dot" />
-                              Playing
-                            </div>
-                          ) : (
-                            <div className="episode-thumb-play">
-                              <PlayIcon />
-                            </div>
-                          )}
-                        </div>
-                        <div className="episode-info">
-                          <div
-                            className="episode-num"
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 5,
-                            }}
-                          >
-                            E{ep.episode_number}
-                            {epWatched && <WatchedIcon size={14} />}
-                            {epDownload && (
-                              <span
-                                className="ep-downloaded-badge"
-                                title={
-                                  epDownload.status === "downloading"
-                                    ? "Downloading… - click to view in Downloads"
-                                    : "Downloaded - click to view in Downloads"
-                                }
-                                style={{
-                                  borderColor:
-                                    epDownload.status === "downloading"
-                                      ? "rgba(229,9,20,0.5)"
-                                      : "rgba(72,199,116,0.5)",
-                                  color:
-                                    epDownload.status === "downloading"
-                                      ? "var(--red)"
-                                      : "#4caf50",
-                                  background:
-                                    epDownload.status === "downloading"
-                                      ? "rgba(229,9,20,0.12)"
-                                      : "rgba(72,199,116,0.18)",
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onGoToDownloads?.(epDownload.id);
-                                }}
-                              >
-                                {epDownload.status === "downloading"
-                                  ? "↓"
-                                  : "↓"}
-                              </span>
-                            )}
-                          </div>
-                          <div className="episode-name">{ep.name}</div>
-                          <EpisodeDesc
-                            overview={ep.overview}
-                            episodeName={ep.name}
-                          />
-                          {!epWatched && epPct > 0 && (
-                            <div className="episode-progress-bar">
-                              <div
-                                className="episode-progress-fill"
-                                style={{ width: `${Math.min(epPct, 100)}%` }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
+                {currentSeasonEpisodes.map((ep) => (
+                  <EpisodeCard
+                    key={ep.episode_number}
+                    ep={ep}
+                    itemId={item.id}
+                    selectedSeason={selectedSeason}
+                    progress={progress}
+                    watched={watched}
+                    playing={playing}
+                    selectedEpNumber={selectedEp?.episode_number}
+                    downloadsByEpisodeKey={downloadsByEpisodeKey}
+                    restricted={restricted}
+                    onPlay={playEpisode}
+                    onContextMenu={setEpMenu}
+                    onGoToDownloads={onGoToDownloads}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -1374,3 +1290,142 @@ export default function TVPage({
     </div>
   );
 }
+
+// ── EpisodeCard ────────────────────────────────────────────────────────────
+// Isolated memo'd component so progress-bar updates (every 5s) only re-render
+// the one currently-playing card, not all 24+ cards in the grid.
+const _todayForEpisodes = (() => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+})();
+
+const EpisodeCard = memo(function EpisodeCard({
+  ep,
+  itemId,
+  selectedSeason,
+  progress,
+  watched,
+  playing,
+  selectedEpNumber,
+  downloadsByEpisodeKey,
+  restricted,
+  onPlay,
+  onContextMenu,
+  onGoToDownloads,
+}) {
+  const pk = `tv_${itemId}_s${selectedSeason}e${ep.episode_number}`;
+  const epPct = progress[pk] || 0;
+  const epWatched = !!watched?.[pk];
+  const isPlaying = playing && selectedEpNumber === ep.episode_number;
+  const epUnreleased = ep.air_date
+    ? new Date(ep.air_date) > _todayForEpisodes
+    : false;
+  const epDownload =
+    downloadsByEpisodeKey.get(`s${selectedSeason}e${ep.episode_number}`) ??
+    null;
+
+  return (
+    <div
+      className={`episode-card ${isPlaying ? "playing" : ""} ${epWatched ? "ep-watched" : ""} ${restricted ? "episode-card--restricted" : ""} ${epUnreleased ? "episode-card--unreleased" : ""}`}
+      onClick={() => (restricted || epUnreleased ? null : onPlay(ep))}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!restricted && !epUnreleased)
+          onContextMenu({ x: e.clientX, y: e.clientY, pk });
+      }}
+      style={epUnreleased ? { cursor: "default" } : undefined}
+    >
+      <div className="episode-thumb">
+        {ep.still_path ? (
+          <img
+            src={imgUrl(ep.still_path, "w300")}
+            alt={ep.name}
+            loading="lazy"
+          />
+        ) : (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--text3)",
+            }}
+          >
+            <PlayIcon />
+          </div>
+        )}
+        {restricted ? (
+          <div className="episode-restricted-overlay">
+            🔒<span>Inappropriate for your age</span>
+          </div>
+        ) : epUnreleased ? (
+          <div className="episode-restricted-overlay">
+            🔒<span>Unreleased</span>
+          </div>
+        ) : isPlaying ? (
+          <div className="episode-playing-badge">
+            <span className="episode-playing-dot" />
+            Playing
+          </div>
+        ) : (
+          <div className="episode-thumb-play">
+            <PlayIcon />
+          </div>
+        )}
+      </div>
+      <div className="episode-info">
+        <div
+          className="episode-num"
+          style={{ display: "flex", alignItems: "center", gap: 5 }}
+        >
+          E{ep.episode_number}
+          {epWatched && <WatchedIcon size={14} />}
+          {epDownload && (
+            <span
+              className="ep-downloaded-badge"
+              title={
+                epDownload.status === "downloading"
+                  ? "Downloading… - click to view in Downloads"
+                  : "Downloaded - click to view in Downloads"
+              }
+              style={{
+                borderColor:
+                  epDownload.status === "downloading"
+                    ? "rgba(229,9,20,0.5)"
+                    : "rgba(72,199,116,0.5)",
+                color:
+                  epDownload.status === "downloading"
+                    ? "var(--red)"
+                    : "#4caf50",
+                background:
+                  epDownload.status === "downloading"
+                    ? "rgba(229,9,20,0.12)"
+                    : "rgba(72,199,116,0.18)",
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onGoToDownloads?.(epDownload.id);
+              }}
+            >
+              ↓
+            </span>
+          )}
+        </div>
+        <div className="episode-name">{ep.name}</div>
+        <EpisodeDesc overview={ep.overview} episodeName={ep.name} />
+        {!epWatched && epPct > 0 && (
+          <div className="episode-progress-bar">
+            <div
+              className="episode-progress-fill"
+              style={{ width: `${Math.min(epPct, 100)}%` }}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});

@@ -397,6 +397,15 @@ export default function App() {
     storage.set("savedOrder", newOrder);
   }, []);
 
+  // Stable handler
+  const handleGoToDownloads = useCallback(
+    (id) => {
+      setHighlightDownload(id || null);
+      navigate("downloads");
+    },
+    [navigate],
+  );
+
   if (!apiKey && !skipped)
     return <SetupScreen onSave={saveApiKey} onSkip={() => setSkipped(true)} />;
 
@@ -476,10 +485,7 @@ export default function App() {
             onMarkWatched={markWatched}
             onMarkUnwatched={markUnwatched}
             downloads={downloads}
-            onGoToDownloads={(id) => {
-              setHighlightDownload(id || null);
-              navigate("downloads");
-            }}
+            onGoToDownloads={handleGoToDownloads}
             onSelect={handleSelectResult}
           />
         )}
@@ -499,10 +505,7 @@ export default function App() {
             onMarkWatched={markWatched}
             onMarkUnwatched={markUnwatched}
             downloads={downloads}
-            onGoToDownloads={(id) => {
-              setHighlightDownload(id || null);
-              navigate("downloads");
-            }}
+            onGoToDownloads={handleGoToDownloads}
           />
         )}
         {page === "history" && (
