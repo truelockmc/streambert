@@ -20,6 +20,7 @@ A cross-platform Electron Desktop App to stream and download any Movie, TV Serie
 ![Watch TV Series](screenshots/series.png)
 ![Watch Movies](screenshots/movie.png)
 ![Watch Anime](screenshots/anime.png)
+![Without any Ads or Trackers](screenshots/adblock.png)
 ![Download Everything](screenshots/download.png)
 ---
 [![Stargazers](https://reporoster.com/stars/dark/truelockmc/streambert)](https://github.com/truelockmc/streambert/stargazers)
@@ -80,42 +81,61 @@ npm run dist:linux
 ```
 
 ---
-
 ## Project Structure
 ```
 Project Root
 ├── index.html
 ├── main.js
 ├── package.json
-├── package-lock.json
 ├── preload.js
-├── public
-│   └── logo.svg
+├── vite.config.js
+├── LICENSE
 ├── README.md
+├── public
+│   ├── icon.png
+│   └── logo.svg
 ├── screenshots
+│   ├── adblock.png
+│   ├── anime.png
 │   ├── download.png
-│   └── series.png
-├── src
-│   ├── App.jsx
-│   ├── components
-│   │   ├── DownloadModal.jsx
-│   │   ├── Icons.jsx
-│   │   ├── MediaCard.jsx
-│   │   ├── SearchModal.jsx
-│   │   ├── SetupScreen.jsx
-│   │   └── Sidebar.jsx
-│   ├── main.jsx
-│   ├── pages
-│   │   ├── DownloadsPage.jsx
-│   │   ├── HomePage.jsx
-│   │   ├── LibraryPage.jsx
-│   │   ├── MoviePage.jsx
-│   │   ├── SettingsPage.jsx
-│   │   └── TVPage.jsx
-│   ├── styles
-│   │   └── global.css
-│   └── utils
-│       ├── api.js
-│       └── storage.js
-└── vite.config.js
+│   ├── icon.png
+│   ├── movie.png
+│   ├── series.png
+│   └── trending.png
+└── src
+    ├── App.jsx
+    ├── main.jsx
+    ├── components
+    │   ├── BlockedStatsModal.jsx
+    │   ├── CloseConfirmModal.jsx
+    │   ├── DownloadModal.jsx
+    │   ├── Icons.jsx
+    │   ├── MediaCard.jsx
+    │   ├── SearchModal.jsx
+    │   ├── SetupScreen.jsx
+    │   ├── Sidebar.jsx
+    │   ├── TrailerModal.jsx
+    │   └── TrendingCarousel.jsx
+    ├── pages
+    │   ├── DownloadsPage.jsx
+    │   ├── HomePage.jsx
+    │   ├── LibraryPage.jsx
+    │   ├── MoviePage.jsx
+    │   ├── SettingsPage.jsx
+    │   └── TVPage.jsx
+    ├── styles
+    │   ├── global.css
+    │   └── fonts
+    │       ├── bebas-neue-regular.woff2
+    │       ├── dm-sans-300.woff2
+    │       ├── dm-sans-300italic.woff2
+    │       ├── dm-sans-500.woff2
+    │       ├── dm-sans-600.woff2
+    │       └── dm-sans-regular.woff2
+    └── utils
+        ├── ageRating.js
+        ├── api.js
+        ├── storage.js
+        ├── useBlockedStats.js
+        └── useRatings.js
 ```
