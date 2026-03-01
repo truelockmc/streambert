@@ -169,6 +169,18 @@ export default function DownloadsPage({
                 key={dl.id}
                 dl={dl}
                 onDelete={() => handleDelete(dl)}
+                onSelect={
+                  dl.tmdbId && dl.mediaType
+                    ? () =>
+                        onSelect?.({
+                          id: dl.tmdbId,
+                          media_type: dl.mediaType,
+                          title: dl.mediaType === "movie" ? dl.name : undefined,
+                          name: dl.mediaType === "tv" ? dl.name : undefined,
+                          poster_path: dl.posterPath || null,
+                        })
+                    : null
+                }
               />
             ))}
           </div>
@@ -290,14 +302,26 @@ export default function DownloadsPage({
 }
 
 // ── Active download card ───────────────────────────────────────────────────────
-function ActiveCard({ dl, onDelete }) {
+function ActiveCard({ dl, onDelete, onSelect }) {
   const pct = dl.progress || 0;
   return (
     <div className="dl-card dl-card-active">
       <div className="dl-card__header">
         <Poster posterPath={dl.posterPath} size={42} />
         <div className="dl-card__info">
-          <div className="dl-card__name">{dl.name}</div>
+          <div
+            className={`dl-card__name${onSelect ? " dl-card__title--clickable" : ""}`}
+            onClick={onSelect || undefined}
+            onMouseEnter={(e) => {
+              if (onSelect) e.currentTarget.style.color = "var(--red)";
+            }}
+            onMouseLeave={(e) => {
+              if (onSelect) e.currentTarget.style.color = "";
+            }}
+            title={onSelect ? `Open ${dl.name}` : undefined}
+          >
+            {dl.name}
+          </div>
           <div className="dl-card__meta">
             {dl.speed && <span>↓ {dl.speed}</span>}
             {dl.size && <span>{dl.size}</span>}

@@ -116,7 +116,7 @@ export default function Sidebar({
         icon={<HomeIcon />}
         label="Home"
       />
-      <SideBtn onClick={onSearch} icon={<SearchIcon />} label="Search  (⌘K)" />
+      <SideBtn onClick={onSearch} icon={<SearchIcon />} label="Search  (⌘F)" />
       <SideBtn
         active={page === "history"}
         onClick={() => onNavigate("history")}

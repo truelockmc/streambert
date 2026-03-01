@@ -663,7 +663,24 @@ ipcMain.handle(
           }
         }
 
-        // ── speed: "at X.XMiB/s" or "at X.XKiB/s" ──────────────────────────
+        // ── Retry / timeout — reset speed to 0, show status ─────────────────
+        // Matches lines like: "[download] Got error: ... Retrying (1/100)..."
+        // or "[yt-dlp DEBUG] Sleeping N seconds ..."
+        const retryMatch =
+          trimmed.match(/Retrying\s+\(\d+\/\d+\)/i) ||
+          trimmed.match(/Got error:.*timed?\s*out/i) ||
+          trimmed.match(/Read timed? out/i);
+        if (retryMatch) {
+          update.speed = "0 MB/s";
+          const retryNumMatch = trimmed.match(/Retrying\s+\((\d+)\/(\d+)\)/i);
+          update.lastMessage = retryNumMatch
+            ? `Retrying… (${retryNumMatch[1]}/${retryNumMatch[2]})`
+            : "Retrying…";
+          downloads[idx] = { ...downloads[idx], ...update };
+          sendProgress({ id, ...update, status: downloads[idx].status });
+          return;
+        }
+
         const speedMatch = trimmed.match(
           /\bat\s+([\d.]+\s*(?:[KMGT]i?B|B)\/s)/i,
         );
