@@ -6,6 +6,7 @@
 # Streambert
 A cross-platform Electron Desktop App to stream and download any Movie, TV Series or Anime in the World. Zero Ads and Tracking <br></br>
 ![Logo](public/logo.svg)
+[Installation](https://github.com/truelockmc/streambert?tab=readme-ov-file#installation)
 
 ## Why Streambert?
 - 🎦 **Streaming:** Stream any Movie, Anime or TV Series from around the World.
