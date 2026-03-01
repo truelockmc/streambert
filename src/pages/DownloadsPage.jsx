@@ -99,7 +99,11 @@ export default function DownloadsPage({
   useEffect(() => {
     if (!isElectron) return;
     finished.forEach((d) => {
-      if (d.filePath && fileExistsCache[d.id] === undefined) {
+      if (
+        d.filePath &&
+        d.status === "completed" &&
+        fileExistsCache[d.id] === undefined
+      ) {
         window.electron.fileExists(d.filePath).then((exists) => {
           setFileExistsCache((prev) => ({ ...prev, [d.id]: exists }));
           // Auto-remove from registry if file was deleted externally
