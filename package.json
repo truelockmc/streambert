@@ -2,7 +2,10 @@
   "name": "streambert",
   "version": "1.7.0",
   "description": "Streambert Desktop App",
-  "author": "truelockmc",
+  "author": {
+    "name": "truelockmc",
+    "email": "anonyson@proton.me"
+  },
   "license": "GPL-3.0",
   "main": "main.js",
   "private": false,
