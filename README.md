@@ -53,25 +53,6 @@ Media Files for Animes are scraped from AllManga.to (i stole this mechanic from 
 ## Installation
 On first launch you'll be prompted to enter your TMDB API key. It's saved locally, you only need to do this once.
 
-### Linux, APT (recommended)
-
-Add the repository once, then install and update via `apt`:
-```bash
-# Import GPG key
-curl -fsSL https://truelockmc.github.io/streambert/KEY.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/streambert.gpg
-
-# Add repository
-echo "deb [signed-by=/etc/apt/keyrings/streambert.gpg] https://truelockmc.github.io/streambert ./" | sudo tee /etc/apt/sources.list.d/streambert.list
-
-# Install
-sudo apt update && sudo apt install streambert
-```
-
-Future updates will be applied automatically with:
-```bash
-sudo apt update && sudo apt upgrade
-```
-
 ### Linux, Manual (.deb / .AppImage)
 
 Download the latest `.deb` or `.AppImage` from the [Releases](https://github.com/truelockmc/streambert/releases/latest) page.
