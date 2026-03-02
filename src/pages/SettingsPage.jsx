@@ -920,10 +920,7 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
   const handleResetApp = async () => {
     setShowResetConfirm(false);
     if (isElectron) await window.electron.resetApp();
-    const keys = Object.keys(localStorage).filter((k) =>
-      k.startsWith("streambert_"),
-    );
-    keys.forEach((k) => localStorage.removeItem(k));
+    storage.clearAll();
     window.location.reload();
   };
 

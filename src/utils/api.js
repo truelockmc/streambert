@@ -94,6 +94,9 @@ export const sourceSupportsProgress = (sourceId) =>
 export const sourceIsAsync = (sourceId) =>
   PLAYER_SOURCES.find((s) => s.id === sourceId)?.async ?? false;
 
+// Sources that require a transparent webRequest intercept to load properly
+export const NEEDS_INTERCEPT = ["vidsrc", "2embed"];
+
 // ── AniList API (anime metadata) ──────────────────────────────────────────────
 const ANILIST_API = "https://graphql.anilist.co";
 

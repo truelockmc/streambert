@@ -11,6 +11,7 @@ import {
   isAnimeContent,
   ANIME_DEFAULT_SOURCE,
   NON_ANIME_DEFAULT_SOURCE,
+  NEEDS_INTERCEPT,
 } from "../utils/api";
 import {
   PlayIcon,
@@ -89,7 +90,10 @@ export default function MoviePage({
   const [collection, setCollection] = useState(null); // { name, parts }
 
   // Derived: detect anime before any effects so effects can use it
-  const isAnime = useMemo(() => isAnimeContent(item, details), [item, details]);
+  const isAnime = useMemo(
+    () => isAnimeContent(item, details),
+    [item.id, details],
+  );
   const [downloaderFolder, setDownloaderFolder] = useState(
     () => storage.get("downloaderFolder") || "",
   );
@@ -356,19 +360,18 @@ export default function MoviePage({
     };
   }, [playing, progressKey, watchedThreshold, playerSource]);
 
-  const handlePlay = () => {
+  const handlePlay = useCallback(() => {
     setM3u8Url(null);
     setSubtitleUrl(null);
     setPlaying(true);
     onHistory({ ...d, media_type: "movie" });
-  };
+  }, [d, onHistory]);
 
   // Intercept fullscreen requests from embedded players (vidsrc / 2embed use
   // the native Fullscreen API which would otherwise fullscreen the entire app).
   // Videasy and AllManga handle fullscreen internally via CSS, skip those.
   useEffect(() => {
     if (!playing) return;
-    const NEEDS_INTERCEPT = ["vidsrc", "2embed"];
     if (!NEEDS_INTERCEPT.includes(playerSource)) return;
     const enterH = window.electron?.onWebviewEnterFullscreen?.(() => {
       playerWrapRef.current?.requestFullscreen?.();
@@ -382,10 +385,10 @@ export default function MoviePage({
     };
   }, [playing, playerSource]);
 
-  const handleSetDownloaderFolder = (folder) => {
+  const handleSetDownloaderFolder = useCallback((folder) => {
     setDownloaderFolder(folder);
     storage.set("downloaderFolder", folder);
-  };
+  }, []);
 
   const d = details || item;
   const title = d.title || d.name;

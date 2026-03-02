@@ -8,8 +8,7 @@ import {
   WatchedIcon,
 } from "../components/Icons";
 import { storage } from "../utils/storage";
-
-const IMG_BASE = "https://image.tmdb.org/t/p/w154";
+import { imgUrl } from "../utils/api";
 
 const STATUS_CLASS = {
   downloading: "dl-status--downloading",
@@ -40,7 +39,7 @@ function Poster({ posterPath, size = 48 }) {
   if (posterPath && !errored) {
     return (
       <img
-        src={`${IMG_BASE}${posterPath}`}
+        src={imgUrl(posterPath, "w154")}
         alt=""
         onError={() => setErrored(true)}
         className="dl-poster"

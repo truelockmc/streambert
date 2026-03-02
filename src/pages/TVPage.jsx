@@ -12,6 +12,7 @@ import {
   isAnimeContent,
   ANIME_DEFAULT_SOURCE,
   NON_ANIME_DEFAULT_SOURCE,
+  NEEDS_INTERCEPT,
 } from "../utils/api";
 import {
   BookmarkIcon,
@@ -50,8 +51,10 @@ function EpisodeContextMenu({
   onClose,
 }) {
   const ref = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
-    const close = () => onClose();
+    const close = () => onCloseRef.current();
     window.addEventListener("click", close);
     window.addEventListener("contextmenu", close);
     return () => {
@@ -72,7 +75,7 @@ function EpisodeContextMenu({
           onClick={(e) => {
             e.stopPropagation();
             onMarkUnwatched();
-            onClose();
+            onCloseRef.current();
           }}
         >
           ↩ Mark as Unwatched
@@ -83,7 +86,7 @@ function EpisodeContextMenu({
           onClick={(e) => {
             e.stopPropagation();
             onMarkWatched();
-            onClose();
+            onCloseRef.current();
           }}
         >
           ✓ Mark as Watched
@@ -103,8 +106,10 @@ function SeasonContextMenu({
   onClose,
 }) {
   const ref = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
-    const close = () => onClose();
+    const close = () => onCloseRef.current();
     window.addEventListener("click", close);
     window.addEventListener("contextmenu", close);
     return () => {
@@ -125,7 +130,7 @@ function SeasonContextMenu({
           onClick={(e) => {
             e.stopPropagation();
             onMarkUnwatched();
-            onClose();
+            onCloseRef.current();
           }}
         >
           ↩ Mark Season as Unwatched
@@ -136,7 +141,7 @@ function SeasonContextMenu({
           onClick={(e) => {
             e.stopPropagation();
             onMarkWatched();
-            onClose();
+            onCloseRef.current();
           }}
         >
           ✓ Mark Season as Watched
@@ -191,6 +196,131 @@ function EpisodeDesc({ overview, episodeName }) {
     </>
   );
 }
+
+// Injected into the webview DOM
+const INJECT_SKIP_CONTROLS = `
+(function() {
+  if (window.__skipControlsInjected) return;
+  var style = document.createElement('style');
+  style.innerHTML =
+    '*:focus, *:focus-visible {' +
+    'outline: none !important;' +
+    'box-shadow: none !important;' +
+    '}' +
+    'video:focus, video:focus-visible {' +
+    'outline: none !important;' +
+    'box-shadow: none !important;' +
+    '}';
+  document.head.appendChild(style);
+  window.__skipControlsInjected = true;
+
+  var BACK_SVG = '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"width:26px;height:26px\"><polyline points=\"1 4 1 10 7 10\"/><path d=\"M3.51 15a9 9 0 1 0 .49-4.53\"/><text x=\"13.5\" y=\"15.5\" text-anchor=\"middle\" font-size=\"6.5\" fill=\"currentColor\" stroke=\"none\" font-weight=\"800\" font-family=\"system-ui,sans-serif\">15</text></svg>';
+  var FWD_SVG  = '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"width:26px;height:26px\"><polyline points=\"23 4 23 10 17 10\"/><path d=\"M20.49 15a9 9 0 1 1-.49-4.53\"/><text x=\"10.5\" y=\"15.5\" text-anchor=\"middle\" font-size=\"6.5\" fill=\"currentColor\" stroke=\"none\" font-weight=\"800\" font-family=\"system-ui,sans-serif\">15</text></svg>';
+
+  var wrap = document.createElement('div');
+  wrap.id = '__skip-ui';
+  wrap.style.cssText = [
+    'position:fixed',
+    'top:0','left:0','right:0','bottom:0',
+    'pointer-events:none',
+    'z-index:2147483647',
+    'opacity:0',
+    'transition:opacity 0.25s ease',
+  ].join(';');
+
+  function makeBtn(seconds, svg, label, side) {
+    var btn = document.createElement('button');
+    btn.innerHTML = svg + '<span style="font-size:11px;font-family:system-ui,sans-serif">' + label + '</span>';
+    btn.setAttribute('tabindex', '-1');
+    btn.title = label;
+    btn.style.cssText = [
+      'pointer-events:auto',
+      'background:rgba(0,0,0,0.72)',
+      'border:1px solid rgba(255,255,255,0.18)',
+      'border-radius:8px',
+      'color:white',
+      'cursor:pointer',
+      'padding:10px 18px',
+      'display:flex',
+      'align-items:center',
+      'gap:7px',
+      'backdrop-filter:blur(6px)',
+      '-webkit-backdrop-filter:blur(6px)',
+      'transition:background 0.15s',
+      'font-size:12px',
+    ].join(';');
+    btn.style.position = 'absolute';
+    btn.style.top = '50%';
+    btn.style.transform = 'translateY(-50%)';
+
+    if (side === 'left') {
+      btn.style.left = '24px';
+    } else {
+      btn.style.right = '24px';
+    }
+    btn.onmouseenter = function() { btn.style.background = 'rgba(229,9,20,0.85)'; btn.style.borderColor = '#e5091466'; };
+    btn.onmouseleave = function() { btn.style.background = 'rgba(0,0,0,0.72)'; btn.style.borderColor = 'rgba(255,255,255,0.18)'; };
+    btn.onclick = function(e) {
+      e.stopPropagation();
+      var v = document.querySelector('video');
+      if (v) v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + seconds));
+      show();
+    };
+    return btn;
+  }
+
+  wrap.appendChild(makeBtn(-15, BACK_SVG, '−15s', 'left'));
+  wrap.appendChild(makeBtn(15,  FWD_SVG,  '+15s', 'right'));
+  document.documentElement.appendChild(wrap);
+
+  var idleTimer;
+  function show() {
+    wrap.style.opacity = '1';
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(function() { wrap.style.opacity = '0'; }, 2500);
+  }
+  document.addEventListener('mousemove', show, true);
+  document.addEventListener('keydown', function(e) {
+    const active = document.activeElement;
+
+    // Keine Shortcuts wenn User tippt
+    if (
+      active &&
+      active.matches('input, textarea, [contenteditable="true"]')
+    ) {
+      return;
+    }
+
+    // Key repeat blockieren (wenn Taste gehalten wird)
+    if (e.repeat) return;
+
+    const v = document.querySelector('video');
+    if (!v) return;
+
+    // Throttle (max 1 Aktion alle 250ms)
+    const now = Date.now();
+    if (window.__skipKeyCooldown && now < window.__skipKeyCooldown) return;
+    window.__skipKeyCooldown = now + 250;
+
+    if (e.code === 'Space') {
+      e.preventDefault(); // verhindert Scrollen
+      if (v.paused) v.play();
+      else v.pause();
+      show();
+    }
+
+    if (e.key === 'ArrowLeft') {
+      v.currentTime = Math.max(0, v.currentTime - 10);
+      show();
+    }
+
+    if (e.key === 'ArrowRight') {
+      v.currentTime = Math.min(v.duration || 0, v.currentTime + 10);
+      show();
+    }
+  }, true);
+})();
+`;
 
 export default function TVPage({
   item,
@@ -471,8 +601,8 @@ export default function TVPage({
   );
 
   // ── Episode slice ──────────────────────────────────────────────────────────
-  const getSeasonEpisodes = useMemo(() => {
-    return (rawEpisodes) => {
+  const getSeasonEpisodes = useCallback(
+    (rawEpisodes) => {
       if (!useAnilistSeasons || !rawEpisodes) return rawEpisodes;
       if (tmdbSeasons.length > 1) return rawEpisodes;
       let offset = 0;
@@ -487,8 +617,9 @@ export default function TVPage({
         episode_number: i + 1,
         _tmdbAbsolute: ep.episode_number,
       }));
-    };
-  }, [useAnilistSeasons, tmdbSeasons.length, anilistSeasons, selectedSeason]);
+    },
+    [useAnilistSeasons, tmdbSeasons.length, anilistSeasons, selectedSeason],
+  );
 
   // ── Player episode mapping
   const playerEp = useMemo(() => {
@@ -734,132 +865,6 @@ export default function TVPage({
     } catch {}
   }, []);
 
-  // Inject skip buttons directly into the webview DOM so they work in fullscreen
-  // and react to the player's own mousemove events (webview eats host mouse events).
-  const INJECT_SKIP_CONTROLS = `
-(function() {
-  if (window.__skipControlsInjected) return;
-  var style = document.createElement('style');
-  style.innerHTML =
-    '*:focus, *:focus-visible {' +
-    'outline: none !important;' +
-    'box-shadow: none !important;' +
-    '}' +
-    'video:focus, video:focus-visible {' +
-    'outline: none !important;' +
-    'box-shadow: none !important;' +
-    '}';
-  document.head.appendChild(style);
-  window.__skipControlsInjected = true;
-
-  var BACK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><path d="M2.5 12a9.5 9.5 0 1 1 1.5 5.2"/><polyline points="2 8 2 13 7 13"/><text x="12" y="15" text-anchor="middle" font-size="6.5" fill="currentColor" stroke="none" font-weight="700" font-family="sans-serif">10</text></svg>';
-  var FWD_SVG  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><path d="M21.5 12a9.5 9.5 0 1 0-1.5 5.2"/><polyline points="22 8 22 13 17 13"/><text x="12" y="15" text-anchor="middle" font-size="6.5" fill="currentColor" stroke="none" font-weight="700" font-family="sans-serif">10</text></svg>';
-
-  var wrap = document.createElement('div');
-  wrap.id = '__skip-ui';
-  wrap.style.cssText = [
-    'position:fixed',
-    'top:0','left:0','right:0','bottom:0',
-    'pointer-events:none',
-    'z-index:2147483647',
-    'opacity:0',
-    'transition:opacity 0.25s ease',
-  ].join(';');
-
-  function makeBtn(seconds, svg, label, side) {
-    var btn = document.createElement('button');
-    btn.innerHTML = svg + '<span style="font-size:11px;font-family:system-ui,sans-serif">' + label + '</span>';
-    btn.setAttribute('tabindex', '-1');
-    btn.title = label;
-    btn.style.cssText = [
-      'pointer-events:auto',
-      'background:rgba(0,0,0,0.72)',
-      'border:1px solid rgba(255,255,255,0.18)',
-      'border-radius:8px',
-      'color:white',
-      'cursor:pointer',
-      'padding:10px 18px',
-      'display:flex',
-      'align-items:center',
-      'gap:7px',
-      'backdrop-filter:blur(6px)',
-      '-webkit-backdrop-filter:blur(6px)',
-      'transition:background 0.15s',
-      'font-size:12px',
-    ].join(';');
-    btn.style.position = 'absolute';
-    btn.style.top = '50%';
-    btn.style.transform = 'translateY(-50%)';
-
-    if (side === 'left') {
-      btn.style.left = '24px';
-    } else {
-      btn.style.right = '24px';
-    }
-    btn.onmouseenter = function() { btn.style.background = 'rgba(229,9,20,0.85)'; btn.style.borderColor = '#e5091466'; };
-    btn.onmouseleave = function() { btn.style.background = 'rgba(0,0,0,0.72)'; btn.style.borderColor = 'rgba(255,255,255,0.18)'; };
-    btn.onclick = function(e) {
-      e.stopPropagation();
-      var v = document.querySelector('video');
-      if (v) v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + seconds));
-      show();
-    };
-    return btn;
-  }
-
-  wrap.appendChild(makeBtn(-10, BACK_SVG, '−15s', 'left'));
-  wrap.appendChild(makeBtn(10,  FWD_SVG,  '+15s', 'right'));
-  document.documentElement.appendChild(wrap);
-
-  var idleTimer;
-  function show() {
-    wrap.style.opacity = '1';
-    clearTimeout(idleTimer);
-    idleTimer = setTimeout(function() { wrap.style.opacity = '0'; }, 2500);
-  }
-  document.addEventListener('mousemove', show, true);
-  document.addEventListener('keydown', function(e) {
-    const active = document.activeElement;
-
-    // Keine Shortcuts wenn User tippt
-    if (
-      active &&
-      active.matches('input, textarea, [contenteditable="true"]')
-    ) {
-      return;
-    }
-
-    // Key repeat blockieren (wenn Taste gehalten wird)
-    if (e.repeat) return;
-
-    const v = document.querySelector('video');
-    if (!v) return;
-
-    // Throttle (max 1 Aktion alle 250ms)
-    const now = Date.now();
-    if (window.__skipKeyCooldown && now < window.__skipKeyCooldown) return;
-    window.__skipKeyCooldown = now + 250;
-
-    if (e.code === 'Space') {
-      e.preventDefault(); // verhindert Scrollen
-      if (v.paused) v.play();
-      else v.pause();
-      show();
-    }
-
-    if (e.key === 'ArrowLeft') {
-      v.currentTime = Math.max(0, v.currentTime - 10);
-      show();
-    }
-
-    if (e.key === 'ArrowRight') {
-      v.currentTime = Math.min(v.duration || 0, v.currentTime + 10);
-      show();
-    }
-  }, true);
-})();
-`;
-
   useEffect(() => {
     const wv = webviewRef.current;
     if (!wv || !playing || playerSource !== "allmanga") return;
@@ -909,17 +914,16 @@ export default function TVPage({
     [d, selectedSeason, onHistory],
   );
 
-  const handleSetDownloaderFolder = (folder) => {
+  const handleSetDownloaderFolder = useCallback((folder) => {
     setDownloaderFolder(folder);
     storage.set("downloaderFolder", folder);
-  };
+  }, []);
 
   // Intercept fullscreen requests from embedded players (vidsrc / 2embed use
   // the native Fullscreen API which would otherwise fullscreen the entire app).
   // Videasy and AllManga handle fullscreen internally via CSS, skip those.
   useEffect(() => {
     if (!playing) return;
-    const NEEDS_INTERCEPT = ["vidsrc", "2embed"];
     if (!NEEDS_INTERCEPT.includes(playerSource)) return;
     const enterH = window.electron?.onWebviewEnterFullscreen?.(() => {
       playerWrapRef.current?.requestFullscreen?.();
