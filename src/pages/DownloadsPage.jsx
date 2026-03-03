@@ -166,18 +166,30 @@ export default function DownloadsPage({
           dl={subtitleModalDl}
           onClose={() => setSubtitleModalDl(null)}
           onSubtitlesSaved={(newPaths) => {
-            onUpdateDownload?.(subtitleModalDl.id, {
-              subtitlePaths: [
-                ...(subtitleModalDl.subtitlePaths || []),
-                ...newPaths.filter(
-                  (np) =>
-                    !(subtitleModalDl.subtitlePaths || []).some(
-                      (e) => e.lang === np.lang,
-                    ),
-                ),
-              ],
-            });
-            setSubtitleModalDl(null);
+            const updated = [
+              ...(subtitleModalDl.subtitlePaths || []),
+              ...newPaths.filter(
+                (np) =>
+                  !(subtitleModalDl.subtitlePaths || []).some(
+                    (e) => e.lang === np.lang,
+                  ),
+              ),
+            ];
+            onUpdateDownload?.(subtitleModalDl.id, { subtitlePaths: updated });
+            // Keep modal open with updated list so user can manage / delete subs
+            setSubtitleModalDl((prev) =>
+              prev ? { ...prev, subtitlePaths: updated } : null,
+            );
+          }}
+          onSubtitleDeleted={(deletedPath) => {
+            const updated = (subtitleModalDl.subtitlePaths || []).filter(
+              (sp) => sp.path !== deletedPath,
+            );
+            onUpdateDownload?.(subtitleModalDl.id, { subtitlePaths: updated });
+            // Keep the modal open with the updated list
+            setSubtitleModalDl((prev) =>
+              prev ? { ...prev, subtitlePaths: updated } : null,
+            );
           }}
         />
       )}
@@ -712,7 +724,12 @@ function LocalFileCard({
 }
 
 // ── Subtitle Downloader Modal (for retroactive subtitle download) ──────────────
-function SubtitleDownloaderModal({ dl, onClose, onSubtitlesSaved }) {
+function SubtitleDownloaderModal({
+  dl,
+  onClose,
+  onSubtitlesSaved,
+  onSubtitleDeleted,
+}) {
   const subdlApiKey = storage.get(STORAGE_KEYS.SUBDL_API_KEY) || "";
   const defaultLang = storage.get(STORAGE_KEYS.SUBTITLE_LANG) || "en";
 
@@ -724,6 +741,10 @@ function SubtitleDownloaderModal({ dl, onClose, onSubtitlesSaved }) {
   const [downloading, setDownloading] = useState(false);
   const [dlError, setDlError] = useState(null);
   const [done, setDone] = useState(false);
+  const [deletingPath, setDeletingPath] = useState(null); // path currently being deleted
+
+  const existingSubs = dl.subtitlePaths || [];
+  const existingLangs = new Set(existingSubs.map((s) => s.lang));
 
   const doSearch = useCallback(
     async (lang) => {
@@ -769,7 +790,12 @@ function SubtitleDownloaderModal({ dl, onClose, onSubtitlesSaved }) {
       });
       if (res.ok && res.subtitlePaths?.length > 0) {
         setDone(true);
-        setTimeout(() => onSubtitlesSaved(res.subtitlePaths), 900);
+        onSubtitlesSaved(res.subtitlePaths);
+        // Reset after moment so the modal stays open with updated manage-section
+        setTimeout(() => {
+          setDone(false);
+          setSelectedSubs([]);
+        }, 1500);
       } else {
         setDlError(res.error || "No subtitles could be saved.");
       }
@@ -777,6 +803,27 @@ function SubtitleDownloaderModal({ dl, onClose, onSubtitlesSaved }) {
       setDlError(e.message);
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleDeleteSub = async (sp) => {
+    if (
+      !confirm(
+        `Delete subtitle "${(sp.lang || "?").toUpperCase()}"${sp.release ? ` (${sp.release})` : ""}?`,
+      )
+    )
+      return;
+    setDeletingPath(sp.path);
+    try {
+      await window.electron.deleteSubtitleFile({
+        downloadId: dl.id,
+        subtitlePath: sp.path,
+      });
+      onSubtitleDeleted(sp.path);
+    } catch (e) {
+      console.error("Delete subtitle error:", e);
+    } finally {
+      setDeletingPath(null);
     }
   };
 
@@ -799,9 +846,9 @@ function SubtitleDownloaderModal({ dl, onClose, onSubtitlesSaved }) {
           background: "var(--surface)",
           border: "1px solid var(--border)",
           borderRadius: 12,
-          width: 600,
+          width: 620,
           maxWidth: "95vw",
-          maxHeight: "82vh",
+          maxHeight: "85vh",
           display: "flex",
           flexDirection: "column",
           boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
@@ -830,36 +877,132 @@ function SubtitleDownloaderModal({ dl, onClose, onSubtitlesSaved }) {
           >
             <SubtitlesIcon size={14} />
             Subtitles: {dl.name}
-            {selectedSubs.length > 0 && (
-              <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                · {selectedSubs.length} selected
-              </span>
-            )}
           </span>
           <button className="icon-btn" onClick={onClose}>
             ✕
           </button>
         </div>
 
-        {/* Already-downloaded note */}
-        {(dl.subtitlePaths?.length ?? 0) > 0 && (
+        {/* ── Existing / downloaded subtitles section ── */}
+        {existingSubs.length > 0 && (
           <div
             style={{
-              padding: "8px 20px",
+              padding: "10px 20px 12px",
               borderBottom: "1px solid var(--border)",
-              fontSize: 12,
-              color: "#63cab7",
-              background: "rgba(99,202,183,0.05)",
+              flexShrink: 0,
+              background: "rgba(99,202,183,0.04)",
             }}
           >
-            Already downloaded:{" "}
-            {dl.subtitlePaths
-              .map((s) => (s.lang || "?").toUpperCase())
-              .join(", ")}
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "var(--text3)",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                marginBottom: 8,
+              }}
+            >
+              Downloaded subtitles
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              {existingSubs.map((sp) => (
+                <div
+                  key={sp.path}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 7,
+                    padding: "6px 10px",
+                  }}
+                >
+                  {/* Lang badge */}
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "1px 6px",
+                      borderRadius: 3,
+                      background: "rgba(99,202,183,0.15)",
+                      color: "#63cab7",
+                      border: "1px solid rgba(99,202,183,0.3)",
+                      textTransform: "uppercase",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {(sp.lang || "?").toUpperCase()}
+                  </span>
+                  {/* Source badge */}
+                  {sp.source && (
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        padding: "1px 5px",
+                        borderRadius: 3,
+                        background:
+                          sp.source === "subdl"
+                            ? "rgba(99,149,255,0.15)"
+                            : "rgba(180,130,255,0.15)",
+                        color: sp.source === "subdl" ? "#6395ff" : "#b482ff",
+                        border: `1px solid ${sp.source === "subdl" ? "rgba(99,149,255,0.3)" : "rgba(180,130,255,0.3)"}`,
+                        textTransform: "uppercase",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {sp.source === "subdl" ? "SubDL" : "Wyzie"}
+                    </span>
+                  )}
+                  {/* Release name */}
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text2)",
+                      flex: 1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      minWidth: 0,
+                    }}
+                    title={sp.release || sp.path}
+                  >
+                    {sp.release || sp.path.split(/[\\/]/).pop()}
+                  </span>
+                  {/* File path hint */}
+                  <span
+                    style={{
+                      fontSize: 10,
+                      color: "var(--text3)",
+                      flexShrink: 0,
+                    }}
+                    title={sp.path}
+                  >
+                    .{sp.path.split(".").pop()}
+                  </span>
+                  {/* Delete button */}
+                  <button
+                    className="icon-btn"
+                    disabled={deletingPath === sp.path}
+                    onClick={() => handleDeleteSub(sp)}
+                    title="Delete this subtitle file"
+                    style={{
+                      flexShrink: 0,
+                      opacity: deletingPath === sp.path ? 0.4 : 1,
+                      fontSize: 13,
+                    }}
+                  >
+                    {deletingPath === sp.path ? "…" : <TrashIcon />}
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Lang filter */}
+        {/* ── Lang filter + search controls ── */}
         <div
           style={{
             padding: "10px 16px",
@@ -870,7 +1013,9 @@ function SubtitleDownloaderModal({ dl, onClose, onSubtitlesSaved }) {
             flexShrink: 0,
           }}
         >
-          <span style={{ fontSize: 12, color: "var(--text3)" }}>Language:</span>
+          <span style={{ fontSize: 12, color: "var(--text3)" }}>
+            Download more:
+          </span>
           <select
             value={langFilter}
             onChange={(e) => {
@@ -902,9 +1047,20 @@ function SubtitleDownloaderModal({ dl, onClose, onSubtitlesSaved }) {
           >
             {searching ? "…" : "⟳ Refresh"}
           </button>
+          {selectedSubs.length > 0 && (
+            <span
+              style={{
+                fontSize: 12,
+                color: "var(--text3)",
+                marginLeft: "auto",
+              }}
+            >
+              {selectedSubs.length} selected
+            </span>
+          )}
         </div>
 
-        {/* Results list */}
+        {/* ── Results list ── */}
         <div style={{ flex: 1, overflowY: "auto" }}>
           {searching && (
             <div
@@ -953,45 +1109,59 @@ function SubtitleDownloaderModal({ dl, onClose, onSubtitlesSaved }) {
               const isSelected = selectedSubs.some(
                 (s) => s.file_id === r.file_id,
               );
+              const alreadyHave = existingLangs.has(
+                (r.language || "").replace(/[^a-z0-9_-]/gi, "").toLowerCase(),
+              );
               return (
                 <div
                   key={r.file_id}
-                  onClick={() =>
+                  onClick={() => {
+                    if (alreadyHave) return; // can't re-download same lang (use delete first)
                     setSelectedSubs((prev) =>
                       isSelected
                         ? prev.filter((s) => s.file_id !== r.file_id)
                         : [...prev, r],
-                    )
-                  }
+                    );
+                  }}
                   style={{
                     padding: "8px 16px",
-                    cursor: "pointer",
+                    cursor: alreadyHave ? "default" : "pointer",
                     borderBottom: "1px solid var(--border)",
-                    background: isSelected
-                      ? "rgba(229,9,20,0.07)"
-                      : "transparent",
+                    background: alreadyHave
+                      ? "rgba(255,255,255,0.01)"
+                      : isSelected
+                        ? "rgba(229,9,20,0.07)"
+                        : "transparent",
                     display: "flex",
                     alignItems: "flex-start",
                     gap: 10,
                     transition: "background 0.1s",
+                    opacity: alreadyHave ? 0.45 : 1,
                   }}
                   onMouseEnter={(e) => {
-                    if (!isSelected)
+                    if (!isSelected && !alreadyHave)
                       e.currentTarget.style.background = "var(--surface2)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = isSelected
-                      ? "rgba(229,9,20,0.07)"
-                      : "transparent";
+                    e.currentTarget.style.background = alreadyHave
+                      ? "rgba(255,255,255,0.01)"
+                      : isSelected
+                        ? "rgba(229,9,20,0.07)"
+                        : "transparent";
                   }}
                 >
+                  {/* Checkbox */}
                   <div
                     style={{
                       width: 15,
                       height: 15,
                       borderRadius: 3,
-                      border: `2px solid ${isSelected ? "var(--red)" : "var(--border)"}`,
-                      background: isSelected ? "var(--red)" : "transparent",
+                      border: `2px solid ${alreadyHave ? "var(--border)" : isSelected ? "var(--red)" : "var(--border)"}`,
+                      background: alreadyHave
+                        ? "var(--surface2)"
+                        : isSelected
+                          ? "var(--red)"
+                          : "transparent",
                       flexShrink: 0,
                       marginTop: 3,
                       display: "flex",
@@ -999,9 +1169,13 @@ function SubtitleDownloaderModal({ dl, onClose, onSubtitlesSaved }) {
                       justifyContent: "center",
                     }}
                   >
-                    {isSelected && (
+                    {alreadyHave ? (
+                      <span style={{ color: "var(--text3)", fontSize: 9 }}>
+                        ✓
+                      </span>
+                    ) : isSelected ? (
                       <span style={{ color: "#fff", fontSize: 9 }}>✓</span>
-                    )}
+                    ) : null}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
@@ -1043,6 +1217,17 @@ function SubtitleDownloaderModal({ dl, onClose, onSubtitlesSaved }) {
                       >
                         {r.via_subdl ? "SubDL" : "Wyzie"}
                       </span>
+                      {alreadyHave && (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            color: "var(--text3)",
+                            fontStyle: "italic",
+                          }}
+                        >
+                          already downloaded
+                        </span>
+                      )}
                       {r.hearing_impaired && (
                         <span
                           style={{ fontSize: 10, color: "var(--text3)" }}

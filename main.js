@@ -1567,23 +1567,29 @@ ipcMain.handle(
 
           const destPath = path.join(dir, `${baseName}.${langCode}.${ext}`);
           fs.writeFileSync(destPath, fileData);
-          results.push({ lang: langCode, path: destPath });
+          // Store rich metadata so the UI can display and manage each subtitle
+          results.push({
+            lang: langCode,
+            path: destPath,
+            file_id: sub.file_id || null,
+            release: sub.release || sub.file_name || null,
+            source: sub.via_subdl ? "subdl" : "wyzie",
+          });
         } catch (subErr) {
           console.error("Subtitle download error:", subErr);
         }
       }
 
-      // Update the download registry entry
+      // Update the download registry entry (merge, skip already-present langs)
       if (results.length > 0 && filePath) {
         const idx = downloads.findIndex((d) => d.filePath === filePath);
         if (idx >= 0) {
           const existing = downloads[idx].subtitlePaths || [];
           const existingLangs = new Set(existing.map((s) => s.lang));
-          const merged = [
+          downloads[idx].subtitlePaths = [
             ...existing,
             ...results.filter((r) => !existingLangs.has(r.lang)),
           ];
-          downloads[idx].subtitlePaths = merged;
           saveDownloads();
         }
       }
@@ -1594,6 +1600,29 @@ ipcMain.handle(
     }
   },
 );
+
+// ── IPC: Delete a single subtitle file and remove from registry ───────────────
+ipcMain.handle("delete-subtitle-file", (_, { downloadId, subtitlePath }) => {
+  try {
+    // Delete the physical file
+    if (subtitlePath && fs.existsSync(subtitlePath)) {
+      fs.unlinkSync(subtitlePath);
+    }
+    // Remove from registry
+    if (downloadId) {
+      const idx = downloads.findIndex((d) => d.id === downloadId);
+      if (idx >= 0) {
+        downloads[idx].subtitlePaths = (
+          downloads[idx].subtitlePaths || []
+        ).filter((sp) => sp.path !== subtitlePath);
+        saveDownloads();
+      }
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
 
 // ── IPC: Quit app ─────────────────────────
 ipcMain.handle("quit-app", () => {

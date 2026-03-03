@@ -100,4 +100,6 @@ contextBridge.exposeInMainWorld("electron", {
   getSubtitleUrl: (args) => ipcRenderer.invoke("get-subtitle-url", args),
   downloadSubtitlesForFile: (args) =>
     ipcRenderer.invoke("download-subtitles-for-file", args),
+  deleteSubtitleFile: (args) =>
+    ipcRenderer.invoke("delete-subtitle-file", args),
 });
