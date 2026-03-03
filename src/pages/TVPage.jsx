@@ -374,6 +374,8 @@ export default function TVPage({
   const [resolveError, setResolveError] = useState(null);
   const [anilistData, setAnilistData] = useState(null);
   const [anilistSeasons, setAnilistSeasons] = useState(null); // [{seasonNum, title, episodes, year}]
+  // Webview loading overlay
+  const [webviewLoading, setWebviewLoading] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
   const sourceRef = useRef(null);
   const playerWrapRef = useRef(null);
@@ -473,6 +475,7 @@ export default function TVPage({
     setResolvedPlayerUrl(null);
     setResolvingUrl(false);
     setResolveError(null);
+    setWebviewLoading(true); // instantly blank the player on every source/episode switch
   }, [
     item.id,
     selectedEp?.episode_number,
@@ -759,6 +762,25 @@ export default function TVPage({
     lastKnownTimeRef.current = 0;
     seekBackCooldownRef.current = 0;
   }, [currentProgressKey]);
+
+  // Show loader instantly when playback starts
+  useEffect(() => {
+    if (playing) setWebviewLoading(true);
+  }, [playing]);
+
+  // Attach webview load events so we know when the new source has painted
+  useEffect(() => {
+    if (!playing) return;
+    const wv = webviewRef.current;
+    if (!wv) return;
+    const done = () => setWebviewLoading(false);
+    wv.addEventListener("did-finish-load", done);
+    wv.addEventListener("did-fail-load", done);
+    return () => {
+      wv.removeEventListener("did-finish-load", done);
+      wv.removeEventListener("did-fail-load", done);
+    };
+  }, [playing, playerSource, item.id, selectedEp?.episode_number]);
 
   // ── Auto-track progress + auto-watched every 5s ──────────────────────────
   useEffect(() => {
@@ -1093,8 +1115,8 @@ export default function TVPage({
                 )}
               </div>
               <div className="player-wrap" ref={playerWrapRef}>
-                {/* 9anime: spinner while looking up episode */}
-                {isAsync && resolvingUrl && (
+                {/* Universal source-loading overlay – shown instantly on every source/episode switch */}
+                {webviewLoading && !resolveError && (
                   <div
                     style={{
                       position: "absolute",
@@ -1104,14 +1126,16 @@ export default function TVPage({
                       flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
-                      background: "rgba(0,0,0,0.85)",
+                      background: "rgba(0,0,0,0.92)",
                       gap: 14,
                       borderRadius: "inherit",
                     }}
                   >
                     <div className="spinner" />
                     <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                      Looking up episode on AllManga…
+                      {resolvingUrl
+                        ? "Looking up episode on AllManga…"
+                        : `Loading ${PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "source"}…`}
                     </span>
                   </div>
                 )}
@@ -1170,7 +1194,9 @@ export default function TVPage({
                     boxShadow: "none",
                     background: "black",
                     visibility:
-                      isAsync && !resolvedPlayerUrl ? "hidden" : "visible",
+                      webviewLoading || (isAsync && !resolvedPlayerUrl)
+                        ? "hidden"
+                        : "visible",
                   }}
                   tabIndex={-1}
                 />

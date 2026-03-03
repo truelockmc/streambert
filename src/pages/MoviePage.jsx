@@ -88,6 +88,8 @@ export default function MoviePage({
   const [resolvingUrl, setResolvingUrl] = useState(false);
   const [resolveError, setResolveError] = useState(null);
   const [collection, setCollection] = useState(null); // { name, parts }
+  // Webview loading overlay
+  const [webviewLoading, setWebviewLoading] = useState(false);
 
   // Derived: detect anime before any effects so effects can use it
   const isAnime = useMemo(
@@ -178,6 +180,7 @@ export default function MoviePage({
     setResolvedPlayerUrl(null);
     setResolvingUrl(false);
     setResolveError(null);
+    setWebviewLoading(true); // instantly blank the player on every source/item switch
   }, [item.id, playerSource, dubMode]);
 
   // Fetch AniList data + auto-set source for anime/non-anime
@@ -268,6 +271,25 @@ export default function MoviePage({
     lastKnownTimeRef.current = 0;
     seekBackCooldownRef.current = 0;
   }, [item.id, isWatched]);
+
+  // Show loader instantly when play starts
+  useEffect(() => {
+    if (playing) setWebviewLoading(true);
+  }, [playing]);
+
+  // Attach webview load events so we know when the new source has painted
+  useEffect(() => {
+    if (!playing) return;
+    const wv = webviewRef.current;
+    if (!wv) return;
+    const done = () => setWebviewLoading(false);
+    wv.addEventListener("did-finish-load", done);
+    wv.addEventListener("did-fail-load", done);
+    return () => {
+      wv.removeEventListener("did-finish-load", done);
+      wv.removeEventListener("did-fail-load", done);
+    };
+  }, [playing, playerSource, item.id]);
 
   // ── Auto-track progress + auto-watched every 5s ──────────────────────────
   useEffect(() => {
@@ -360,7 +382,7 @@ export default function MoviePage({
     };
   }, [playing, progressKey, watchedThreshold, playerSource]);
 
-  // ── Derived display value
+  // ── Derived display values (must be declared before any callbacks that use them) ──
   const d = details || item;
   const title = d.title || d.name;
   const year = (d.release_date || "").slice(0, 4);
@@ -584,8 +606,8 @@ export default function MoviePage({
       {playing && !restricted && !isUnreleased && (
         <div className="section">
           <div className="player-wrap" ref={playerWrapRef}>
-            {/* AllManga: spinner while resolving */}
-            {sourceIsAsync(playerSource) && resolvingUrl && (
+            {/* Universal source-loading overlay – shown instantly on every source/item switch */}
+            {webviewLoading && !resolveError && (
               <div
                 style={{
                   position: "absolute",
@@ -595,14 +617,16 @@ export default function MoviePage({
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  background: "rgba(0,0,0,0.85)",
+                  background: "rgba(0,0,0,0.92)",
                   gap: 14,
                   borderRadius: "inherit",
                 }}
               >
                 <div className="spinner" />
                 <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                  Looking up movie on AllManga…
+                  {resolvingUrl
+                    ? "Looking up movie on AllManga…"
+                    : `Loading ${PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "source"}…`}
                 </span>
               </div>
             )}
@@ -658,7 +682,8 @@ export default function MoviePage({
                 height: "100%",
                 border: "none",
                 visibility:
-                  sourceIsAsync(playerSource) && !resolvedPlayerUrl
+                  webviewLoading ||
+                  (sourceIsAsync(playerSource) && !resolvedPlayerUrl)
                     ? "hidden"
                     : "visible",
               }}
