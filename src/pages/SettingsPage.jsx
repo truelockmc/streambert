@@ -794,7 +794,7 @@ function SubtitleSettingsSection() {
         <span style={{ color: "var(--text)", fontWeight: 600 }}>
           Wyzie Subs
         </span>{" "}
-        is used by default — no account or API key required. Optionally add a{" "}
+        is used by default, no account or API key is required. Optionally add a{" "}
         <span
           style={{
             color: "var(--red)",
@@ -807,8 +807,8 @@ function SubtitleSettingsSection() {
         >
           SubDL API key
         </span>{" "}
-        (free) to use SubDL as the primary source instead — it has a larger
-        library from Subscene.
+        (free), to use SubDL as the primary source instead. SubDL has a larger
+        Library, especially for non-mainstream/western stuff.
         {hasSubdlKey && (
           <span
             style={{
@@ -950,15 +950,15 @@ function SubtitleSettingsSection() {
             >
               Leave empty to use{" "}
               <strong style={{ color: "var(--text)" }}>Wyzie Subs</strong>{" "}
-              (default, no key needed). Add a SubDL key to switch to SubDL as
-              the primary source.
+              (default, no api key needed). Add a SubDL key to switch to SubDL
+              as the primary source.
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input
                 className="apikey-input"
                 style={{ flex: 1, maxWidth: 400, marginBottom: 0 }}
                 type={showSubdlKey ? "text" : "password"}
-                placeholder="SubDL API key — leave empty to use Wyzie"
+                placeholder="SubDL API key, leave empty to use Wyzie"
                 value={subdlApiKey}
                 onChange={(e) => setSubdlApiKey(e.target.value)}
               />
