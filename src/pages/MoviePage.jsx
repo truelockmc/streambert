@@ -360,6 +360,12 @@ export default function MoviePage({
     };
   }, [playing, progressKey, watchedThreshold, playerSource]);
 
+  // ── Derived display value
+  const d = details || item;
+  const title = d.title || d.name;
+  const year = (d.release_date || "").slice(0, 4);
+  const mediaName = `${title}${year ? " (" + year + ")" : ""}`;
+
   const handlePlay = useCallback(() => {
     setM3u8Url(null);
     setSubtitleUrl(null);
@@ -389,11 +395,6 @@ export default function MoviePage({
     setDownloaderFolder(folder);
     storage.set("downloaderFolder", folder);
   }, []);
-
-  const d = details || item;
-  const title = d.title || d.name;
-  const year = (d.release_date || "").slice(0, 4);
-  const mediaName = `${title}${year ? " (" + year + ")" : ""}`;
 
   // Prefer AniList metadata for anime when available
   const displayOverview =
