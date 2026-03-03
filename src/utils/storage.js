@@ -54,4 +54,9 @@ export const STORAGE_KEYS = {
   HOME_ROW_VISIBLE: "homeRowVisible",
   AUTO_CHECK_UPDATES: "autoCheckUpdates",
   INVIDIOUS_BASE: "invidiousBase",
+  // Subtitle settings
+  SUBTITLE_ENABLED: "subtitleDownload",
+  SUBTITLE_LANG: "subtitleLang",
+  SUBDL_API_KEY: "subdlApiKey",
+  OS_API_KEY: "opensubtitlesApiKey",
 };

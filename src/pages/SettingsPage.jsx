@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { storage } from "../utils/storage";
+import { storage, STORAGE_KEYS } from "../utils/storage";
+import { SUBTITLE_LANGUAGES } from "../utils/subtitles";
 import { DEFAULT_INVIDIOUS_BASE } from "../components/TrailerModal";
 import { RATING_COUNTRIES } from "../utils/ageRating";
 import { WarningIcon } from "../components/Icons";
@@ -751,6 +752,262 @@ function StartPageSection() {
   );
 }
 
+// ── Subtitle Settings ─────────────────────────────────────────────────────────
+function SubtitleSettingsSection() {
+  const [enabled, setEnabled] = useState(
+    () =>
+      storage.get(STORAGE_KEYS.SUBTITLE_ENABLED) !== 0 &&
+      storage.get(STORAGE_KEYS.SUBTITLE_ENABLED) !== "0",
+  );
+  const [lang, setLang] = useState(
+    () => storage.get(STORAGE_KEYS.SUBTITLE_LANG) || "en",
+  );
+  const [apiKey, setApiKey] = useState(
+    () => storage.get(STORAGE_KEYS.OS_API_KEY) || "",
+  );
+  const [subdlApiKey, setSubdlApiKey] = useState(
+    () => storage.get(STORAGE_KEYS.SUBDL_API_KEY) || "",
+  );
+  const [showKey, setShowKey] = useState(false);
+  const [showSubdlKey, setShowSubdlKey] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    storage.set(STORAGE_KEYS.SUBTITLE_ENABLED, enabled ? 1 : 0);
+    storage.set(STORAGE_KEYS.SUBTITLE_LANG, lang);
+    storage.set(STORAGE_KEYS.OS_API_KEY, apiKey.trim());
+    storage.set(STORAGE_KEYS.SUBDL_API_KEY, subdlApiKey.trim());
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">Subtitle Downloads</div>
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--text3)",
+          marginBottom: 20,
+          lineHeight: 1.6,
+        }}
+      >
+        Automatically find and download subtitles via{" "}
+        <span
+          style={{
+            color: "var(--red)",
+            cursor: "pointer",
+            textDecoration: "underline",
+          }}
+          onClick={() => window.electron?.openExternal("https://subdl.com")}
+        >
+          SubDL
+        </span>{" "}
+        (Subscene library) and{" "}
+        <span
+          style={{
+            color: "var(--red)",
+            cursor: "pointer",
+            textDecoration: "underline",
+          }}
+          onClick={() =>
+            window.electron?.openExternal(
+              "https://www.opensubtitles.com/en/consumers",
+            )
+          }
+        >
+          OpenSubtitles
+        </span>
+        . SubDL is recommended: free key, huge library.
+      </div>
+
+      {/* Enable toggle */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          marginBottom: 20,
+        }}
+      >
+        <button
+          onClick={() => setEnabled((v) => !v)}
+          style={{
+            width: 40,
+            height: 22,
+            borderRadius: 11,
+            border: "none",
+            cursor: "pointer",
+            background: enabled ? "var(--red)" : "var(--surface2)",
+            position: "relative",
+            transition: "background 0.2s",
+            flexShrink: 0,
+          }}
+        >
+          <span
+            style={{
+              position: "absolute",
+              top: 3,
+              left: enabled ? 21 : 3,
+              width: 16,
+              height: 16,
+              borderRadius: "50%",
+              background: "#fff",
+              transition: "left 0.2s",
+            }}
+          />
+        </button>
+        <span
+          style={{
+            fontSize: 14,
+            color: enabled ? "var(--text)" : "var(--text3)",
+          }}
+        >
+          {enabled
+            ? "Auto-download subtitles when downloading videos"
+            : "Subtitle download disabled"}
+        </span>
+      </div>
+
+      {enabled && (
+        <>
+          {/* Default language */}
+          <div style={{ marginBottom: 16 }}>
+            <div
+              style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}
+            >
+              Default language
+            </div>
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value)}
+              style={{
+                background: "var(--surface2)",
+                border: "1px solid var(--border)",
+                borderRadius: 6,
+                color: "var(--text)",
+                padding: "7px 12px",
+                fontSize: 13,
+                cursor: "pointer",
+                minWidth: 200,
+              }}
+            >
+              {SUBTITLE_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* SubDL API key (primary source) */}
+          <div style={{ marginBottom: 16 }}>
+            <div
+              style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}
+            >
+              SubDL API key{" "}
+              <span
+                style={{
+                  color: "var(--text3)",
+                  cursor: "pointer",
+                  fontSize: 11,
+                }}
+                onClick={() =>
+                  window.electron?.openExternal("https://subdl.com/settings")
+                }
+              >
+                (free, register at subdl.com ↗)
+              </span>
+              <span
+                style={{
+                  marginLeft: 8,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "1px 5px",
+                  borderRadius: 3,
+                  background: "rgba(99,149,255,0.15)",
+                  color: "#6395ff",
+                  border: "1px solid rgba(99,149,255,0.3)",
+                }}
+              >
+                RECOMMENDED
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                className="apikey-input"
+                style={{ flex: 1, maxWidth: 400, marginBottom: 0 }}
+                type={showSubdlKey ? "text" : "password"}
+                placeholder="Primary source: Subscene library, generous limits"
+                value={subdlApiKey}
+                onChange={(e) => setSubdlApiKey(e.target.value)}
+              />
+              <button
+                className="btn btn-ghost"
+                style={{ padding: "6px 12px", fontSize: 12 }}
+                onClick={() => setShowSubdlKey((v) => !v)}
+              >
+                {showSubdlKey ? "Hide" : "Show"}
+              </button>
+            </div>
+          </div>
+
+          {/* OpenSubtitles API key (secondary/optional) */}
+          <div style={{ marginBottom: 16 }}>
+            <div
+              style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}
+            >
+              OpenSubtitles API key{" "}
+              <span
+                style={{
+                  color: "var(--text3)",
+                  cursor: "pointer",
+                  fontSize: 11,
+                }}
+                onClick={() =>
+                  window.electron?.openExternal(
+                    "https://www.opensubtitles.com/en/consumers",
+                  )
+                }
+              >
+                (optional, get one free ↗)
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                className="apikey-input"
+                style={{ flex: 1, maxWidth: 400, marginBottom: 0 }}
+                type={showKey ? "text" : "password"}
+                placeholder="Optional secondary source"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+              />
+              <button
+                className="btn btn-ghost"
+                style={{ padding: "6px 12px", fontSize: 12 }}
+                onClick={() => setShowKey((v) => !v)}
+              >
+                {showKey ? "Hide" : "Show"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}
+      >
+        <button className="btn btn-primary" onClick={handleSave}>
+          Save
+        </button>
+        {saved && (
+          <span style={{ fontSize: 13, color: "#4caf50" }}>✓ Saved</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function SettingsPage({ apiKey, onChangeApiKey }) {
   const [downloadPath, setDownloadPath] = useState(
@@ -1296,6 +1553,13 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
         </div>
 
         {/* ══ HOME PAGE LAYOUT ═════════════════════════════════════════════════ */}
+        <div
+          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
+        />
+
+        {/* ── Subtitle Downloads ── */}
+        <SubtitleSettingsSection />
+
         <div
           style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
         />

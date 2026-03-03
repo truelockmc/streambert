@@ -65,7 +65,7 @@ export default function MoviePage({
   const [trailerKey, setTrailerKey] = useState(null);
   const [showTrailer, setShowTrailer] = useState(false);
   const [m3u8Url, setM3u8Url] = useState(null);
-  const [subtitleUrl, setSubtitleUrl] = useState(null);
+  const [interceptedSubs, setInterceptedSubs] = useState([]);
   const [playerSource, setPlayerSource] = useState(
     () => storage.get("playerSource") || "videasy",
   );
@@ -174,7 +174,7 @@ export default function MoviePage({
   // Reset m3u8 URL, subtitle URL and source menu whenever the movie or source changes
   useEffect(() => {
     setM3u8Url(null);
-    setSubtitleUrl(null);
+    setInterceptedSubs([]);
     setShowSourceMenu(false);
     setAnilistData(null);
     setResolvedPlayerUrl(null);
@@ -259,8 +259,13 @@ export default function MoviePage({
 
   useEffect(() => {
     if (!window.electron) return;
-    const handler = window.electron.onSubtitleFound((url) => {
-      setSubtitleUrl((prev) => (prev !== url ? url : prev));
+    const handler = window.electron.onSubtitleFound(({ url, lang }) => {
+      // Only keep VTT, deduplicate per language (latest wins)
+      if (!url || !url.toLowerCase().includes(".vtt")) return;
+      setInterceptedSubs((prev) => {
+        const filtered = prev.filter((s) => s.lang !== lang);
+        return [...filtered, { url, lang: lang || "unknown" }];
+      });
     });
     return () => window.electron.offSubtitleFound(handler);
   }, []);
@@ -390,7 +395,7 @@ export default function MoviePage({
 
   const handlePlay = useCallback(() => {
     setM3u8Url(null);
-    setSubtitleUrl(null);
+    setInterceptedSubs([]);
     setPlaying(true);
     onHistory({ ...d, media_type: "movie" });
   }, [d, onHistory]);
@@ -714,7 +719,7 @@ export default function MoviePage({
                     setDubMode(next);
                     storage.set("allmangaDubMode", next);
                     setM3u8Url(null);
-                    setSubtitleUrl(null);
+                    setInterceptedSubs([]);
                     setResolvedPlayerUrl(null);
                     setResolvingUrl(false);
                     setResolveError(null);
@@ -756,7 +761,7 @@ export default function MoviePage({
                       storage.set("playerSource", src.id);
                       setShowSourceMenu(false);
                       setM3u8Url(null);
-                      setSubtitleUrl(null);
+                      setInterceptedSubs([]);
                       setResolvedPlayerUrl(null);
                       setResolvingUrl(false);
                       setResolveError(null);
@@ -896,7 +901,7 @@ export default function MoviePage({
         <DownloadModal
           onClose={() => setShowDownload(false)}
           m3u8Url={m3u8Url}
-          subtitleUrl={subtitleUrl}
+          subtitles={interceptedSubs}
           mediaName={mediaName}
           downloaderFolder={downloaderFolder}
           setDownloaderFolder={handleSetDownloaderFolder}

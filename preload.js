@@ -9,9 +9,9 @@ contextBridge.exposeInMainWorld("electron", {
   },
   offM3u8Found: (h) => ipcRenderer.removeListener("m3u8-found", h),
 
-  // subtitle capture (.vtt / .srt)
+  // subtitle capture (.vtt / .srt), cb receives { url, lang }
   onSubtitleFound: (cb) => {
-    const h = (_, url) => cb(url);
+    const h = (_, data) => cb(data);
     ipcRenderer.on("subtitle-found", h);
     return h;
   },
@@ -95,4 +95,7 @@ contextBridge.exposeInMainWorld("electron", {
   clearWatchData: () => ipcRenderer.invoke("clear-watch-data"),
   deleteAllDownloads: () => ipcRenderer.invoke("delete-all-downloads"),
   resetApp: () => ipcRenderer.invoke("reset-app"),
+  // OpenSubtitles
+  searchSubtitles: (args) => ipcRenderer.invoke("search-subtitles", args),
+  getSubtitleUrl: (args) => ipcRenderer.invoke("get-subtitle-url", args),
 });

@@ -304,3 +304,20 @@ export const ShieldBlockIcon = ({ size = 16 }) => (
     <polyline points="9 12 11 14 15 10" />
   </svg>
 );
+
+export const SubtitlesIcon = ({ size = 16, ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+    <path d="M7 15h4M15 15h2M7 11h2M13 11h4" />
+  </svg>
+);

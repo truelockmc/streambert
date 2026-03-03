@@ -120,6 +120,49 @@ function sendProgress(update) {
   }
 }
 
+// ── Ad/tracker block list ─────────────────────
+const BLOCKED_HOSTS = [
+  "*://www.google-analytics.com/*",
+  "*://analytics.google.com/*",
+  "*://googletagmanager.com/*",
+  "*://www.googletagmanager.com/*",
+  "*://googletagservices.com/*",
+  "*://doubleclick.net/*",
+  "*://*.doubleclick.net/*",
+  "*://adservice.google.com/*",
+  "*://adservice.google.de/*",
+  "*://pagead2.googlesyndication.com/*",
+  "*://stats.g.doubleclick.net/*",
+  "*://yt3.ggpht.com/ytc/*",
+  "*://fonts.googleapis.com/*",
+  "*://fonts.gstatic.com/*",
+  "*://im.malocacomals.com/*",
+  "*://users.videasy.net/*",
+  "*://nf.sixmossin.com/*",
+  "*://realizationnewestfangs.com/*",
+  "*://acscdn.com/*",
+  "*://lt.taloseempest.com/*",
+  "*://pl26708123.profitableratecpm.com/*",
+  "*://preferencenail.com/*",
+  "*://protrafficinspector.com/*",
+  "*://s10.histats.com/*",
+  "*://weirdopt.com/*",
+  "*://static.cloudflareinsights.com/*",
+  "*://kettledroopingcontinuation.com/*",
+  "*://wayfarerorthodox.com/*",
+  "*://woxaglasuy.net/*",
+  "*://adeptspiritual.com/*",
+  "*://www.calculating-laugh.com/*",
+  "*://amavhxdlofklxjg.xyz/*",
+  "*://7jtjubf8p5kq7x3z2.u3qleufcm6vure326ktfpbj.cfd/*",
+  "*://5mq.get64t9vqg8pnbex1y463o.rest/*",
+  "*://usrpubtrk.com/*",
+  "*://adexchangeclear.com/*",
+  "*://rzjzjnavztycv.online/*",
+  "*://tmstr4.cloudnestra.com/*",
+  "*://tmstr4.neonhorizonworkshops.com/*",
+];
+
 // ── Window ────────────────────────────────────────────────────────────────────
 let mainWindow;
 
@@ -142,7 +185,7 @@ function createWindow() {
     },
   });
 
-  // Videasy session — strip CSP/X-Frame-Options and capture m3u8 URLs
+  // Videasy session: strip CSP/X-Frame-Options and capture m3u8 URLs
   const videasySession = session.fromPartition("persist:videasy");
 
   videasySession.setUserAgent(
@@ -164,82 +207,36 @@ function createWindow() {
 
   // Block Google tracking & analytics + videasy trackers
   // Defined here so both videasy and trailer sessions can use the same list
-  const BLOCKED_HOSTS = [
-    "*://www.google-analytics.com/*",
-    "*://analytics.google.com/*",
-    "*://googletagmanager.com/*",
-    "*://www.googletagmanager.com/*",
-    "*://googletagservices.com/*",
-    "*://doubleclick.net/*",
-    "*://*.doubleclick.net/*",
-    "*://adservice.google.com/*",
-    "*://adservice.google.de/*",
-    "*://pagead2.googlesyndication.com/*",
-    "*://stats.g.doubleclick.net/*",
-    "*://yt3.ggpht.com/ytc/*",
-    // Google Fonts (Tracking)
-    "*://fonts.googleapis.com/*",
-    "*://fonts.gstatic.com/*",
-    // Videasy-Tracker
-    "*://im.malocacomals.com/*",
-    "*://users.videasy.net/*",
-    "*://nf.sixmossin.com/*",
-    // 2embed Ads & Tracker
-    "*://realizationnewestfangs.com/*",
-    "*://acscdn.com/*",
-    "*://lt.taloseempest.com/*",
-    "*://pl26708123.profitableratecpm.com/*",
-    "*://preferencenail.com/*",
-    "*://protrafficinspector.com/*",
-    "*://s10.histats.com/*",
-    "*://weirdopt.com/*",
-    "*://static.cloudflareinsights.com/*",
-    "*://kettledroopingcontinuation.com/*",
-    "*://wayfarerorthodox.com/*",
-    "*://woxaglasuy.net/*",
-    "*://adeptspiritual.com/*",
-    "*://www.calculating-laugh.com/*",
-    "*://amavhxdlofklxjg.xyz/*",
-    // vidsrc Ads & Tracker
-    "*://7jtjubf8p5kq7x3z2.u3qleufcm6vure326ktfpbj.cfd/*",
-    "*://5mq.get64t9vqg8pnbex1y463o.rest/*",
-    "*://usrpubtrk.com/*",
-    "*://adexchangeclear.com/*",
-    "*://rzjzjnavztycv.online/*",
-    "*://tmstr4.cloudnestra.com/*",
-    "*://tmstr4.neonhorizonworkshops.com/*",
-  ];
 
-  // Pre-compile blocked patterns once
-  const BLOCKED_REGEXES = BLOCKED_HOSTS.map((pattern) => {
-    const escaped = pattern
-      .replace(/\\/g, "\\\\")
-      .replace(/[.+?^${}()|[\]]/g, "\\$&")
-      .replace(/\*/g, ".*");
-    return new RegExp("^" + escaped + "$");
-  });
-
+  // Native block filter, Electron applies URL matching before calling JS
   videasySession.webRequest.onBeforeRequest(
-    { urls: ["*://*/*"] },
+    { urls: BLOCKED_HOSTS },
     (details, callback) => {
-      const { url } = details;
-      if (url.includes(".m3u8")) {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send("m3u8-found", url);
-        }
-      } else if (url.includes(".vtt") || url.includes(".srt")) {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send("subtitle-found", url);
-        }
-      }
-
-      const isBlocked = BLOCKED_REGEXES.some((r) => r.test(url));
-      if (isBlocked) recordBlockedRequest(url);
-      callback(isBlocked ? { cancel: true } : {});
+      recordBlockedRequest(details.url);
+      callback({ cancel: true });
     },
   );
 
-  // Trailer session — strip X-Frame-Options/CSP so YouTube plays in-app
+  // m3u8 / VTT detector, only intercepts media-like URLs to stay lightweight
+  videasySession.webRequest.onBeforeRequest(
+    { urls: ["*://*/*.m3u8*", "*://*/*.m3u8", "*://*/*.vtt*", "*://*/*.vtt"] },
+    (details, callback) => {
+      const { url } = details;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (url.includes(".m3u8")) {
+          mainWindow.webContents.send("m3u8-found", url);
+        } else if (url.includes(".vtt")) {
+          mainWindow.webContents.send("subtitle-found", {
+            url,
+            lang: extractSubtitleLang(url),
+          });
+        }
+      }
+      callback({});
+    },
+  );
+
+  // Trailer session: strip X-Frame-Options/CSP so YouTube plays in-app
   const trailerSession = session.fromPartition("persist:trailer");
 
   trailerSession.setUserAgent(
@@ -345,7 +342,7 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, "dist/index.html"));
 
-  // Intercept close — ask user if downloads are running
+  // Intercept close, ask user if downloads are running
   let closeResponsePending = false;
 
   mainWindow.on("close", (e) => {
@@ -396,6 +393,26 @@ if (!gotTheLock) {
   app.on("activate", () => {
     if (mainWindow === null) createWindow();
   });
+}
+
+// ── Subtitle language extractor ───────────────────────────────────────────────
+function extractSubtitleLang(url) {
+  try {
+    const u = new URL(url);
+    for (const param of ["lang", "language", "locale", "sub", "l"]) {
+      const v = u.searchParams.get(param);
+      if (v && v.length >= 2 && v.length <= 20) return v.toLowerCase();
+    }
+    const pathname = u.pathname;
+    const filename = pathname.split("/").filter(Boolean).pop() || "";
+    const fileMatch = filename.match(/[._-]([a-z]{2,3})[._-]?(vtt|srt|ass)?$/i);
+    if (fileMatch) return fileMatch[1].toLowerCase();
+    const segments = pathname.split("/").filter(Boolean);
+    for (const seg of segments.slice(0, -1)) {
+      if (/^[a-z]{2,3}(-[A-Z]{2})?$/.test(seg)) return seg.toLowerCase();
+    }
+  } catch {}
+  return "unknown";
 }
 
 // ── Subtitle file downloader ──────────────────────────────────────────────────
@@ -497,7 +514,7 @@ ipcMain.handle(
       episode,
       posterPath,
       tmdbId,
-      subtitleUrl,
+      subtitles,
     },
   ) => {
     try {
@@ -524,15 +541,15 @@ ipcMain.handle(
         episode: episode || null,
         posterPath: posterPath || null,
         tmdbId: tmdbId || mediaId || null,
-        subtitleUrl: subtitleUrl || null,
-        subtitlePath: null,
+        subtitles: Array.isArray(subtitles) ? subtitles : [],
+        subtitlePaths: [], // [{lang, path}] filled after download completes
       };
       downloads.push(entry);
       // Do NOT call sendProgress here. The renderer adds the initial entry via
       // handleDownloadStarted() after invoke() resolves. Calling sendProgress()
       // synchronously inside the handler causes the event to arrive at the renderer
       // BEFORE invoke() resolves, so the renderer adds it via onDownloadProgress
-      // AND again via handleDownloadStarted — resulting in two cards.
+      // AND again via handleDownloadStarted, resulting in two cards.
 
       const args = [
         "--cli",
@@ -568,7 +585,7 @@ ipcMain.handle(
       //
       // Key insight: "(frag N/total)" appears in BOTH "Downloading:" and "[download]"
       // lines. The leading "Downloading: X%" is byte-level progress within the
-      // current fragment (oscillates 0→100 per fragment) — DO NOT use it for
+      // current fragment (oscillates 0→100 per fragment), DO NOT use it for
       // overall progress. Use (frag N/total) exclusively.
 
       const handleLine = (line) => {
@@ -581,7 +598,7 @@ ipcMain.handle(
         // Multiple patterns can match the same line (e.g. frag + speed + size).
         const update = {};
 
-        // ── (frag N/total) — THE source of truth for HLS overall progress ───
+        // ── (frag N/total), THE source of truth for HLS overall progress ───
         // Appears as: "... (frag 4/672)" or "(frag 4/672)"
         const fragMatch = trimmed.match(/\(frag\s+(\d+)\/(\d+)\)/);
         if (fragMatch) {
@@ -596,7 +613,7 @@ ipcMain.handle(
           update.lastMessage = `Fragment ${currentFrag} / ${total}`;
         }
 
-        // ── [download] X% of Y — direct mp4 HTTP download progress ──────────
+        // ── [download] X% of Y, direct mp4 HTTP download progress ──────────
         // e.g. "[download]  43.2% of  271.89MiB at  3.05MiB/s ETA 02:30"
         // Only use when there are no fragments (i.e. not HLS)
         if (!fragMatch && !downloads[idx].totalFragments) {
@@ -617,7 +634,7 @@ ipcMain.handle(
         }
 
         // ── ffmpeg Duration line: "Duration: HH:MM:SS.xx" ───────────────────
-        // Emitted early in ffmpeg stderr — used to compute % from time=
+        // Emitted early in ffmpeg stderr,  used to compute % from time=
         const durationMatch = trimmed.match(/Duration:\s*(\d+):(\d+):([\d.]+)/);
         if (durationMatch) {
           const totalSecs =
@@ -672,7 +689,7 @@ ipcMain.handle(
           }
         }
 
-        // ── Retry / timeout — reset speed to 0, show status ─────────────────
+        // ── Retry / timeout, reset speed to 0, show status ─────────────────
         // Matches lines like: "[download] Got error: ... Retrying (1/100)..."
         // or "[yt-dlp DEBUG] Sleeping N seconds ..."
         const retryMatch =
@@ -768,7 +785,7 @@ ipcMain.handle(
       let buf = "";
       proc.stdout.on("data", (chunk) => {
         buf += chunk.toString();
-        // Binary uses \r to overwrite lines in a terminal — split on all variants
+        // Binary uses \r to overwrite lines in a terminal, split on all variants
         const lines = buf.split(/\r\n|\r|\n/);
         buf = lines.pop(); // hold incomplete last chunk
         lines.forEach(handleLine);
@@ -851,22 +868,32 @@ ipcMain.handle(
             } catch {}
           }
 
-          // Download subtitle file if a URL was captured
+          // Download all subtitle files with language in filename
           if (
             code === 0 &&
-            downloads[idx].subtitleUrl &&
+            downloads[idx].subtitles?.length > 0 &&
             downloads[idx].filePath
           ) {
-            const subUrl = downloads[idx].subtitleUrl;
-            const subExt = subUrl.toLowerCase().includes(".srt")
-              ? ".srt"
-              : ".vtt";
-            const videoBase = downloads[idx].filePath.replace(/\.[^.]+$/, "");
-            const subDestPath = videoBase + subExt;
-            downloadSubtitleFile(subUrl, subDestPath).then((ok) => {
+            const videoBase = downloads[idx].filePath.replace(/.[^.]+$/, "");
+            const subPromises = downloads[idx].subtitles.map(
+              ({ url, lang }) => {
+                const subExt = url.toLowerCase().includes(".srt")
+                  ? ".srt"
+                  : ".vtt";
+                const safeLang = (lang || "unknown").replace(
+                  /[^a-z0-9_-]/gi,
+                  "",
+                );
+                const subDestPath = `${videoBase}.${safeLang}${subExt}`;
+                return downloadSubtitleFile(url, subDestPath).then((ok) =>
+                  ok ? { lang: lang || "unknown", path: subDestPath } : null,
+                );
+              },
+            );
+            Promise.all(subPromises).then((results) => {
               const i2 = downloads.findIndex((d) => d.id === id);
-              if (i2 !== -1 && ok) {
-                downloads[i2].subtitlePath = subDestPath;
+              if (i2 !== -1) {
+                downloads[i2].subtitlePaths = results.filter(Boolean);
                 saveDownloads();
               }
             });
@@ -893,51 +920,39 @@ ipcMain.handle(
   },
 );
 
-// ── IPC: get all downloads ────────────────────────────────────────────────────
+// ── IPC: delete a download ────────────────────────────────────────────────────
 ipcMain.handle("get-downloads", () => downloads);
 
-// ── IPC: delete a download ────────────────────────────────────────────────────
 ipcMain.handle("delete-download", (_, { id, filePath }) => {
   try {
-    // Kill the running process first so it stops sending progress events
-    const proc = activeProcs.get(id);
-    if (proc) {
+    const dlEntry = downloads.find((d) => d.id === id);
+
+    // Kill the running process if active
+    if (activeProcs.has(id)) {
       try {
-        proc.kill("SIGKILL");
+        activeProcs.get(id).kill("SIGKILL");
       } catch {}
       activeProcs.delete(id);
     }
-    if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-    // Delete part/temp files that belong only to this download.
-    // Derive the base filename: e.g. "Movie.mp4.part" → stem "Movie.mp4"
-
-    const dlEntry = downloads.find((d) => d.id === id);
-    const dlDownloadPath = dlEntry?.downloadPath;
-    const partPath = filePath || dlEntry?.filePath;
-    if (dlDownloadPath && partPath) {
+    // Delete the main video file
+    if (filePath) {
       try {
-        const baseName = path.basename(partPath).replace(/\.part$/, "");
-        const entries = fs.readdirSync(dlDownloadPath);
-        for (const entry of entries) {
-          if (!entry.startsWith(baseName)) continue;
-          const isTempFile = PART_FILE_SUFFIXES.some((p) =>
-            typeof p === "string" ? entry.endsWith(p) : p.test(entry),
-          );
-          if (isTempFile) {
-            try {
-              fs.unlinkSync(path.join(dlDownloadPath, entry));
-            } catch {}
-          }
-        }
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       } catch {}
     }
-    // Also delete subtitle file if it was downloaded alongside the video
-    if (dlEntry?.subtitlePath && fs.existsSync(dlEntry.subtitlePath)) {
+
+    // Delete subtitle files
+    for (const sp of dlEntry?.subtitlePaths || []) {
       try {
-        fs.unlinkSync(dlEntry.subtitlePath);
+        if (sp?.path && fs.existsSync(sp.path)) fs.unlinkSync(sp.path);
       } catch {}
     }
+
+    // Clean up temp/partial files in the download folder
+    const dlPath = dlEntry?.downloadPath;
+    if (dlPath) cleanupTempFiles(dlPath);
+
     downloads = downloads.filter((d) => d.id !== id);
     saveDownloads();
     return { ok: true };
@@ -1151,9 +1166,9 @@ ipcMain.handle("delete-all-downloads", async () => {
           errors++;
         }
       }
-      if (dl.subtitlePath) {
+      for (const sp of dl.subtitlePaths || []) {
         try {
-          if (fs.existsSync(dl.subtitlePath)) fs.unlinkSync(dl.subtitlePath);
+          if (sp?.path && fs.existsSync(sp.path)) fs.unlinkSync(sp.path);
         } catch {}
       }
     }
@@ -1202,6 +1217,365 @@ ipcMain.handle("get-block-stats", () => ({
 
 // ── IPC: App version ──────────────────────
 ipcMain.handle("get-app-version", () => app.getVersion());
+
+// ── IPC: Subtitle search ──────────────────────────────────────────────────────
+// Priority: SubDL (free key) → OpenSubtitles (optional key) → Wyzie (no key)
+ipcMain.handle(
+  "search-subtitles",
+  async (
+    _,
+    { tmdbId, mediaType, season, episode, languages, apiKey, subdlApiKey },
+  ) => {
+    // Convert app language code (en/zh-CN) to SubDL uppercase code (EN/ZH)
+    function toSubDLLang(lang) {
+      if (!lang) return "";
+      return lang.split("-")[0].toUpperCase();
+    }
+
+    // ── Helper: SubDL search ──────────────────────────────────────────────────
+    async function searchSubDL() {
+      try {
+        const params = new URLSearchParams({
+          api_key: subdlApiKey,
+          tmdb_id: String(tmdbId),
+          type: mediaType === "tv" ? "tv" : "movie",
+          subs_per_page: "30",
+        });
+        if (mediaType === "tv" && season != null)
+          params.set("season_number", String(season));
+        if (mediaType === "tv" && episode != null)
+          params.set("episode_number", String(episode));
+        if (languages) params.set("languages", toSubDLLang(languages));
+
+        const res = await fetch(
+          `https://api.subdl.com/api/v1/subtitles?${params}`,
+          {
+            headers: { "User-Agent": "Streambert v1" },
+            signal: AbortSignal.timeout(12000),
+          },
+        );
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "");
+          return { ok: false, error: `SubDL error ${res.status}: ${errText}` };
+        }
+        const data = await res.json();
+        if (!data.status)
+          return { ok: false, error: "SubDL returned no results" };
+        const results = (data.subtitles || []).map((s) => ({
+          file_id: `subdl_${s.sd_id}_${encodeURIComponent(s.url)}`,
+          file_name: s.name || s.release_name || "",
+          language: (s.lang || "").toLowerCase(),
+          release: s.release_name || s.name || "",
+          uploader: s.author || "SubDL",
+          download_count: s.downloads || 0,
+          hearing_impaired: !!s.hi,
+          ai_translated: false,
+          machine_translated: false,
+          ratings: 0,
+          fps: null,
+          from_trusted: false,
+          via_subdl: true,
+        }));
+        if (results.length === 0)
+          return { ok: false, error: "SubDL: no results" };
+        return { ok: true, results, via_subdl: true };
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }
+
+    // ── Helper: Wyzie Subs (no key required) ─────────────────────────────────
+    async function searchWyzie() {
+      try {
+        const params = new URLSearchParams({
+          id: String(tmdbId),
+          format: "srt",
+        });
+        if (languages) params.set("language", languages);
+        if (mediaType === "tv" && season != null)
+          params.set("season", String(season));
+        if (mediaType === "tv" && episode != null)
+          params.set("episode", String(episode));
+        const res = await fetch(`https://subs.wyzie.ru/search?${params}`, {
+          signal: AbortSignal.timeout(12000),
+        });
+        if (!res.ok) return { ok: false, error: `Wyzie error ${res.status}` };
+        const data = await res.json();
+        const results = (Array.isArray(data) ? data : [])
+          .filter((r) => r.url)
+          .map((r, i) => {
+            const rawUrl = r.url || "";
+            const fullUrl = rawUrl.startsWith("http")
+              ? rawUrl
+              : `https://subs.wyzie.ru${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
+            const displayName =
+              r.display_name ||
+              r.name ||
+              r.release_name ||
+              r.title ||
+              r.SubFileName ||
+              r.fileName ||
+              "";
+            const lang = (r.language || "").toUpperCase();
+            const hiTag = r.isHearingImpaired ? " [HI]" : "";
+            const aiTag = r.isAiTranslated ? " [AI]" : "";
+            const src = r.source ? ` · ${r.source}` : "";
+            const fallback = `${lang} subtitle${hiTag}${aiTag}${src} #${i + 1}`;
+            return {
+              file_id: `wyzie_${i}_${encodeURIComponent(fullUrl)}`,
+              direct_url: fullUrl,
+              file_name: displayName || fallback,
+              language: r.language || "",
+              release: displayName || fallback,
+              uploader: "Wyzie",
+              download_count: 0,
+              hearing_impaired: !!r.isHearingImpaired,
+              ai_translated: !!r.isAiTranslated,
+              machine_translated: false,
+              ratings: 0,
+              fps: null,
+              from_trusted: false,
+              via_wyzie: true,
+              original_source: r.source || "",
+            };
+          });
+        if (results.length === 0)
+          return { ok: false, error: "Wyzie: no results" };
+        return { ok: true, results, via_wyzie: true };
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }
+
+    // ── Helper: OpenSubtitles ─────────────────────────────────────────────────
+    async function searchOS() {
+      try {
+        const params = new URLSearchParams({
+          tmdb_id: String(tmdbId),
+          type: mediaType === "tv" ? "episode" : "movie",
+        });
+        if (mediaType === "tv" && season != null)
+          params.set("season_number", String(season));
+        if (mediaType === "tv" && episode != null)
+          params.set("episode_number", String(episode));
+        if (languages) params.set("languages", languages);
+        params.set("order_by", "download_count");
+        params.set("per_page", "30");
+
+        const res = await fetch(
+          `https://api.opensubtitles.com/api/v1/subtitles?${params}`,
+          {
+            headers: {
+              "Api-Key": apiKey || "",
+              "Content-Type": "application/json",
+              "User-Agent": "Streambert v1",
+            },
+            signal: AbortSignal.timeout(10000),
+          },
+        );
+        if (!res.ok)
+          return { ok: false, error: `OpenSubtitles error ${res.status}` };
+        const data = await res.json();
+        const results = (data.data || [])
+          .map((item) => {
+            const attrs = item.attributes || {};
+            const file = (attrs.files || [])[0] || {};
+            return {
+              file_id: file.file_id,
+              file_name: file.file_name || "",
+              language: attrs.language || "",
+              release: attrs.release || "",
+              uploader: attrs.uploader?.name || "anonymous",
+              download_count: attrs.download_count || 0,
+              hearing_impaired: !!attrs.hearing_impaired,
+              ai_translated: !!attrs.ai_translated,
+              machine_translated: !!attrs.machine_translated,
+              ratings: attrs.ratings || 0,
+              fps: attrs.fps || null,
+              from_trusted: !!attrs.from_trusted,
+              via_os: true,
+            };
+          })
+          .filter((r) => r.file_id);
+        if (results.length === 0)
+          return { ok: false, error: "OpenSubtitles: no results" };
+        return { ok: true, results, via_os: true };
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }
+
+    // ── Search priority chain ─────────────────────────────────────────────────
+    const errors = [];
+
+    if (subdlApiKey) {
+      const r = await searchSubDL();
+      if (r.ok) return r;
+      errors.push(r.error);
+    }
+
+    if (apiKey) {
+      const r = await searchOS();
+      if (r.ok) return r;
+      errors.push(r.error);
+    }
+
+    const r = await searchWyzie();
+    if (r.ok) return r;
+    errors.push(r.error);
+
+    return {
+      ok: false,
+      error:
+        errors.length > 0
+          ? errors.join(" · ")
+          : "No subtitle sources available. Add a free SubDL API key in Settings.",
+    };
+  },
+);
+
+// ── IPC: Get subtitle download URL (handles SubDL ZIP, Wyzie direct, OpenSubtitles) ──
+ipcMain.handle("get-subtitle-url", async (_, { fileId, apiKey }) => {
+  try {
+    // ── SubDL: download ZIP and extract first SRT/VTT ─────────────────────
+    if (String(fileId).startsWith("subdl_")) {
+      const parts = String(fileId).split("_");
+      // format: subdl_{sd_id}_{encodedUrl}
+      const encodedUrl = parts.slice(2).join("_");
+      const subdlPath = decodeURIComponent(encodedUrl);
+      const downloadUrl = `https://dl.subdl.com${subdlPath}`;
+
+      const res = await fetch(downloadUrl, {
+        headers: { "User-Agent": "Streambert v1" },
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok)
+        return { ok: false, error: `SubDL download error ${res.status}` };
+
+      const arrayBuffer = await res.arrayBuffer();
+      const zipBuffer = Buffer.from(arrayBuffer);
+
+      // Extract first SRT/VTT from ZIP using Node's built-in zlib
+      const zlib = require("zlib");
+      const os = require("os");
+      const path = require("path");
+      const fs = require("fs");
+
+      function extractFirstSubtitleFromZip(buf) {
+        let offset = 0;
+        while (offset < buf.length - 30) {
+          if (
+            buf[offset] === 0x50 &&
+            buf[offset + 1] === 0x4b &&
+            buf[offset + 2] === 0x03 &&
+            buf[offset + 3] === 0x04
+          ) {
+            const compression = buf.readUInt16LE(offset + 8);
+            const compressedSize = buf.readUInt32LE(offset + 18);
+            const fileNameLen = buf.readUInt16LE(offset + 26);
+            const extraLen = buf.readUInt16LE(offset + 28);
+            const fileName = buf
+              .slice(offset + 30, offset + 30 + fileNameLen)
+              .toString("utf8");
+            const dataOffset = offset + 30 + fileNameLen + extraLen;
+            const ext = fileName.toLowerCase().split(".").pop();
+            if (
+              ext === "srt" ||
+              ext === "vtt" ||
+              ext === "ass" ||
+              ext === "ssa"
+            ) {
+              const compressedData = buf.slice(
+                dataOffset,
+                dataOffset + compressedSize,
+              );
+              let data;
+              if (compression === 0) {
+                data = compressedData;
+              } else if (compression === 8) {
+                data = zlib.inflateRawSync(compressedData);
+              } else {
+                offset = dataOffset + compressedSize;
+                continue;
+              }
+              return { data, name: fileName };
+            }
+            offset = dataOffset + compressedSize;
+          } else {
+            offset++;
+          }
+        }
+        return null;
+      }
+
+      const extracted = extractFirstSubtitleFromZip(zipBuffer);
+      if (!extracted)
+        return { ok: false, error: "No subtitle file found in SubDL ZIP" };
+
+      // Save to temp file and return file:// URL
+      const tmpDir = os.tmpdir();
+      const tmpPath = path.join(
+        tmpDir,
+        `streambert_sub_${Date.now()}_${extracted.name}`,
+      );
+      fs.writeFileSync(tmpPath, extracted.data);
+
+      return {
+        ok: true,
+        url: `file://${tmpPath}`,
+        file_name: extracted.name,
+        remaining: null,
+        reset_time: null,
+        via_subdl: true,
+      };
+    }
+
+    // ── Wyzie: direct URL, no extra step needed ───────────────────────────
+    if (String(fileId).startsWith("wyzie_")) {
+      const url = decodeURIComponent(
+        String(fileId).split("_").slice(2).join("_"),
+      );
+      return {
+        ok: true,
+        url,
+        file_name: "",
+        remaining: null,
+        reset_time: null,
+        via_wyzie: true,
+      };
+    }
+
+    // ── OpenSubtitles: POST to get download link ──────────────────────────
+    const res = await fetch("https://api.opensubtitles.com/api/v1/download", {
+      method: "POST",
+      headers: {
+        "Api-Key": apiKey || "",
+        "Content-Type": "application/json",
+        "User-Agent": "Streambert v1",
+      },
+      body: JSON.stringify({ file_id: fileId }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      return {
+        ok: false,
+        error: `OpenSubtitles API error ${res.status}: ${errText}`,
+      };
+    }
+    const data = await res.json();
+    if (!data.link) return { ok: false, error: "No download link returned" };
+    return {
+      ok: true,
+      url: data.link,
+      file_name: data.file_name || "",
+      remaining: data.remaining ?? null,
+      reset_time: data.reset_time_utc || null,
+    };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
 
 // ── IPC: Quit app ─────────────────────────
 ipcMain.handle("quit-app", () => {
@@ -1989,7 +2363,7 @@ ipcMain.handle(
         // - already has a host (contains ".") but no protocol -> add https://
         // - full URL -> use as-is
         if (fetchUrl.startsWith("//")) {
-          // Protocol-relative external URL — fetch directly
+          // Protocol-relative external URL, fetch directly
           fetchUrl = "https:" + fetchUrl;
         } else if (fetchUrl.startsWith("/")) {
           fetchUrl = "https://allanime.day" + fetchUrl;

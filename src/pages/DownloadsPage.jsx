@@ -6,6 +6,7 @@ import {
   PlayIcon,
   FilmIcon,
   WatchedIcon,
+  SubtitlesIcon,
 } from "../components/Icons";
 import { storage } from "../utils/storage";
 import { imgUrl } from "../utils/api";
@@ -333,6 +334,30 @@ function ActiveCard({ dl, onDelete, onSelect }) {
                 {dl.completedFragments || 0}/{dl.totalFragments} fragments
               </span>
             )}
+            {dl.subtitles?.length > 0 && (
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "1px 6px",
+                  borderRadius: 3,
+                  background: "rgba(99,202,183,0.12)",
+                  color: "#63cab7",
+                  border: "1px solid rgba(99,202,183,0.25)",
+                }}
+                title={dl.subtitles
+                  .map((s) => s.lang?.toUpperCase())
+                  .join(", ")}
+              >
+                <SubtitlesIcon
+                  size={11}
+                  style={{ verticalAlign: "middle", marginRight: 3 }}
+                />
+                {dl.subtitles
+                  .map((s) => (s.lang || "?").toUpperCase())
+                  .join(" · ")}
+              </span>
+            )}
           </div>
         </div>
         <div className="dl-card__right">
@@ -513,6 +538,33 @@ function LocalFileCard({
             )}
             {dl.completedAt && <span>{timeAgo(dl.completedAt)}</span>}
             {dl.size && <span>{dl.size}</span>}
+            {/* Subtitle info */}
+            {dl.subtitlePaths?.length > 0 && (
+              <span
+                title={dl.subtitlePaths
+                  .map((s) => s.lang?.toUpperCase())
+                  .join(", ")}
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "1px 6px",
+                  borderRadius: 3,
+                  background: "rgba(99,202,183,0.12)",
+                  color: "#63cab7",
+                  border: "1px solid rgba(99,202,183,0.25)",
+                  cursor: "default",
+                  letterSpacing: "0.03em",
+                }}
+              >
+                <SubtitlesIcon
+                  size={11}
+                  style={{ verticalAlign: "middle", marginRight: 3 }}
+                />
+                {dl.subtitlePaths
+                  .map((s) => (s.lang || "?").toUpperCase())
+                  .join(" · ")}
+              </span>
+            )}
             {fileExists === false && (
               <span className="dl-status--missing">File missing</span>
             )}
