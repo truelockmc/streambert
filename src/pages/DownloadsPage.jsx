@@ -249,6 +249,10 @@ export default function DownloadsPage({
                           title: dl.mediaType === "movie" ? dl.name : undefined,
                           name: dl.mediaType === "tv" ? dl.name : undefined,
                           poster_path: dl.posterPath || null,
+                          season:
+                            dl.mediaType === "tv" && dl.season != null
+                              ? Number(dl.season)
+                              : undefined,
                         })
                     : null
                 }
@@ -348,6 +352,10 @@ export default function DownloadsPage({
                               dl.mediaType === "movie" ? dl.name : undefined,
                             name: dl.mediaType === "tv" ? dl.name : undefined,
                             poster_path: dl.posterPath || null,
+                            season:
+                              dl.mediaType === "tv" && dl.season != null
+                                ? Number(dl.season)
+                                : undefined,
                           })
                       : null
                   }

@@ -341,7 +341,9 @@ export default function TVPage({
 }) {
   const [details, setDetails] = useState(null);
   const [seasonData, setSeasonData] = useState(null);
-  const [selectedSeason, setSelectedSeason] = useState(1);
+  const [selectedSeason, setSelectedSeason] = useState(() =>
+    item.season != null ? Number(item.season) : 1,
+  );
   const [selectedEp, setSelectedEp] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(true);

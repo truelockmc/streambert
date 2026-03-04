@@ -99,11 +99,36 @@ export default function App() {
     return () => controller.abort();
   }, [apiKey]);
 
-  // Load persisted downloads on startup
+  // Load persisted downloads on startup + immediately prune missing files
   useEffect(() => {
     if (!window.electron) return;
-    window.electron.getDownloads().then((list) => {
-      if (Array.isArray(list)) setDownloads(list);
+    window.electron.getDownloads().then(async (list) => {
+      if (!Array.isArray(list)) return;
+
+      const pruned = [...list];
+      const toRemove = new Set();
+
+      await Promise.all(
+        pruned.map(async (d) => {
+          if (d.status !== "completed" || !d.filePath) return;
+          const exists = await window.electron.fileExists(d.filePath);
+          if (!exists) {
+            window.electron.deleteDownload({ id: d.id, filePath: null });
+            toRemove.add(d.id);
+            return;
+          }
+          // Prune subtitle paths that no longer exist
+          if (
+            d.subtitlePaths?.length > 0 &&
+            window.electron.pruneSubtitlePaths
+          ) {
+            const res = await window.electron.pruneSubtitlePaths(d.id);
+            if (res?.ok) d.subtitlePaths = res.subtitlePaths;
+          }
+        }),
+      );
+
+      setDownloads(pruned.filter((d) => !toRemove.has(d.id)));
     });
   }, []);
 
