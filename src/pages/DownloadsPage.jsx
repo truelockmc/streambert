@@ -144,10 +144,25 @@ export default function DownloadsPage({
       const unique = (files || []).filter((f) => !knownPaths.has(f.filePath));
       setLocalFiles(unique);
       storage.set("localFiles", unique);
+
+      // Re-check subtitle files for all completed downloads
+      if (window.electron.pruneSubtitlePaths) {
+        for (const d of finished) {
+          if (d.subtitlePaths?.length > 0) {
+            const res = await window.electron.pruneSubtitlePaths(d.id);
+            if (
+              res?.ok &&
+              res.subtitlePaths.length !== d.subtitlePaths.length
+            ) {
+              onUpdateDownload?.(d.id, { subtitlePaths: res.subtitlePaths });
+            }
+          }
+        }
+      }
     } finally {
       setScanning(false);
     }
-  }, [scanFolder, downloads]);
+  }, [scanFolder, downloads, finished, onUpdateDownload]);
 
   const handleDelete = async (dl) => {
     if (!confirm(`Delete "${dl.name}"${dl.filePath ? " and its file" : ""}?`))
