@@ -8,7 +8,7 @@ import {
   WatchedIcon,
   SubtitlesIcon,
 } from "../components/Icons";
-import { storage, STORAGE_KEYS } from "../utils/storage";
+import { storage, STORAGE_KEYS, secureStorage } from "../utils/storage";
 import { SUBTITLE_LANGUAGES } from "../utils/subtitles";
 import { imgUrl } from "../utils/api";
 
@@ -778,8 +778,13 @@ function SubtitleDownloaderModal({
   onSubtitlesSaved,
   onSubtitleDeleted,
 }) {
-  const subdlApiKey = storage.get(STORAGE_KEYS.SUBDL_API_KEY) || "";
   const defaultLang = storage.get(STORAGE_KEYS.SUBTITLE_LANG) || "en";
+  const [subdlApiKey, setSubdlApiKey] = useState("");
+  useEffect(() => {
+    secureStorage.get(STORAGE_KEYS.SUBDL_API_KEY).then((val) => {
+      if (val) setSubdlApiKey(val);
+    });
+  }, []);
 
   const [langFilter, setLangFilter] = useState(defaultLang);
   const [results, setResults] = useState(null);

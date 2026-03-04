@@ -5,6 +5,7 @@ const {
   session,
   shell,
   dialog,
+  safeStorage,
 } = require("electron");
 const { spawn, spawnSync } = require("child_process");
 const path = require("path");
@@ -88,6 +89,52 @@ const downloadsFile = () =>
 
 // Track running child processes by download id
 const activeProcs = new Map();
+
+// ── Secure key/value store (OS-level encryption via safeStorage) ──────────────
+// Falls back to plain JSON when encryption is unavailable (rare Linux setups).
+const secureStoreFile = () =>
+  path.join(app.getPath("userData"), "secure-store.json");
+
+function readSecureStore() {
+  try {
+    return JSON.parse(fs.readFileSync(secureStoreFile(), "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function writeSecureStore(data) {
+  fs.writeFileSync(secureStoreFile(), JSON.stringify(data));
+}
+
+function secureStoreGet(key) {
+  const store = readSecureStore();
+  const raw = store[key];
+  if (!raw) return null;
+  try {
+    if (safeStorage.isEncryptionAvailable()) {
+      return safeStorage.decryptString(Buffer.from(raw, "base64"));
+    }
+    // Fallback: stored as plain base64-encoded UTF-8
+    return Buffer.from(raw, "base64").toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
+function secureStoreSet(key, value) {
+  const store = readSecureStore();
+  if (value === null || value === undefined || value === "") {
+    delete store[key];
+  } else {
+    if (safeStorage.isEncryptionAvailable()) {
+      store[key] = safeStorage.encryptString(value).toString("base64");
+    } else {
+      store[key] = Buffer.from(value, "utf8").toString("base64");
+    }
+  }
+  writeSecureStore(store);
+}
 
 const PART_FILE_SUFFIXES = [
   ".part",
@@ -652,7 +699,9 @@ ipcMain.handle(
       };
       downloads.push(entry);
 
-      // Remove any stale entries for the same media (e.g. file deleted externally)
+      // Remove any stale entries for the same media (e.g. file deleted externally
+      // and re-downloaded before the renderer's fileExists check could clean up).
+      // Keep only the freshly created entry when tmdbId + type + season + episode match.
       const isSameMedia = (d) =>
         d.id !== id &&
         d.tmdbId &&
@@ -1395,6 +1444,24 @@ ipcMain.handle("get-block-stats", () => ({
 
 // ── IPC: App version ──────────────────────
 ipcMain.handle("get-app-version", () => app.getVersion());
+
+// ── IPC: Secure key store (safeStorage) ───────────────────────────────────────
+ipcMain.handle("secure-store-get", (_, key) => {
+  try {
+    return { ok: true, value: secureStoreGet(key) };
+  } catch (e) {
+    return { ok: false, value: null };
+  }
+});
+
+ipcMain.handle("secure-store-set", (_, { key, value }) => {
+  try {
+    secureStoreSet(key, value);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
 
 // ── IPC: Subtitle search ──────────────────────────────────────────────────────
 // Priority: SubDL (with API key) → Wyzie (always available, no key needed)

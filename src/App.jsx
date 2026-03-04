@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { storage } from "./utils/storage";
+import { storage, secureStorage } from "./utils/storage";
 import { tmdbFetch, setApiErrorHandlers } from "./utils/api";
 
 import Sidebar from "./components/Sidebar";
@@ -15,7 +15,9 @@ import SettingsPage, { checkForUpdates } from "./pages/SettingsPage";
 import DownloadsPage from "./pages/DownloadsPage";
 
 export default function App() {
-  const [apiKey, setApiKey] = useState(() => storage.get("apikey"));
+  // apiKey loaded async from secure storage (OS keychain)
+  const [apiKey, setApiKey] = useState(null);
+  const [apiKeyLoaded, setApiKeyLoaded] = useState(false);
   const [skipped, setSkipped] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState("checking"); // 'checking' | 'ok' | 'invalid_token' | 'unreachable'
   const [page, setPage] = useState(() => storage.get("startPage") || "home");
@@ -56,6 +58,14 @@ export default function App() {
   const [downloads, setDownloads] = useState([]);
   const [highlightDownload, setHighlightDownload] = useState(null);
   const [closeConfirm, setCloseConfirm] = useState(null); // { count }
+
+  // ── Load API key from secure storage on startup ──
+  useEffect(() => {
+    secureStorage.get("apikey").then((val) => {
+      setApiKey(val || null);
+      setApiKeyLoaded(true);
+    });
+  }, []);
 
   // Listen for close confirmation request from main process
   useEffect(() => {
@@ -113,6 +123,7 @@ export default function App() {
           if (d.status !== "completed" || !d.filePath) return;
           const exists = await window.electron.fileExists(d.filePath);
           if (!exists) {
+            // File gone — remove from registry silently
             window.electron.deleteDownload({ id: d.id, filePath: null });
             toRemove.add(d.id);
             return;
@@ -275,13 +286,14 @@ export default function App() {
   );
 
   const saveApiKey = useCallback((key) => {
-    storage.set("apikey", key);
+    secureStorage.set("apikey", key);
     setApiKey(key);
   }, []);
 
   const changeApiKey = useCallback(() => {
-    storage.remove("apikey");
+    secureStorage.set("apikey", "");
     setApiKey(null);
+    setApiKeyLoaded(true);
     setSkipped(false);
   }, []);
 
@@ -431,6 +443,7 @@ export default function App() {
     [navigate],
   );
 
+  if (!apiKeyLoaded) return null; // wait for secure storage to resolve
   if (!apiKey && !skipped)
     return <SetupScreen onSave={saveApiKey} onSkip={() => setSkipped(true)} />;
 

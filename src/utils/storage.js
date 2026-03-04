@@ -57,5 +57,31 @@ export const STORAGE_KEYS = {
   // Subtitle settings
   SUBTITLE_ENABLED: "subtitleDownload",
   SUBTITLE_LANG: "subtitleLang",
+  // NOTE: SUBDL_API_KEY and API_KEY are stored encrypted via secureStorage (see below)
   SUBDL_API_KEY: "subdlApiKey",
+};
+
+// ── Secure storage for sensitive keys ────────────────────────────────────────
+// Uses Electron safeStorage (OS keychain / DPAPI / libsecret).
+// All methods are async. Non-Electron environments silently fall back to no-op.
+//
+// Sensitive keys managed here (NOT stored in localStorage):
+//   "apikey"      – TMDB API key
+//   "subdlApiKey" – SubDL API key
+
+const isElectron =
+  typeof window !== "undefined" && !!window.electron?.secureGet;
+
+export const secureStorage = {
+  /** Read an encrypted value. Returns null if not set. */
+  async get(key) {
+    if (!isElectron) return null;
+    return window.electron.secureGet(key);
+  },
+
+  /** Write an encrypted value. Pass null/empty to delete. */
+  async set(key, value) {
+    if (!isElectron) return;
+    return window.electron.secureSet(key, value ?? "");
+  },
 };

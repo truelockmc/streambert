@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { CloseIcon, DownloadIcon, SettingsIcon, SubtitlesIcon } from "./Icons";
-import { storage, STORAGE_KEYS } from "../utils/storage";
+import { storage, STORAGE_KEYS, secureStorage } from "../utils/storage";
 import {
   SUBTITLE_LANGUAGES,
   LANG_LABEL,
@@ -390,9 +390,12 @@ export default function DownloadModal({
       storage.get(STORAGE_KEYS.SUBTITLE_ENABLED) !== 0 &&
       storage.get(STORAGE_KEYS.SUBTITLE_ENABLED) !== "0",
   );
-  const [subdlApiKey] = useState(
-    () => storage.get(STORAGE_KEYS.SUBDL_API_KEY) || "",
-  );
+  const [subdlApiKey, setSubdlApiKey] = useState("");
+  useEffect(() => {
+    secureStorage.get(STORAGE_KEYS.SUBDL_API_KEY).then((val) => {
+      if (val) setSubdlApiKey(val);
+    });
+  }, []);
   const defaultLang = storage.get(STORAGE_KEYS.SUBTITLE_LANG) || "en";
 
   const [subResults, setSubResults] = useState(null);

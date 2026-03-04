@@ -428,9 +428,12 @@ export default function TVPage({
     tmdbFetch(`/tv/${item.id}`, apiKey)
       .then((d) => {
         setDetails(d);
-        const first =
-          d.seasons?.find((s) => s.season_number > 0) || d.seasons?.[0];
-        if (first) setSelectedSeason(first.season_number);
+        // Only fall back to first season when no specific season was requested
+        if (item.season == null) {
+          const first =
+            d.seasons?.find((s) => s.season_number > 0) || d.seasons?.[0];
+          if (first) setSelectedSeason(first.season_number);
+        }
       })
       .catch(() => setDetails(item))
       .finally(() => setLoading(false));

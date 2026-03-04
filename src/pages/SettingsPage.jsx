@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { storage, STORAGE_KEYS } from "../utils/storage";
+import { storage, STORAGE_KEYS, secureStorage } from "../utils/storage";
 import { SUBTITLE_LANGUAGES } from "../utils/subtitles";
 import { DEFAULT_INVIDIOUS_BASE } from "../components/TrailerModal";
 import { RATING_COUNTRIES } from "../utils/ageRating";
@@ -762,18 +762,23 @@ function SubtitleSettingsSection() {
   const [lang, setLang] = useState(
     () => storage.get(STORAGE_KEYS.SUBTITLE_LANG) || "en",
   );
-  const [subdlApiKey, setSubdlApiKey] = useState(
-    () => storage.get(STORAGE_KEYS.SUBDL_API_KEY) || "",
-  );
+  const [subdlApiKey, setSubdlApiKey] = useState("");
   const [showSubdlKey, setShowSubdlKey] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Load SubDL key from secure storage
+  useEffect(() => {
+    secureStorage.get(STORAGE_KEYS.SUBDL_API_KEY).then((val) => {
+      if (val) setSubdlApiKey(val);
+    });
+  }, []);
 
   const hasSubdlKey = subdlApiKey.trim().length > 0;
 
   const handleSave = () => {
     storage.set(STORAGE_KEYS.SUBTITLE_ENABLED, enabled ? 1 : 0);
     storage.set(STORAGE_KEYS.SUBTITLE_LANG, lang);
-    storage.set(STORAGE_KEYS.SUBDL_API_KEY, subdlApiKey.trim());
+    secureStorage.set(STORAGE_KEYS.SUBDL_API_KEY, subdlApiKey.trim());
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };

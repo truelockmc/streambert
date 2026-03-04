@@ -108,4 +108,9 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("download-subtitles-for-file", args),
   deleteSubtitleFile: (args) =>
     ipcRenderer.invoke("delete-subtitle-file", args),
+  // Secure key store (OS-encrypted via safeStorage)
+  secureGet: (key) =>
+    ipcRenderer.invoke("secure-store-get", key).then((r) => r.value ?? null),
+  secureSet: (key, value) =>
+    ipcRenderer.invoke("secure-store-set", { key, value }),
 });
