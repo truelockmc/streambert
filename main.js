@@ -292,6 +292,7 @@ const BLOCKED_HOSTS = [
 let mainWindow;
 
 function createWindow() {
+  applySecretMigrationIfNeeded();
   loadDownloads();
   loadBlockStats();
 
@@ -1457,6 +1458,55 @@ ipcMain.handle("get-block-stats", () => ({
 
 // ── IPC: App version ──────────────────────
 ipcMain.handle("get-app-version", () => app.getVersion());
+
+// ── Update migration: persist secrets across AppImage replacement ─────────────
+// safeStorage derives its key from the executable path on Linux. When the
+// AppImage binary is replaced the new instance can no longer decrypt the old
+// ciphertext. We solve this by writing a short-lived plaintext migration file
+// to userData before exiting, then re-encrypting it on the next startup.
+
+const migrationFile = () =>
+  path.join(app.getPath("userData"), ".secret-migration.json");
+
+function writeSecretMigration() {
+  try {
+    const store = readSecureStore();
+    const plain = {};
+    for (const [k, raw] of Object.entries(store)) {
+      if (!raw) continue;
+      try {
+        if (safeStorage.isEncryptionAvailable()) {
+          plain[k] = safeStorage.decryptString(Buffer.from(raw, "base64"));
+        } else {
+          plain[k] = Buffer.from(raw, "base64").toString("utf8");
+        }
+      } catch {
+        /* skip unreadable keys */
+      }
+    }
+    if (Object.keys(plain).length > 0) {
+      fs.writeFileSync(migrationFile(), JSON.stringify(plain), { mode: 0o600 });
+    }
+  } catch {
+    /* best-effort */
+  }
+}
+
+function applySecretMigrationIfNeeded() {
+  const mf = migrationFile();
+  if (!fs.existsSync(mf)) return;
+  try {
+    const plain = JSON.parse(fs.readFileSync(mf, "utf8"));
+    for (const [k, v] of Object.entries(plain)) {
+      if (v) secureStoreSet(k, v);
+    }
+    fs.unlinkSync(mf);
+  } catch {
+    try {
+      fs.unlinkSync(mf);
+    } catch {}
+  }
+}
 
 // ── IPC: Secure key store (safeStorage) ───────────────────────────────────────
 ipcMain.handle("secure-store-get", (_, key) => {
@@ -2876,18 +2926,36 @@ ipcMain.handle("download-and-install-update", async (_, { url, format }) => {
 
     // ── Run installer ────────────────────────────────────────────────────────
     if (format === "appimage") {
-      // AppImage: no admin needed
+      // AppImage: can't overwrite a running executable (ETXTBSY).
+      // Write a small shell script that waits for this process to exit,
+      // then moves the downloaded file into place and relaunches it.
       fs.chmodSync(destPath, 0o755);
       const currentAppImage = process.env.APPIMAGE;
+      const target = currentAppImage || destPath;
+
       if (currentAppImage) {
-        fs.copyFileSync(destPath, currentAppImage);
-        fs.chmodSync(currentAppImage, 0o755);
-        app.relaunch({ execPath: currentAppImage });
-        app.exit(0);
+        // Script: wait until the old process is gone, then replace + relaunch
+        const scriptPath = path.join(os.tmpdir(), "streambert-update.sh");
+        const pid = process.pid;
+        const scriptContent =
+          [
+            "#!/bin/sh",
+            // wait for parent PID to disappear (max ~10 s)
+            `while kill -0 ${pid} 2>/dev/null; do sleep 0.2; done`,
+            // move new AppImage over old one atomically (same fs → rename)
+            `mv -f "${destPath}" "${target}"`,
+            `chmod +x "${target}"`,
+            // relaunch
+            `"${target}" &`,
+          ].join("\n") + "\n";
+        fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
+        spawn("sh", [scriptPath], { detached: true, stdio: "ignore" }).unref();
       } else {
+        // No APPIMAGE env: just launch the downloaded file directly
         spawn(destPath, [], { detached: true, stdio: "ignore" }).unref();
-        app.exit(0);
       }
+      writeSecretMigration();
+      app.exit(0);
     } else if (format === "deb") {
       // .deb: needs admin, try pkexec dpkg, fall back to pkexec apt, then gdebi
       fs.chmodSync(destPath, 0o644);
