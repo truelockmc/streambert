@@ -403,22 +403,34 @@ export default function App() {
   }, []);
 
   // Memoized, avoids re-filtering on every download-progress event
+  // Pre-compute progress keys for history items once; only re-runs when history changes.
+  const historyWithKeys = useMemo(
+    () =>
+      history
+        .filter((h) => {
+          if (h.media_type === "tv" && (h.season == null || h.episode == null))
+            return false;
+          return true;
+        })
+        .map((h) => ({
+          ...h,
+          _pk:
+            h.media_type === "movie"
+              ? `movie_${h.id}`
+              : `tv_${h.id}_s${h.season}e${h.episode}`,
+        })),
+    [history],
+  );
+
+  // Filter by progress/watched
   const inProgress = useMemo(
     () =>
-      history.filter((h) => {
-        // Guard: TV entries must have valid season + episode to form a matchable key
-        if (h.media_type === "tv" && (h.season == null || h.episode == null))
-          return false;
-        const pk =
-          h.media_type === "movie"
-            ? `movie_${h.id}`
-            : `tv_${h.id}_s${h.season}e${h.episode}`;
-        const pct = progress[pk];
-        // Exclude watched items and items not meaningfully started or already finished
-        if (watched[pk]) return false;
+      historyWithKeys.filter((h) => {
+        if (watched[h._pk]) return false;
+        const pct = progress[h._pk];
         return pct != null && pct > 2 && pct < 98;
       }),
-    [history, progress, watched],
+    [historyWithKeys, progress, watched],
   );
 
   // Memoized, avoids re-mapping on every download-progress event

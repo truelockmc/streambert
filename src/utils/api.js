@@ -12,7 +12,17 @@ export const setApiErrorHandlers = (onAuth, onUnreachable) => {
   _onUnreachable = onUnreachable;
 };
 
+// ── In-memory TMDB response cache (session-scoped, cleared on page reload) ───
+// Avoids redundant network calls when navigating back to the same show.
+// TTL: 5 minutes
+const _tmdbCache = new Map(); // key → { data, expiresAt }
+const TMDB_CACHE_TTL = 5 * 60 * 1000;
+
 export const tmdbFetch = async (path, apiKey) => {
+  const cacheKey = `${apiKey}|${path}`;
+  const cached = _tmdbCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt) return cached.data;
+
   let res;
   try {
     res = await fetch(`${TMDB_BASE}${path}`, {
@@ -30,7 +40,9 @@ export const tmdbFetch = async (path, apiKey) => {
   }
 
   if (!res.ok) throw new Error(`TMDB ${res.status}`);
-  return res.json();
+  const data = await res.json();
+  _tmdbCache.set(cacheKey, { data, expiresAt: Date.now() + TMDB_CACHE_TTL });
+  return data;
 };
 
 export const videasyMovieUrl = (id) => `https://player.videasy.net/movie/${id}`;
@@ -154,33 +166,35 @@ query ($search: String, $type: MediaType) {
   }
 }`;
 
-// ── AniList cache (localStorage) ─────────────────────────────────────────────
+// ── AniList cache (localStorage + in-memory) ──────────────────────────────────
 const ANILIST_CACHE_KEY = "streambert_anilistCache";
 const ANILIST_CACHE_TTL = 1000 * 60 * 60 * 24 * 7; // 7 days
 
-function readAnilistCache() {
+// loaded once on first use, flushed to localStorage on write.
+let _anilistCache = null;
+
+function getAnilistCache() {
+  if (_anilistCache) return _anilistCache;
   try {
     const raw = localStorage.getItem(ANILIST_CACHE_KEY);
-    return raw ? JSON.parse(raw) : {};
+    _anilistCache = raw ? JSON.parse(raw) : {};
   } catch {
-    return {};
+    _anilistCache = {};
   }
-}
-
-function writeAnilistCache(cache) {
-  try {
-    localStorage.setItem(ANILIST_CACHE_KEY, JSON.stringify(cache));
-  } catch {}
-}
-
-function evictStaleAnilist(cache) {
+  // Evict stale entries once on load
   const now = Date.now();
-  for (const key of Object.keys(cache)) {
-    if (now - cache[key].ts > ANILIST_CACHE_TTL) {
-      delete cache[key];
+  for (const key of Object.keys(_anilistCache)) {
+    if (now - _anilistCache[key].ts > ANILIST_CACHE_TTL) {
+      delete _anilistCache[key];
     }
   }
-  return cache;
+  return _anilistCache;
+}
+
+function flushAnilistCache() {
+  try {
+    localStorage.setItem(ANILIST_CACHE_KEY, JSON.stringify(_anilistCache));
+  } catch {}
 }
 
 // tmdbId is used as the cache key (unique per show) while title is used for the AniList search query.
@@ -193,8 +207,7 @@ export const fetchAnilistData = async (
     ? `${type}__tmdb_${tmdbId}`
     : `${type}__${title.toLowerCase().trim()}`;
 
-  // Return cached data if still fresh (also works offline)
-  const cache = evictStaleAnilist(readAnilistCache());
+  const cache = getAnilistCache();
   const entry = cache[cacheKey];
   if (entry && Date.now() - entry.ts <= ANILIST_CACHE_TTL) {
     // Sanity-check: make sure cached data actually belongs to this title.
@@ -215,7 +228,7 @@ export const fetchAnilistData = async (
     if (!isMismatch) return entry.data;
     // Mismatch detected
     delete cache[cacheKey];
-    writeAnilistCache(cache);
+    flushAnilistCache();
   }
 
   try {
@@ -233,13 +246,11 @@ export const fetchAnilistData = async (
     const json = await res.json();
     const data = json?.data?.Media || null;
 
-    // Persist to cache (even null results, so we don't hammer the API)
     cache[cacheKey] = { data, ts: Date.now() };
-    writeAnilistCache(cache);
+    flushAnilistCache();
 
     return data;
   } catch {
-    // Offline or network error – return stale cache entry if available
     if (entry) return entry.data;
     return null;
   }

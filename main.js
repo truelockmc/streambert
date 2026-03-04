@@ -12,6 +12,7 @@ const path = require("path");
 const fs = require("fs");
 const https = require("https");
 const http = require("http");
+const os = require("os");
 
 // ── Block stats store ─────────────────────────────────────────────────────────
 const blockStatsFile = () =>
@@ -84,26 +85,37 @@ function recordBlockedRequest(url) {
 
 // ── Download store ────────────────────────────────────────────────────────────
 let downloads = [];
+// File paths memoized after app.ready
+let _downloadsFile = null;
 const downloadsFile = () =>
-  path.join(app.getPath("userData"), "downloads.json");
+  _downloadsFile ||
+  (_downloadsFile = path.join(app.getPath("userData"), "downloads.json"));
 
 // Track running child processes by download id
 const activeProcs = new Map();
 
 // ── Secure key/value store (OS-level encryption via safeStorage) ──────────────
 // Falls back to plain JSON when encryption is unavailable (rare Linux setups).
+let _secureStoreFile = null;
 const secureStoreFile = () =>
-  path.join(app.getPath("userData"), "secure-store.json");
+  _secureStoreFile ||
+  (_secureStoreFile = path.join(app.getPath("userData"), "secure-store.json"));
+
+// In-memory cache so we only hit the filesystem once per run
+let _secureStoreCache = null;
 
 function readSecureStore() {
+  if (_secureStoreCache) return _secureStoreCache;
   try {
-    return JSON.parse(fs.readFileSync(secureStoreFile(), "utf8"));
+    _secureStoreCache = JSON.parse(fs.readFileSync(secureStoreFile(), "utf8"));
   } catch {
-    return {};
+    _secureStoreCache = {};
   }
+  return _secureStoreCache;
 }
 
 function writeSecureStore(data) {
+  _secureStoreCache = data;
   fs.writeFileSync(secureStoreFile(), JSON.stringify(data));
 }
 
@@ -1639,7 +1651,6 @@ ipcMain.handle("get-subtitle-url", async (_, { fileId }) => {
         return { ok: false, error: "No subtitle file found in SubDL ZIP" };
 
       // Save to temp file and return file:// URL
-      const os = require("os");
       const tmpDir = os.tmpdir();
       const tmpPath = path.join(
         tmpDir,

@@ -41,16 +41,17 @@ import {
   getRatingCountry,
 } from "../utils/ageRating";
 
-// Small context menu for episode cards
-function EpisodeContextMenu({
+// Generic context menu (used for both episode and season actions)
+function ContextMenu({
   x,
   y,
   isWatched,
+  watchedLabel,
+  unwatchedLabel,
   onMarkWatched,
   onMarkUnwatched,
   onClose,
 }) {
-  const ref = useRef(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   useEffect(() => {
@@ -64,7 +65,6 @@ function EpisodeContextMenu({
   }, []);
   return (
     <div
-      ref={ref}
       className="context-menu"
       style={{ top: y, left: x }}
       onClick={(e) => e.stopPropagation()}
@@ -78,7 +78,7 @@ function EpisodeContextMenu({
             onCloseRef.current();
           }}
         >
-          ↩ Mark as Unwatched
+          ↩ {unwatchedLabel}
         </button>
       ) : (
         <button
@@ -89,62 +89,7 @@ function EpisodeContextMenu({
             onCloseRef.current();
           }}
         >
-          ✓ Mark as Watched
-        </button>
-      )}
-    </div>
-  );
-}
-
-// Small context menu for season buttons
-function SeasonContextMenu({
-  x,
-  y,
-  isWatched,
-  onMarkWatched,
-  onMarkUnwatched,
-  onClose,
-}) {
-  const ref = useRef(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-  useEffect(() => {
-    const close = () => onCloseRef.current();
-    window.addEventListener("click", close);
-    window.addEventListener("contextmenu", close);
-    return () => {
-      window.removeEventListener("click", close);
-      window.removeEventListener("contextmenu", close);
-    };
-  }, []);
-  return (
-    <div
-      ref={ref}
-      className="context-menu"
-      style={{ top: y, left: x }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {isWatched ? (
-        <button
-          className="context-menu-item"
-          onClick={(e) => {
-            e.stopPropagation();
-            onMarkUnwatched();
-            onCloseRef.current();
-          }}
-        >
-          ↩ Mark Season as Unwatched
-        </button>
-      ) : (
-        <button
-          className="context-menu-item"
-          onClick={(e) => {
-            e.stopPropagation();
-            onMarkWatched();
-            onCloseRef.current();
-          }}
-        >
-          ✓ Mark Season as Watched
+          ✓ {watchedLabel}
         </button>
       )}
     </div>
@@ -470,7 +415,7 @@ export default function TVPage({
       .then(setSeasonData)
       .catch(() => {})
       .finally(() => setLoadingSeason(false));
-  }, [item.id, selectedSeason, apiKey]);
+  }, [item.id, selectedSeason, apiKey, anilistSeasons]);
 
   // Reset m3u8 URL, subtitle URL and source menu whenever the series, episode, or source changes
   useEffect(() => {
@@ -1425,23 +1370,26 @@ export default function TVPage({
             )}
             {!loadingSeason && seasonData?.episodes && (
               <div className="episodes-grid">
-                {currentSeasonEpisodes.map((ep) => (
-                  <EpisodeCard
-                    key={ep.episode_number}
-                    ep={ep}
-                    itemId={item.id}
-                    selectedSeason={selectedSeason}
-                    progress={progress}
-                    watched={watched}
-                    playing={playing}
-                    selectedEpNumber={selectedEp?.episode_number}
-                    downloadsByEpisodeKey={downloadsByEpisodeKey}
-                    restricted={restricted}
-                    onPlay={playEpisode}
-                    onContextMenu={setEpMenu}
-                    onGoToDownloads={onGoToDownloads}
-                  />
-                ))}
+                {currentSeasonEpisodes.map((ep) => {
+                  const pk = `tv_${item.id}_s${selectedSeason}e${ep.episode_number}`;
+                  return (
+                    <EpisodeCard
+                      key={ep.episode_number}
+                      ep={ep}
+                      itemId={item.id}
+                      selectedSeason={selectedSeason}
+                      epPct={progress[pk] || 0}
+                      epWatched={!!watched?.[pk]}
+                      playing={playing}
+                      selectedEpNumber={selectedEp?.episode_number}
+                      downloadsByEpisodeKey={downloadsByEpisodeKey}
+                      restricted={restricted}
+                      onPlay={playEpisode}
+                      onContextMenu={setEpMenu}
+                      onGoToDownloads={onGoToDownloads}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1457,10 +1405,12 @@ export default function TVPage({
       )}
 
       {epMenu && (
-        <EpisodeContextMenu
+        <ContextMenu
           x={epMenu.x}
           y={epMenu.y}
           isWatched={!!watched?.[epMenu.pk]}
+          watchedLabel="Mark as Watched"
+          unwatchedLabel="Mark as Unwatched"
           onMarkWatched={() => onMarkWatched?.(epMenu.pk)}
           onMarkUnwatched={() => onMarkUnwatched?.(epMenu.pk)}
           onClose={() => setEpMenu(null)}
@@ -1468,10 +1418,12 @@ export default function TVPage({
       )}
 
       {seasonMenu && (
-        <SeasonContextMenu
+        <ContextMenu
           x={seasonMenu.x}
           y={seasonMenu.y}
           isWatched={isSeasonWatched(seasonMenu.seasonNum)}
+          watchedLabel="Mark Season as Watched"
+          unwatchedLabel="Mark Season as Unwatched"
           onMarkWatched={() => markSeasonWatched(seasonMenu.seasonNum)}
           onMarkUnwatched={() => markSeasonUnwatched(seasonMenu.seasonNum)}
           onClose={() => setSeasonMenu(null)}
@@ -1522,8 +1474,8 @@ const EpisodeCard = memo(function EpisodeCard({
   ep,
   itemId,
   selectedSeason,
-  progress,
-  watched,
+  epPct,
+  epWatched,
   playing,
   selectedEpNumber,
   downloadsByEpisodeKey,
@@ -1533,8 +1485,6 @@ const EpisodeCard = memo(function EpisodeCard({
   onGoToDownloads,
 }) {
   const pk = `tv_${itemId}_s${selectedSeason}e${ep.episode_number}`;
-  const epPct = progress[pk] || 0;
-  const epWatched = !!watched?.[pk];
   const isPlaying = playing && selectedEpNumber === ep.episode_number;
   const epUnreleased = ep.air_date
     ? new Date(ep.air_date) > _todayForEpisodes
