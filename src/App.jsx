@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import ErrorBoundary from "./components/ErrorBoundary";
+import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
+import WindowTitlebar from "./components/WindowTitlebar";
 import { storage, secureStorage } from "./utils/storage";
 import { tmdbFetch, setApiErrorHandlers } from "./utils/api";
 
@@ -23,6 +26,8 @@ export default function App() {
   const [page, setPage] = useState(() => storage.get("startPage") || "home");
   const [selected, setSelected] = useState(null);
   const [showSearch, setShowSearch] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [platform, setPlatform] = useState(null);
 
   // Navigation history stack for Ctrl+Z back navigation
   const [navStack, setNavStack] = useState([]);
@@ -65,6 +70,18 @@ export default function App() {
       setApiKey(val || null);
       setApiKeyLoaded(true);
     });
+  }, []);
+
+  // ── Detect platform for Windows titlebar ──────────────────────────────────
+  useEffect(() => {
+    if (window.electron?.getPlatform) {
+      window.electron.getPlatform().then((p) => {
+        setPlatform(p);
+        if (p === "win32" || p === "linux") {
+          document.documentElement.setAttribute("data-win-titlebar", "1");
+        }
+      });
+    }
   }, []);
 
   // Listen for close confirmation request from main process
@@ -123,7 +140,7 @@ export default function App() {
           if (d.status !== "completed" || !d.filePath) return;
           const exists = await window.electron.fileExists(d.filePath);
           if (!exists) {
-            // File gone — remove from registry silently
+            // File gone, remove from registry silently
             window.electron.deleteDownload({ id: d.id, filePath: null });
             toRemove.add(d.id);
             return;
@@ -261,11 +278,25 @@ export default function App() {
         e.preventDefault();
         setShowSearch(true);
       }
-      if (e.key === "Escape") setShowSearch(false);
+      if (e.key === "Escape") {
+        setShowSearch(false);
+        setShowShortcuts(false);
+      }
+      if (e.key === "?" && !e.ctrlKey && !e.metaKey) {
+        const tag = (e.target?.tagName || "").toUpperCase();
+        if (tag !== "INPUT" && tag !== "TEXTAREA") {
+          e.preventDefault();
+          setShowShortcuts((v) => !v);
+        }
+      }
       // Ctrl+Z / Cmd+Z → navigate back
       if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
         navigateBack();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "r") {
+        e.preventDefault();
+        window.location.reload();
       }
     };
     window.addEventListener("keydown", handler);
@@ -459,220 +490,229 @@ export default function App() {
   if (!apiKey && !skipped)
     return <SetupScreen onSave={saveApiKey} onSkip={() => setSkipped(true)} />;
 
-  return (
-    <>
-      <Sidebar
-        page={page}
-        onNavigate={navigate}
-        onSearch={() => setShowSearch(true)}
-        savedList={savedList}
-        activeDownloads={activeDownloadCount}
-        onReorderSaved={handleReorderSaved}
-        onRemoveSaved={toggleSave}
-        canGoBack={navStack.length > 0}
-        onBack={navigateBack}
-      />
+  const isWindows = platform === "win32" || platform === "linux";
 
-      <div className="main">
-        {/* ── API key status banner ── */}
-        {apiKeyStatus === "invalid_token" && (
-          <div className="api-status-banner api-status-error">
-            <span>
-              ⚠ Your TMDB token is invalid, not set or has been revoked. Movies
-              and shows won't load.
-            </span>
-            <button className="api-status-btn" onClick={changeApiKey}>
-              Update Token
-            </button>
-          </div>
-        )}
-        {apiKeyStatus === "unreachable" && (
-          <div className="api-status-banner api-status-warn">
-            <span>
-              ⚠ Cannot reach TMDB, check your internet connection. Content may
-              not load.
-            </span>
-            <button
-              className="api-status-btn"
-              onClick={() =>
-                setApiKeyStatus("checking") || window.location.reload()
+  return (
+    <ErrorBoundary>
+      {isWindows && <WindowTitlebar />}
+      <div>
+        <Sidebar
+          page={page}
+          onNavigate={navigate}
+          onSearch={() => setShowSearch(true)}
+          savedList={savedList}
+          activeDownloads={activeDownloadCount}
+          onReorderSaved={handleReorderSaved}
+          onRemoveSaved={toggleSave}
+          canGoBack={navStack.length > 0}
+          onBack={navigateBack}
+          onShowShortcuts={() => setShowShortcuts(true)}
+        />
+
+        <div className="main">
+          {/* ── API key status banner ── */}
+          {apiKeyStatus === "invalid_token" && (
+            <div className="api-status-banner api-status-error">
+              <span>
+                ⚠ Your TMDB token is invalid, not set or has been revoked.
+                Movies and shows won't load.
+              </span>
+              <button className="api-status-btn" onClick={changeApiKey}>
+                Update Token
+              </button>
+            </div>
+          )}
+          {apiKeyStatus === "unreachable" && (
+            <div className="api-status-banner api-status-warn">
+              <span>
+                ⚠ Cannot reach TMDB, check your internet connection. Content may
+                not load.
+              </span>
+              <button
+                className="api-status-btn"
+                onClick={() =>
+                  setApiKeyStatus("checking") || window.location.reload()
+                }
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {page === "home" && (
+            <HomePage
+              trending={trending}
+              trendingTV={trendingTV}
+              loading={loadingHome}
+              onSelect={handleSelectResult}
+              progress={progress}
+              inProgress={inProgress}
+              offline={offline}
+              onRetry={retryHome}
+              watched={watched}
+              onMarkWatched={markWatched}
+              onMarkUnwatched={markUnwatched}
+              history={history}
+              apiKey={apiKey}
+            />
+          )}
+          {page === "movie" && selected && (
+            <MoviePage
+              item={selected}
+              apiKey={apiKey}
+              onSave={() => toggleSave(selected)}
+              isSaved={isSaved(selected)}
+              onHistory={addHistory}
+              progress={progress}
+              saveProgress={saveProgress}
+              onBack={() => navigate("home")}
+              onSettings={() => navigate("settings")}
+              onDownloadStarted={handleDownloadStarted}
+              watched={watched}
+              onMarkWatched={markWatched}
+              onMarkUnwatched={markUnwatched}
+              downloads={downloads}
+              onGoToDownloads={handleGoToDownloads}
+              onSelect={handleSelectResult}
+            />
+          )}
+          {page === "tv" && selected && (
+            <TVPage
+              item={selected}
+              apiKey={apiKey}
+              onSave={() => toggleSave(selected)}
+              isSaved={isSaved(selected)}
+              onHistory={addHistory}
+              progress={progress}
+              saveProgress={saveProgress}
+              onBack={() => navigate("home")}
+              onSettings={() => navigate("settings")}
+              onDownloadStarted={handleDownloadStarted}
+              watched={watched}
+              onMarkWatched={markWatched}
+              onMarkUnwatched={markUnwatched}
+              downloads={downloads}
+              onGoToDownloads={handleGoToDownloads}
+            />
+          )}
+          {page === "history" && (
+            <LibraryPage
+              history={history}
+              inProgress={inProgress}
+              saved={savedList}
+              progress={progress}
+              onSelect={handleSelectResult}
+              watched={watched}
+              onMarkWatched={markWatched}
+              onMarkUnwatched={markUnwatched}
+            />
+          )}
+          {page === "settings" && (
+            <SettingsPage apiKey={apiKey} onChangeApiKey={changeApiKey} />
+          )}
+          {page === "downloads" && (
+            <DownloadsPage
+              downloads={downloads}
+              onDeleteDownload={handleDeleteDownload}
+              onHistory={addHistory}
+              onSaveProgress={saveProgress}
+              progress={progress}
+              watched={watched}
+              onMarkWatched={markWatched}
+              onMarkUnwatched={markUnwatched}
+              highlightId={highlightDownload}
+              onClearHighlight={() => setHighlightDownload(null)}
+              onSelect={handleSelectResult}
+              onUpdateDownload={(id, updates) =>
+                setDownloads((prev) =>
+                  prev.map((d) => (d.id === id ? { ...d, ...updates } : d)),
+                )
               }
+            />
+          )}
+        </div>
+
+        {showSearch && (
+          <SearchModal
+            apiKey={apiKey}
+            onSelect={handleSelectResult}
+            onClose={() => setShowSearch(false)}
+            offline={offline}
+          />
+        )}
+        {updateBanner && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 9999,
+              background: "rgba(229,9,20,0.92)",
+              backdropFilter: "blur(8px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 16,
+              padding: "10px 24px",
+              boxShadow: "0 2px 16px rgba(0,0,0,0.4)",
+              fontSize: 14,
+              fontWeight: 500,
+              color: "#fff",
+            }}
+          >
+            <span>🎉 Streambert v{updateBanner.latest} is available!</span>
+            <a
+              href={updateBanner.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                color: "#fff",
+                fontWeight: 700,
+                background: "rgba(255,255,255,0.18)",
+                border: "1px solid rgba(255,255,255,0.4)",
+                borderRadius: 6,
+                padding: "4px 12px",
+                textDecoration: "none",
+                fontSize: 13,
+              }}
             >
-              Retry
+              Download
+            </a>
+            <button
+              onClick={() => setUpdateBanner(null)}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "rgba(255,255,255,0.7)",
+                cursor: "pointer",
+                fontSize: 18,
+                lineHeight: 1,
+                padding: "0 4px",
+              }}
+              aria-label="Dismiss"
+            >
+              ×
             </button>
           </div>
         )}
-        {page === "home" && (
-          <HomePage
-            trending={trending}
-            trendingTV={trendingTV}
-            loading={loadingHome}
-            onSelect={handleSelectResult}
-            progress={progress}
-            inProgress={inProgress}
-            offline={offline}
-            onRetry={retryHome}
-            watched={watched}
-            onMarkWatched={markWatched}
-            onMarkUnwatched={markUnwatched}
-            history={history}
-            apiKey={apiKey}
+        {toast && <div className="toast">{toast}</div>}
+        {closeConfirm && (
+          <CloseConfirmModal
+            count={closeConfirm.count}
+            onConfirm={() => {
+              setCloseConfirm(null);
+              window.electron.respondClose(true);
+            }}
+            onCancel={() => {
+              setCloseConfirm(null);
+              window.electron.respondClose(false);
+            }}
           />
         )}
-        {page === "movie" && selected && (
-          <MoviePage
-            item={selected}
-            apiKey={apiKey}
-            onSave={() => toggleSave(selected)}
-            isSaved={isSaved(selected)}
-            onHistory={addHistory}
-            progress={progress}
-            saveProgress={saveProgress}
-            onBack={() => navigate("home")}
-            onSettings={() => navigate("settings")}
-            onDownloadStarted={handleDownloadStarted}
-            watched={watched}
-            onMarkWatched={markWatched}
-            onMarkUnwatched={markUnwatched}
-            downloads={downloads}
-            onGoToDownloads={handleGoToDownloads}
-            onSelect={handleSelectResult}
-          />
-        )}
-        {page === "tv" && selected && (
-          <TVPage
-            item={selected}
-            apiKey={apiKey}
-            onSave={() => toggleSave(selected)}
-            isSaved={isSaved(selected)}
-            onHistory={addHistory}
-            progress={progress}
-            saveProgress={saveProgress}
-            onBack={() => navigate("home")}
-            onSettings={() => navigate("settings")}
-            onDownloadStarted={handleDownloadStarted}
-            watched={watched}
-            onMarkWatched={markWatched}
-            onMarkUnwatched={markUnwatched}
-            downloads={downloads}
-            onGoToDownloads={handleGoToDownloads}
-          />
-        )}
-        {page === "history" && (
-          <LibraryPage
-            history={history}
-            inProgress={inProgress}
-            saved={savedList}
-            progress={progress}
-            onSelect={handleSelectResult}
-            watched={watched}
-            onMarkWatched={markWatched}
-            onMarkUnwatched={markUnwatched}
-          />
-        )}
-        {page === "settings" && (
-          <SettingsPage apiKey={apiKey} onChangeApiKey={changeApiKey} />
-        )}
-        {page === "downloads" && (
-          <DownloadsPage
-            downloads={downloads}
-            onDeleteDownload={handleDeleteDownload}
-            onHistory={addHistory}
-            onSaveProgress={saveProgress}
-            progress={progress}
-            watched={watched}
-            onMarkWatched={markWatched}
-            onMarkUnwatched={markUnwatched}
-            highlightId={highlightDownload}
-            onClearHighlight={() => setHighlightDownload(null)}
-            onSelect={handleSelectResult}
-            onUpdateDownload={(id, updates) =>
-              setDownloads((prev) =>
-                prev.map((d) => (d.id === id ? { ...d, ...updates } : d)),
-              )
-            }
-          />
+        {showShortcuts && (
+          <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />
         )}
       </div>
-
-      {showSearch && (
-        <SearchModal
-          apiKey={apiKey}
-          onSelect={handleSelectResult}
-          onClose={() => setShowSearch(false)}
-          offline={offline}
-        />
-      )}
-      {updateBanner && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 9999,
-            background: "rgba(229,9,20,0.92)",
-            backdropFilter: "blur(8px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 16,
-            padding: "10px 24px",
-            boxShadow: "0 2px 16px rgba(0,0,0,0.4)",
-            fontSize: 14,
-            fontWeight: 500,
-            color: "#fff",
-          }}
-        >
-          <span>🎉 Streambert v{updateBanner.latest} is available!</span>
-          <a
-            href={updateBanner.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              color: "#fff",
-              fontWeight: 700,
-              background: "rgba(255,255,255,0.18)",
-              border: "1px solid rgba(255,255,255,0.4)",
-              borderRadius: 6,
-              padding: "4px 12px",
-              textDecoration: "none",
-              fontSize: 13,
-            }}
-          >
-            Download
-          </a>
-          <button
-            onClick={() => setUpdateBanner(null)}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "rgba(255,255,255,0.7)",
-              cursor: "pointer",
-              fontSize: 18,
-              lineHeight: 1,
-              padding: "0 4px",
-            }}
-            aria-label="Dismiss"
-          >
-            ×
-          </button>
-        </div>
-      )}
-      {toast && <div className="toast">{toast}</div>}
-      {closeConfirm && (
-        <CloseConfirmModal
-          count={closeConfirm.count}
-          onConfirm={() => {
-            setCloseConfirm(null);
-            window.electron.respondClose(true);
-          }}
-          onCancel={() => {
-            setCloseConfirm(null);
-            window.electron.respondClose(false);
-          }}
-        />
-      )}
-    </>
+    </ErrorBoundary>
   );
 }

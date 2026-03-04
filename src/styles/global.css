@@ -3488,3 +3488,13 @@ kbd {
 .blocked-modal-footer strong {
     color: var(--text2);
 }
+
+/* ── Windows / Linux custom titlebar adjustments ────────────────────────── */
+html[data-win-titlebar] .sidebar {
+    top: 32px;
+}
+
+html[data-win-titlebar] .main {
+    margin-top: 32px;
+    height: calc(100vh - 32px);
+}

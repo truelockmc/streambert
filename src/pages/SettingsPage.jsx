@@ -212,6 +212,105 @@ function ResetConfirmDialog({ onConfirm, onCancel }) {
   );
 }
 
+// ── Generic Confirm Dialog ───────────────────────────────────────────────────
+function ConfirmDialog({
+  title,
+  description,
+  confirmLabel = "Confirm",
+  onConfirm,
+  onCancel,
+}) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1000,
+        background: "rgba(0,0,0,0.75)",
+        backdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <div
+        style={{
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: 12,
+          padding: "36px 40px",
+          maxWidth: 460,
+          width: "90%",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
+        }}
+      >
+        <div
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: "50%",
+            background: "rgba(229,9,20,0.12)",
+            border: "1px solid rgba(229,9,20,0.3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 20,
+          }}
+        >
+          <WarningIcon size={24} />
+        </div>
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 22,
+            letterSpacing: 1,
+            marginBottom: 10,
+          }}
+        >
+          {title}
+        </div>
+        <div
+          style={{
+            fontSize: 13,
+            color: "var(--text2)",
+            lineHeight: 1.7,
+            marginBottom: 28,
+          }}
+        >
+          {description}
+          <br />
+          <br />
+          <span style={{ color: "var(--red)" }}>
+            This action cannot be undone.
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 12 }}>
+          <button
+            className="btn btn-ghost"
+            style={{ flex: 1 }}
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+          <button
+            className="btn"
+            style={{
+              flex: 1,
+              background: "var(--red)",
+              color: "#fff",
+              border: "none",
+              fontWeight: 600,
+            }}
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Status Badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   if (!status) return null;
@@ -248,12 +347,17 @@ function CleanRow({
     setStatus(null);
     try {
       const result = await onAction();
+      if (result?.cancelled) {
+        // User dismissed the confirm dialog
+        return;
+      }
       setStatus(result?.msg || "✓ Done");
+      setTimeout(() => setStatus(null), 4000);
     } catch (e) {
       setStatus("✕ " + (e.message || "Something went wrong"));
+      setTimeout(() => setStatus(null), 4000);
     } finally {
       setBusy(false);
-      setTimeout(() => setStatus(null), 4000);
     }
   };
 
@@ -446,7 +550,7 @@ function VersionSection() {
               (e.currentTarget.style.background = "rgba(229,9,20,0.12)")
             }
           >
-            🎉 v{result.latest} available — Download
+            🎉 v{result.latest} available Download
           </a>
         )}
 
@@ -677,6 +781,201 @@ function HomeLayoutSection() {
         </button>
         {saved && (
           <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Backup & Restore ─────────────────────────────────────────────────────────
+function BackupRestoreSection({ onRestored }) {
+  const [restoreStatus, setRestoreStatus] = useState(null);
+
+  const handleExport = () => {
+    const backup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      data: {
+        saved: JSON.parse(localStorage.getItem("streambert_saved") || "null"),
+        savedOrder: JSON.parse(
+          localStorage.getItem("streambert_savedOrder") || "null",
+        ),
+        history: JSON.parse(
+          localStorage.getItem("streambert_history") || "null",
+        ),
+        progress: JSON.parse(
+          localStorage.getItem("streambert_progress") || "null",
+        ),
+        watched: JSON.parse(
+          localStorage.getItem("streambert_watched") || "null",
+        ),
+        // Settings
+        homeRowOrder: JSON.parse(
+          localStorage.getItem("streambert_homeRowOrder") || "null",
+        ),
+        homeRowVisible: JSON.parse(
+          localStorage.getItem("streambert_homeRowVisible") || "null",
+        ),
+        startPage: JSON.parse(
+          localStorage.getItem("streambert_startPage") || "null",
+        ),
+        ageLimit: JSON.parse(
+          localStorage.getItem("streambert_ageLimit") || "null",
+        ),
+        ratingCountry: JSON.parse(
+          localStorage.getItem("streambert_ratingCountry") || "null",
+        ),
+        watchedThreshold: JSON.parse(
+          localStorage.getItem("streambert_watchedThreshold") || "null",
+        ),
+        subtitleDownload: JSON.parse(
+          localStorage.getItem("streambert_subtitleDownload") || "null",
+        ),
+        subtitleLang: JSON.parse(
+          localStorage.getItem("streambert_subtitleLang") || "null",
+        ),
+        invidiousBase: JSON.parse(
+          localStorage.getItem("streambert_invidiousBase") || "null",
+        ),
+        autoCheckUpdates: JSON.parse(
+          localStorage.getItem("streambert_autoCheckUpdates") || "null",
+        ),
+        playerSource: JSON.parse(
+          localStorage.getItem("streambert_playerSource") || "null",
+        ),
+        downloadPath: JSON.parse(
+          localStorage.getItem("streambert_downloadPath") || "null",
+        ),
+      },
+    };
+    // Remove null fields to keep export clean
+    for (const k of Object.keys(backup.data)) {
+      if (backup.data[k] === null) delete backup.data[k];
+    }
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `streambert-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const backup = JSON.parse(ev.target.result);
+        if (!backup?.data)
+          throw new Error("Invalid backup file, missing data field.");
+        const { data } = backup;
+        const keyMap = {
+          saved: "streambert_saved",
+          savedOrder: "streambert_savedOrder",
+          history: "streambert_history",
+          progress: "streambert_progress",
+          watched: "streambert_watched",
+          homeRowOrder: "streambert_homeRowOrder",
+          homeRowVisible: "streambert_homeRowVisible",
+          startPage: "streambert_startPage",
+          ageLimit: "streambert_ageLimit",
+          ratingCountry: "streambert_ratingCountry",
+          watchedThreshold: "streambert_watchedThreshold",
+          subtitleDownload: "streambert_subtitleDownload",
+          subtitleLang: "streambert_subtitleLang",
+          invidiousBase: "streambert_invidiousBase",
+          autoCheckUpdates: "streambert_autoCheckUpdates",
+          playerSource: "streambert_playerSource",
+          downloadPath: "streambert_downloadPath",
+        };
+        for (const [k, lsKey] of Object.entries(keyMap)) {
+          if (data[k] !== undefined && data[k] !== null) {
+            localStorage.setItem(lsKey, JSON.stringify(data[k]));
+          }
+        }
+        setRestoreStatus("✓ Backup restored: reloading…");
+        setTimeout(() => window.location.reload(), 1200);
+        onRestored?.();
+      } catch (err) {
+        setRestoreStatus("✕ " + (err.message || "Could not read backup file."));
+        setTimeout(() => setRestoreStatus(null), 4000);
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so same file can be re-selected
+    e.target.value = "";
+  };
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">Backup &amp; Restore</div>
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--text3)",
+          marginBottom: 20,
+          lineHeight: 1.6,
+        }}
+      >
+        Export your watchlist, watch history, progress, and all settings to a
+        JSON file. Import it later to restore everything, useful before
+        reinstalling or switching devices.
+      </div>
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <button className="btn btn-primary" onClick={handleExport}>
+          ⬇ Export Backup
+        </button>
+        <label
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "9px 18px",
+            background: "var(--surface2)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            fontSize: 14,
+            fontWeight: 600,
+            color: "var(--text)",
+            cursor: "pointer",
+            transition: "background 0.15s",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.background = "var(--surface)")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.background = "var(--surface2)")
+          }
+        >
+          ⬆ Import Backup
+          <input
+            type="file"
+            accept=".json,application/json"
+            onChange={handleImport}
+            style={{ display: "none" }}
+          />
+        </label>
+        {restoreStatus && (
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              color: restoreStatus.startsWith("✕") ? "var(--red)" : "#48c774",
+            }}
+          >
+            {restoreStatus}
+          </span>
         )}
       </div>
     </div>
@@ -1018,6 +1317,8 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
   const [saved, setSaved] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetHovered, setResetHovered] = useState(false);
+  const [showProgressConfirm, setShowProgressConfirm] = useState(false);
+  const [showDeleteDlConfirm, setShowDeleteDlConfirm] = useState(false);
 
   // Age Rating
   const [ratingCountry, setRatingCountry] = useState(
@@ -1182,6 +1483,42 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
 
   return (
     <>
+      {showProgressConfirm && (
+        <ConfirmDialog
+          title="CLEAR WATCH PROGRESS?"
+          description="This will permanently delete all watch history, continue-watching progress, and watched/completed markings for all movies and series."
+          confirmLabel="Yes, Clear Everything"
+          onConfirm={async () => {
+            setShowProgressConfirm(false);
+            await handleClearWatchProgress();
+            window.__progressConfirmResolve?.({ msg: "✓ Watch data cleared" });
+            window.__progressConfirmResolve = null;
+          }}
+          onCancel={() => {
+            setShowProgressConfirm(false);
+            window.__progressConfirmResolve?.({ cancelled: true });
+            window.__progressConfirmResolve = null;
+          }}
+        />
+      )}
+      {showDeleteDlConfirm && (
+        <ConfirmDialog
+          title="DELETE ALL DOWNLOADS?"
+          description="This will permanently delete all video files downloaded through Streambert and remove them from the download list."
+          confirmLabel="Yes, Delete All"
+          onConfirm={async () => {
+            setShowDeleteDlConfirm(false);
+            const result = await handleDeleteAllDownloads();
+            window.__deleteDlConfirmResolve?.(result);
+            window.__deleteDlConfirmResolve = null;
+          }}
+          onCancel={() => {
+            setShowDeleteDlConfirm(false);
+            window.__deleteDlConfirmResolve?.({ cancelled: true });
+            window.__deleteDlConfirmResolve = null;
+          }}
+        />
+      )}
       {showResetConfirm && (
         <ResetConfirmDialog
           onConfirm={handleResetApp}
@@ -1573,6 +1910,12 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
           style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
         />
 
+        {/* ══ BACKUP & RESTORE ════════════════════════════════════════════════ */}
+        <div
+          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
+        />
+        <BackupRestoreSection />
+
         {/* ══ STORAGE & DATA ══════════════════════════════════════════════════ */}
         <div
           style={{
@@ -1615,7 +1958,14 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
               title="Clear Watch Progress"
               description="Resets all watch history, continue-watching progress, and watched / completed markings for movies and series. Also clears internal video player session data."
               buttonLabel="Clear Progress"
-              onAction={handleClearWatchProgress}
+              onAction={() =>
+                new Promise((resolve) => {
+                  setShowProgressConfirm(true);
+                  // store resolve so confirm dialog can call it
+                  window.__progressConfirmResolve = resolve;
+                })
+              }
+              danger
             />
           </div>
 
@@ -1625,9 +1975,14 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
           <div style={{ padding: "22px 24px" }}>
             <CleanRow
               title="Delete All Downloads"
-              description="Permanently deletes all video files that were downloaded through Streambert and removes them from the download list. Only files downloaded trough the app will be deleted, nothing else in your folder is touched."
+              description="Permanently deletes all video files that were downloaded through Streambert and removes them from the download list. Only files downloaded through the app will be deleted, nothing else in your folder is touched."
               buttonLabel="Delete All"
-              onAction={handleDeleteAllDownloads}
+              onAction={() =>
+                new Promise((resolve) => {
+                  setShowDeleteDlConfirm(true);
+                  window.__deleteDlConfirmResolve = resolve;
+                })
+              }
               sizeLabel={formatBytes(sizes.downloads)}
               danger
             />

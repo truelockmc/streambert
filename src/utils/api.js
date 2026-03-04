@@ -18,10 +18,35 @@ export const setApiErrorHandlers = (onAuth, onUnreachable) => {
 const _tmdbCache = new Map(); // key → { data, expiresAt }
 const TMDB_CACHE_TTL = 5 * 60 * 1000;
 
+// ── Request queue (max 4 concurrent TMDB fetches) ────────────────────────────
+// Prevents bursts of 10–20 parallel requests from carousel/similar-rows rapid
+// navigation from hammering the API and triggering rate-limit responses.
+let _inflight = 0;
+const MAX_INFLIGHT = 4;
+const _waiters = [];
+
+function _acquireSlot() {
+  if (_inflight < MAX_INFLIGHT) {
+    _inflight++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => _waiters.push(resolve));
+}
+
+function _releaseSlot() {
+  _inflight--;
+  if (_waiters.length > 0) {
+    _inflight++;
+    _waiters.shift()();
+  }
+}
+
 export const tmdbFetch = async (path, apiKey) => {
   const cacheKey = `${apiKey}|${path}`;
   const cached = _tmdbCache.get(cacheKey);
   if (cached && Date.now() < cached.expiresAt) return cached.data;
+
+  await _acquireSlot();
 
   let res;
   try {
@@ -29,10 +54,16 @@ export const tmdbFetch = async (path, apiKey) => {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
   } catch {
-    // Network failure
+    _releaseSlot();
     _onUnreachable?.();
     throw new Error("TMDB unreachable");
+  } finally {
+    // releaseSlot is called in the catch above for network errors;
+    // for successful responses we release after parsing so the slot
+    // is held only during the actual in-flight request, not parsing.
   }
+
+  _releaseSlot();
 
   if (res.status === 401 || res.status === 403) {
     _onAuthError?.();

@@ -113,4 +113,10 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("secure-store-get", key).then((r) => r.value ?? null),
   secureSet: (key, value) =>
     ipcRenderer.invoke("secure-store-set", { key, value }),
+  // Window controls (Windows custom titlebar)
+  windowMinimize: () => ipcRenderer.invoke("window-minimize"),
+  windowToggleMaximize: () => ipcRenderer.invoke("window-toggle-maximize"),
+  windowClose: () => ipcRenderer.invoke("window-close"),
+  windowIsMaximized: () => ipcRenderer.invoke("window-is-maximized"),
+  getPlatform: () => ipcRenderer.invoke("get-platform"),
 });

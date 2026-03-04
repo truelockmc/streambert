@@ -10,6 +10,7 @@ import {
   DownloadsQueueIcon,
   QuitIcon,
   BackIcon,
+  HelpIcon,
 } from "./Icons";
 
 export default function Sidebar({
@@ -22,6 +23,7 @@ export default function Sidebar({
   onRemoveSaved,
   canGoBack,
   onBack,
+  onShowShortcuts,
 }) {
   const [dragOver, setDragOver] = useState(null);
   const dragItem = useRef(null);
@@ -211,6 +213,11 @@ export default function Sidebar({
       )}
 
       <div className="sidebar-bottom">
+        <SideBtn
+          onClick={onShowShortcuts}
+          icon={<HelpIcon />}
+          label="Help & Shortcuts (?)"
+        />
         <SideBtn
           active={page === "settings"}
           onClick={() => onNavigate("settings")}
