@@ -109,10 +109,23 @@ export default function DownloadsPage({
       ) {
         window.electron.fileExists(d.filePath).then((exists) => {
           setFileExistsCache((prev) => ({ ...prev, [d.id]: exists }));
-          // Auto-remove from registry if file was deleted externally
+          // Auto-remove from registry if video file was deleted externally
           if (!exists) {
             window.electron.deleteDownload({ id: d.id, filePath: null });
             onDeleteDownload(d.id);
+          }
+        });
+      }
+
+      // Prune subtitle paths that were deleted externally from the filesystem
+      if (
+        d.status === "completed" &&
+        d.subtitlePaths?.length > 0 &&
+        window.electron.pruneSubtitlePaths
+      ) {
+        window.electron.pruneSubtitlePaths(d.id).then((res) => {
+          if (res?.ok && res.subtitlePaths.length !== d.subtitlePaths.length) {
+            onUpdateDownload?.(d.id, { subtitlePaths: res.subtitlePaths });
           }
         });
       }
@@ -286,7 +299,15 @@ export default function DownloadsPage({
                   key={dl.id}
                   dl={dl}
                   fileExists={dl.isLocalOnly ? true : fileExistsCache[dl.id]}
-                  onWatch={() => window.electron.openPath(dl.filePath)}
+                  onWatch={(subtitlePaths) =>
+                    subtitlePaths?.length > 0
+                      ? window.electron.openPathAtTime(
+                          dl.filePath,
+                          0,
+                          subtitlePaths,
+                        )
+                      : window.electron.openPath(dl.filePath)
+                  }
                   onHistory={onHistory}
                   onShowFolder={() =>
                     window.electron?.showInFolder(dl.filePath)
@@ -515,9 +536,9 @@ function LocalFileCard({
       });
     }
     if (savedSecs > 0 && window.electron?.openPathAtTime) {
-      window.electron.openPathAtTime(dl.filePath, savedSecs);
+      window.electron.openPathAtTime(dl.filePath, savedSecs, dl.subtitlePaths);
     } else {
-      onWatch();
+      onWatch(dl.subtitlePaths);
     }
   }, [dl.filePath, savedSecs, onWatch, onHistory, dl]);
 

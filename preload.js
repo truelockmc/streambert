@@ -39,8 +39,14 @@ contextBridge.exposeInMainWorld("electron", {
   pickFolder: () => ipcRenderer.invoke("pick-folder"),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
   openPath: (filePath) => ipcRenderer.invoke("open-path", filePath),
-  openPathAtTime: (filePath, seconds) =>
-    ipcRenderer.invoke("open-path-at-time", { filePath, seconds }),
+  openPathAtTime: (filePath, seconds, subtitlePaths) =>
+    ipcRenderer.invoke("open-path-at-time", {
+      filePath,
+      seconds,
+      subtitlePaths,
+    }),
+  pruneSubtitlePaths: (downloadId) =>
+    ipcRenderer.invoke("prune-subtitle-paths", { downloadId }),
 
   // Close confirmation
   onConfirmClose: (cb) => {

@@ -968,10 +968,33 @@ ipcMain.handle(
             const videoBase = downloads[idx].filePath.replace(/\.[^.]+$/, "");
             const langCounter = {};
             const subPromises = downloads[idx].subtitles.map(
-              ({ url, lang, file_id }) => {
-                const subExt = url.toLowerCase().includes(".srt")
-                  ? ".srt"
-                  : ".vtt";
+              ({ url, lang, name, file_id }) => {
+                const KNOWN_SUB_EXTS = [
+                  ".vtt",
+                  ".srt",
+                  ".ass",
+                  ".ssa",
+                  ".sub",
+                  ".idx",
+                ];
+                // 1. Try URL itself (strip query/hash first)
+                const urlClean = url.split("?")[0].split("#")[0];
+                const urlExt = path
+                  .extname(urlClean)
+                  .toLowerCase()
+                  .replace(/[^a-z0-9.]/g, "");
+                // 2. Fallback: extract from name field (e.g. "Movie.Title.srt")
+                const nameExt = name
+                  ? path
+                      .extname(name)
+                      .toLowerCase()
+                      .replace(/[^a-z0-9.]/g, "")
+                  : "";
+                const subExt = KNOWN_SUB_EXTS.includes(urlExt)
+                  ? urlExt
+                  : KNOWN_SUB_EXTS.includes(nameExt)
+                    ? nameExt
+                    : ".srt";
                 const safeLang = (lang || "unknown").replace(
                   /[^a-z0-9_-]/gi,
                   "",
@@ -1105,71 +1128,96 @@ ipcMain.handle("open-path", (_, filePath) => {
 });
 
 // ── IPC: open file at specific timestamp ─────────────────────────────────────
-ipcMain.handle("open-path-at-time", (_, { filePath, seconds }) => {
-  const sec = Math.floor(seconds || 0);
-  const platform = process.platform;
+ipcMain.handle(
+  "open-path-at-time",
+  (_, { filePath, seconds, subtitlePaths }) => {
+    const sec = Math.floor(seconds || 0);
+    const platform = process.platform;
 
-  // Resolve a binary to its full path synchronously.
-  // For absolute paths: check fs.existsSync.
-  // For bare names: use `which` (Linux/mac) or `where` (Windows) via spawnSync.
-  const resolveBin = (bin) => {
-    if (path.isAbsolute(bin)) {
-      return fs.existsSync(bin) ? bin : null;
-    }
-    const whichCmd = platform === "win32" ? "where" : "which";
-    try {
-      const result = spawnSync(whichCmd, [bin], { encoding: "utf8" });
-      if (result.status === 0 && result.stdout.trim()) {
-        return result.stdout.trim().split("\n")[0].trim();
+    // Resolve a binary to its full path synchronously.
+    // For absolute paths: check fs.existsSync.
+    // For bare names: use `which` (Linux/mac) or `where` (Windows) via spawnSync.
+    const resolveBin = (bin) => {
+      if (path.isAbsolute(bin)) {
+        return fs.existsSync(bin) ? bin : null;
       }
-    } catch {}
-    return null;
-  };
+      const whichCmd = platform === "win32" ? "where" : "which";
+      try {
+        const result = spawnSync(whichCmd, [bin], { encoding: "utf8" });
+        if (result.status === 0 && result.stdout.trim()) {
+          return result.stdout.trim().split("\n")[0].trim();
+        }
+      } catch {}
+      return null;
+    };
 
-  const tryLaunch = (bin, args) => {
-    const resolved = resolveBin(bin);
-    if (!resolved) return false;
-    try {
-      const proc = spawn(resolved, args, { detached: true, stdio: "ignore" });
-      proc.unref();
-      return true;
-    } catch {
-      return false;
+    const tryLaunch = (bin, args) => {
+      const resolved = resolveBin(bin);
+      if (!resolved) return false;
+      try {
+        const proc = spawn(resolved, args, { detached: true, stdio: "ignore" });
+        proc.unref();
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const vlcPaths =
+      platform === "win32"
+        ? [
+            "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe",
+            "C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe",
+            "vlc",
+          ]
+        : platform === "darwin"
+          ? ["/Applications/VLC.app/Contents/MacOS/VLC", "vlc"]
+          : ["/usr/bin/vlc", "/usr/local/bin/vlc", "/snap/bin/vlc", "vlc"];
+
+    const mpvPaths =
+      platform === "win32"
+        ? ["mpv", "C:\\Program Files\\mpv\\mpv.exe"]
+        : platform === "darwin"
+          ? ["/opt/homebrew/bin/mpv", "/usr/local/bin/mpv", "mpv"]
+          : ["/usr/bin/mpv", "/usr/local/bin/mpv", "/snap/bin/mpv", "mpv"];
+
+    // Build --sub-file= args for MPV from subtitlePaths (supports multiple subs)
+    const subFilePaths = Array.isArray(subtitlePaths)
+      ? subtitlePaths
+          .map((sp) => (typeof sp === "string" ? sp : sp?.path))
+          .filter((p) => p && fs.existsSync(p))
+      : [];
+    const mpvSubArgs = subFilePaths.map((p) => `--sub-file=${p}`);
+    // VLC only supports a single --sub-file, use the first one
+    const vlcSubArgs =
+      subFilePaths.length > 0 ? [`--sub-file=${subFilePaths[0]}`] : [];
+
+    if (sec > 0) {
+      // Try mpv first
+      for (const mpv of mpvPaths) {
+        if (tryLaunch(mpv, [`--start=${sec}`, ...mpvSubArgs, filePath])) return;
+      }
+      // Try VLC
+      for (const vlc of vlcPaths) {
+        if (tryLaunch(vlc, [`--start-time=${sec}`, ...vlcSubArgs, filePath]))
+          return;
+      }
+    } else {
+      // No timestamp but still pass subtitles
+      if (mpvSubArgs.length > 0) {
+        for (const mpv of mpvPaths) {
+          if (tryLaunch(mpv, [...mpvSubArgs, filePath])) return;
+        }
+        for (const vlc of vlcPaths) {
+          if (tryLaunch(vlc, [...vlcSubArgs, filePath])) return;
+        }
+      }
     }
-  };
 
-  const vlcPaths =
-    platform === "win32"
-      ? [
-          "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe",
-          "C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe",
-          "vlc",
-        ]
-      : platform === "darwin"
-        ? ["/Applications/VLC.app/Contents/MacOS/VLC", "vlc"]
-        : ["/usr/bin/vlc", "/usr/local/bin/vlc", "/snap/bin/vlc", "vlc"];
-
-  const mpvPaths =
-    platform === "win32"
-      ? ["mpv", "C:\\Program Files\\mpv\\mpv.exe"]
-      : platform === "darwin"
-        ? ["/opt/homebrew/bin/mpv", "/usr/local/bin/mpv", "mpv"]
-        : ["/usr/bin/mpv", "/usr/local/bin/mpv", "/snap/bin/mpv", "mpv"];
-
-  if (sec > 0) {
-    // Try mpv first
-    for (const mpv of mpvPaths) {
-      if (tryLaunch(mpv, [`--start=${sec}`, filePath])) return;
-    }
-    // Try VLC
-    for (const vlc of vlcPaths) {
-      if (tryLaunch(vlc, [`--start-time=${sec}`, filePath])) return;
-    }
-  }
-
-  // Fallback: open with default app (no timestamp)
-  shell.openPath(filePath);
-});
+    // Fallback: open with default app (no timestamp)
+    shell.openPath(filePath);
+  },
+);
 
 // ── IPC: scan directory for video files ──────────────────────────────────────
 ipcMain.handle("scan-directory", (_, folderPath) => {
@@ -1638,6 +1686,30 @@ ipcMain.handle(
 );
 
 // ── IPC: Delete a single subtitle file and remove from registry ───────────────
+// ── IPC: prune subtitle paths that no longer exist on disk ───────────────────
+// Returns the surviving subtitlePaths array (already persisted in registry).
+ipcMain.handle("prune-subtitle-paths", (_, { downloadId }) => {
+  try {
+    const idx = downloads.findIndex((d) => d.id === downloadId);
+    if (idx < 0) return { ok: true, subtitlePaths: [] };
+
+    const before = downloads[idx].subtitlePaths || [];
+    const after = before.filter((sp) => {
+      const p = typeof sp === "string" ? sp : sp?.path;
+      return p && fs.existsSync(p);
+    });
+
+    if (after.length !== before.length) {
+      downloads[idx].subtitlePaths = after;
+      saveDownloads();
+    }
+
+    return { ok: true, subtitlePaths: after };
+  } catch (e) {
+    return { ok: false, error: e.message, subtitlePaths: [] };
+  }
+});
+
 ipcMain.handle("delete-subtitle-file", (_, { downloadId, subtitlePath }) => {
   try {
     // Delete the physical file

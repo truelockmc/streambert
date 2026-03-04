@@ -491,17 +491,21 @@ export default function DownloadModal({
       for (const sub of selectedSubs) {
         try {
           let url = sub.direct_url || null;
+          let resolvedFileName = null;
           if (!url && sub.file_id) {
             const urlRes = await window.electron.getSubtitleUrl({
               fileId: sub.file_id,
             });
-            if (urlRes.ok) url = urlRes.url;
+            if (urlRes.ok) {
+              url = urlRes.url;
+              resolvedFileName = urlRes.file_name || null;
+            }
           }
           if (url) {
             resolvedSubs.push({
               url,
               lang: sub.language,
-              name: sub.release || sub.file_name,
+              name: resolvedFileName || sub.release || sub.file_name,
               file_id: sub.file_id || null,
             });
           }
