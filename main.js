@@ -101,7 +101,22 @@ const PART_FILE_SUFFIXES = [
 function loadDownloads() {
   try {
     const raw = fs.readFileSync(downloadsFile(), "utf8");
-    downloads = JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    // Deduplicate: keep only the newest entry per (tmdbId, mediaType, season, episode)
+    const seen = new Map();
+    const sorted = [...parsed].sort(
+      (a, b) =>
+        (b.completedAt || b.startedAt || 0) -
+        (a.completedAt || a.startedAt || 0),
+    );
+    for (const d of sorted) {
+      const key =
+        d.tmdbId && d.mediaType
+          ? `${d.tmdbId}|${d.mediaType}|${d.season ?? ""}|${d.episode ?? ""}`
+          : d.id; // no tmdbId → use id so it's always kept
+      if (!seen.has(key)) seen.set(key, d);
+    }
+    downloads = [...seen.values()];
   } catch {
     downloads = [];
   }
@@ -636,6 +651,16 @@ ipcMain.handle(
         subtitlePaths: [], // [{lang, path}] filled after download completes
       };
       downloads.push(entry);
+
+      // Remove any stale entries for the same media (e.g. file deleted externally)
+      const isSameMedia = (d) =>
+        d.id !== id &&
+        d.tmdbId &&
+        d.tmdbId === entry.tmdbId &&
+        d.mediaType === entry.mediaType &&
+        String(d.season ?? "") === String(entry.season ?? "") &&
+        String(d.episode ?? "") === String(entry.episode ?? "");
+      downloads = downloads.filter((d) => !isSameMedia(d));
       // Do NOT call sendProgress here. The renderer adds the initial entry via
       // handleDownloadStarted() after invoke() resolves. Calling sendProgress()
       // synchronously inside the handler causes the event to arrive at the renderer
