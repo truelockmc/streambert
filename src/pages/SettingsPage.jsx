@@ -476,9 +476,10 @@ function VersionSection() {
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState(null); // { latest, current, url, hasUpdate } | { error }
   const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [autoCheck, setAutoCheck] = useState(
-    () => !!storage.get("autoCheckUpdates"),
-  );
+  const [autoCheck, setAutoCheck] = useState(() => {
+    const stored = storage.get("autoCheckUpdates");
+    return stored === null || stored === undefined ? true : !!stored;
+  });
   const [autoSaved, setAutoSaved] = useState(false);
   const [currentVersion, setCurrentVersion] = useState(APP_VERSION);
 

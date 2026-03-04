@@ -1500,8 +1500,10 @@ function applySecretMigrationIfNeeded() {
     for (const [k, v] of Object.entries(plain)) {
       if (v) secureStoreSet(k, v);
     }
-    fs.unlinkSync(mf);
   } catch {
+    /* ignore parse/decrypt errors */
+  } finally {
+    // Always delete
     try {
       fs.unlinkSync(mf);
     } catch {}
