@@ -38,6 +38,7 @@
     },
     "files": [
       "dist/**/*",
+      "src/ipc/**/*",
       "index.js",
       "preload.js",
       "package.json",
