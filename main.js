@@ -3009,20 +3009,9 @@ ipcMain.handle("download-and-install-update", async (_, { url, format }) => {
       }
       // Keep app running so user can see terminal output / confirm dialog
     } else if (format === "exe") {
-      // Windows NSIS installer: request UAC elevation via runas verb
-      // shell.openPath uses ShellExecute which respects the exe's requireAdministrator manifest
-      // For extra certainty we use the "runas" verb via PowerShell
-      const psCmd = `Start-Process -FilePath '${destPath}' -Verb RunAs`;
-      try {
-        spawn("powershell.exe", ["-NoProfile", "-Command", psCmd], {
-          detached: true,
-          stdio: "ignore",
-          windowsHide: false,
-        }).unref();
-      } catch {
-        // Fallback: plain ShellExecute (still triggers UAC if manifest requires it)
-        spawn(destPath, [], { detached: true, stdio: "ignore" }).unref();
-      }
+      // Windows NSIS installer: launch directly, no UAC elevation needed
+      // (installer is configured with perMachine=false, so no admin required)
+      spawn(destPath, [], { detached: true, stdio: "ignore" }).unref();
       app.exit(0);
     }
 

@@ -45,6 +45,17 @@
       "!**/*.md",
       "!**/node_modules/.cache/**"
     ],
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createStartMenuShortcut": true,
+      "selectPerMachineByDefault": false,
+      "license": "LICENSE",
+      "uninstallDisplayName": "Uninstall Streambert",
+      "installerSidebar": "public/installer-sidebar.bmp"
+    },
     "win": {
       "icon": "public/icon.png",
       "target": [
