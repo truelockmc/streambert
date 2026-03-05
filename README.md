@@ -10,7 +10,8 @@ A cross-platform Electron Desktop App to stream and download any Movie, TV Serie
 
 ## Why Streambert?
 - 🎦 **Streaming:** Stream any Movie, Anime or TV Series from around the World.
-- 📥 **Downloading:** Download anything you want to watch (with Subtitles).
+- 📥 **Downloading:** Download anything you want to watch.
+- 📃 **Subtitles:** Download and manage Subtitles.
 - ⚙️ **Customizability:** Customize the Interface and Features to your unique needs.
 - 📚 **Library:** Track what you watched, save stuff you want to watch and manage your Downloads.
 - ✨ **Trending:** Discover new things to Watch every Day.
@@ -22,6 +23,7 @@ A cross-platform Electron Desktop App to stream and download any Movie, TV Serie
 ![Watch Movies](screenshots/movie.png)
 ![Watch Anime](screenshots/anime.png)
 ![Without any Ads or Trackers](screenshots/adblock.png)
+![Download Subtitles](screenshots/subs.png)
 ![Download Everything](screenshots/download.png)
 ---
 [![Stargazers](https://reporoster.com/stars/dark/truelockmc/streambert)](https://github.com/truelockmc/streambert/stargazers)
