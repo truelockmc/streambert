@@ -1665,6 +1665,639 @@ function SubtitleSettingsSection() {
   );
 }
 
+// ── Section Group Header ──────────────────────────────────────────────────────
+function SectionGroupHeader({ title, subtitle }) {
+  return (
+    <div style={{ marginBottom: 32, marginTop: 4 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 14,
+          marginBottom: subtitle ? 6 : 0,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 11,
+            letterSpacing: 3,
+            color: "var(--red)",
+            textTransform: "uppercase",
+            fontWeight: 700,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {title}
+        </div>
+        <div
+          style={{ flex: 1, height: 1, background: "rgba(229,9,20,0.18)" }}
+        />
+      </div>
+      {subtitle && (
+        <div style={{ fontSize: 12, color: "var(--text3)", lineHeight: 1.5 }}>
+          {subtitle}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Section divider ───────────────────────────────────────────────────────────
+function Divider() {
+  return (
+    <div style={{ height: 1, background: "var(--border)", marginBottom: 40 }} />
+  );
+}
+
+// ── Search & Nav Bar ──────────────────────────────────────────────────────────
+const SECTION_NAV = [
+  {
+    id: "updates",
+    label: "Updates & API",
+    icon: "↑",
+    keywords: [
+      "update",
+      "version",
+      "tmdb",
+      "api",
+      "token",
+      "key",
+      "check",
+      "startup",
+      "auto",
+      "app",
+    ],
+  },
+  {
+    id: "content",
+    label: "Age Rating",
+    icon: "🔞",
+    keywords: [
+      "age",
+      "rating",
+      "parental",
+      "content",
+      "country",
+      "restriction",
+      "pg",
+      "fsk",
+      "adults",
+    ],
+  },
+  {
+    id: "playback",
+    label: "Playback",
+    icon: "▶",
+    keywords: [
+      "invidious",
+      "trailer",
+      "youtube",
+      "threshold",
+      "watched",
+      "playback",
+      "seconds",
+      "mark",
+      "auto-watched",
+    ],
+  },
+  {
+    id: "subtitles",
+    label: "Subtitles",
+    icon: "CC",
+    keywords: [
+      "subtitle",
+      "subdl",
+      "wyzie",
+      "language",
+      "caption",
+      "srt",
+      "download",
+      "cc",
+    ],
+  },
+  {
+    id: "downloads",
+    label: "Downloads",
+    icon: "⬇",
+    keywords: [
+      "download",
+      "folder",
+      "path",
+      "save",
+      "video",
+      "movies",
+      "files",
+    ],
+  },
+  {
+    id: "interface",
+    label: "Interface",
+    icon: "✦",
+    keywords: [
+      "home",
+      "layout",
+      "start page",
+      "appearance",
+      "accent",
+      "colour",
+      "color",
+      "font",
+      "compact",
+      "animation",
+      "theme",
+      "rows",
+      "hero",
+    ],
+  },
+  {
+    id: "library",
+    label: "Library",
+    icon: "📚",
+    keywords: [
+      "library",
+      "watchlist",
+      "sort",
+      "history",
+      "privacy",
+      "watch history",
+      "continue",
+    ],
+  },
+  {
+    id: "backup",
+    label: "Backup",
+    icon: "💾",
+    keywords: [
+      "backup",
+      "restore",
+      "export",
+      "import",
+      "scheduled",
+      "json",
+      "backup file",
+    ],
+  },
+  {
+    id: "storage",
+    label: "Storage & Data",
+    icon: "🗄",
+    keywords: [
+      "storage",
+      "cache",
+      "clear",
+      "reset",
+      "delete",
+      "data",
+      "wipe",
+      "progress",
+      "factory",
+    ],
+  },
+];
+
+function SettingsTopBar({ sectionRefs }) {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const inputRef = useRef(null);
+  const navRef = useRef(null);
+  const barRef = useRef(null);
+
+  // Close nav dropdown on outside click
+  useEffect(() => {
+    if (!navOpen) return;
+    const handler = (e) => {
+      if (navRef.current && !navRef.current.contains(e.target))
+        setNavOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [navOpen]);
+
+  // Focus input when search opens
+  useEffect(() => {
+    if (searchOpen && inputRef.current) inputRef.current.focus();
+  }, [searchOpen]);
+
+  // Escape closes search / ⌘K opens it
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "Escape") {
+        setSearchOpen(false);
+        setQuery("");
+        setNavOpen(false);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen((o) => !o);
+        if (searchOpen) setQuery("");
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [searchOpen]);
+
+  const scrollTo = (id) => {
+    const el = sectionRefs[id]?.current;
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    setNavOpen(false);
+    setSearchOpen(false);
+    setQuery("");
+  };
+
+  const matches = query.trim()
+    ? SECTION_NAV.filter(
+        (s) =>
+          s.label.toLowerCase().includes(query.toLowerCase()) ||
+          s.keywords.some((kw) => kw.includes(query.toLowerCase())),
+      )
+    : [];
+
+  const hasResults = query.trim().length > 0;
+
+  return (
+    <div
+      ref={barRef}
+      style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 100,
+        background: "var(--bg, #141414)",
+        borderBottom: `1px solid ${searchOpen && hasResults ? "transparent" : "var(--border)"}`,
+        padding: "0 48px",
+        backdropFilter: "blur(12px)",
+      }}
+    >
+      {/* Main bar row */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 0",
+        }}
+      >
+        {/* Search area */}
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+          {searchOpen ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                flex: 1,
+                maxWidth: 480,
+                background: "var(--surface2)",
+                border: "1px solid var(--red)",
+                borderRadius: 8,
+                padding: "6px 12px",
+                boxShadow: "0 0 0 3px rgba(229,9,20,0.1)",
+              }}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--text3)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ flexShrink: 0 }}
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                ref={inputRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search settings…"
+                style={{
+                  flex: 1,
+                  background: "transparent",
+                  border: "none",
+                  outline: "none",
+                  fontSize: 14,
+                  color: "var(--text)",
+                  fontFamily: "var(--font-body)",
+                  minWidth: 0,
+                }}
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--text3)",
+                    display: "flex",
+                    alignItems: "center",
+                    padding: 2,
+                    borderRadius: 4,
+                  }}
+                  title="Clear"
+                >
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setSearchOpen(false);
+                  setQuery("");
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--text3)",
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "2px 6px",
+                  fontSize: 11,
+                  borderRadius: 4,
+                  marginLeft: 2,
+                }}
+                title="Close (Esc)"
+              >
+                Esc
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setSearchOpen(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                background: "var(--surface2)",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                padding: "6px 14px",
+                fontSize: 13,
+                color: "var(--text3)",
+                cursor: "pointer",
+                transition: "all 0.15s",
+                fontFamily: "var(--font-body)",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "var(--surface3)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "var(--surface2)")
+              }
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              Search settings…
+              <span
+                style={{
+                  fontSize: 10,
+                  color: "var(--text3)",
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 4,
+                  padding: "1px 6px",
+                  fontFamily: "monospace",
+                  letterSpacing: 0.5,
+                }}
+              >
+                ⌘K
+              </span>
+            </button>
+          )}
+        </div>
+
+        {/* Jump to section dropdown */}
+        <div ref={navRef} style={{ position: "relative", flexShrink: 0 }}>
+          <button
+            onClick={() => setNavOpen((o) => !o)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              background: navOpen ? "var(--surface3)" : "var(--surface2)",
+              border: `1px solid ${navOpen ? "var(--red)" : "var(--border)"}`,
+              boxShadow: navOpen ? "0 0 0 3px rgba(229,9,20,0.1)" : "none",
+              borderRadius: 8,
+              padding: "6px 14px",
+              fontSize: 13,
+              color: "var(--text)",
+              cursor: "pointer",
+              transition: "all 0.15s",
+              fontFamily: "var(--font-body)",
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="8" y1="6" x2="21" y2="6" />
+              <line x1="8" y1="12" x2="21" y2="12" />
+              <line x1="8" y1="18" x2="21" y2="18" />
+              <circle cx="3" cy="6" r="1" fill="currentColor" />
+              <circle cx="3" cy="12" r="1" fill="currentColor" />
+              <circle cx="3" cy="18" r="1" fill="currentColor" />
+            </svg>
+            Jump to Section
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--text3)"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              style={{
+                transform: navOpen ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.2s",
+                flexShrink: 0,
+              }}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+
+          {navOpen && (
+            <div
+              style={{
+                position: "absolute",
+                top: "calc(100% + 6px)",
+                right: 0,
+                zIndex: 200,
+                background: "var(--surface3)",
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                boxShadow: "0 20px 60px rgba(0,0,0,0.55)",
+                minWidth: 230,
+                padding: 6,
+              }}
+            >
+              {SECTION_NAV.map((s) => (
+                <button
+                  key={s.id}
+                  onMouseDown={() => scrollTo(s.id)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    width: "100%",
+                    textAlign: "left",
+                    background: "transparent",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "9px 12px",
+                    fontSize: 13,
+                    color: "var(--text)",
+                    cursor: "pointer",
+                    transition: "background 0.1s",
+                    fontFamily: "var(--font-body)",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background =
+                      "rgba(255,255,255,0.07)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background = "transparent")
+                  }
+                >
+                  <span
+                    style={{
+                      width: 22,
+                      textAlign: "center",
+                      fontSize: 13,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {s.icon}
+                  </span>
+                  <span style={{ flex: 1 }}>{s.label}</span>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--text3)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  >
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Search results panel — inline, no modal */}
+      {searchOpen && hasResults && (
+        <div
+          style={{
+            borderTop: "1px solid var(--border)",
+            padding: "12px 0 14px",
+          }}
+        >
+          {matches.length === 0 ? (
+            <div
+              style={{ fontSize: 13, color: "var(--text3)", paddingLeft: 2 }}
+            >
+              No results for <em>"{query}"</em>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              <span
+                style={{ fontSize: 12, color: "var(--text3)", marginRight: 4 }}
+              >
+                Go to:
+              </span>
+              {matches.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => scrollTo(s.id)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: "rgba(229,9,20,0.09)",
+                    border: "1px solid rgba(229,9,20,0.25)",
+                    borderRadius: 20,
+                    padding: "5px 13px",
+                    fontSize: 13,
+                    color: "var(--red)",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    fontFamily: "var(--font-body)",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(229,9,20,0.2)";
+                    e.currentTarget.style.borderColor = "rgba(229,9,20,0.5)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(229,9,20,0.09)";
+                    e.currentTarget.style.borderColor = "rgba(229,9,20,0.25)";
+                  }}
+                >
+                  <span>{s.icon}</span>
+                  {s.label}
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  >
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function SettingsPage({ apiKey, onChangeApiKey }) {
   const [downloadPath, setDownloadPath] = useState(
@@ -1678,6 +2311,29 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
   const [resetHovered, setResetHovered] = useState(false);
   const [showProgressConfirm, setShowProgressConfirm] = useState(false);
   const [showDeleteDlConfirm, setShowDeleteDlConfirm] = useState(false);
+
+  // ── Section refs for navigation ────────────────────────────────────────────
+  const secUpdates = useRef(null);
+  const secContent = useRef(null);
+  const secPlayback = useRef(null);
+  const secSubtitles = useRef(null);
+  const secDownloads = useRef(null);
+  const secInterface = useRef(null);
+  const secLibrary = useRef(null);
+  const secBackup = useRef(null);
+  const secStorage = useRef(null);
+
+  const sectionRefs = {
+    updates: secUpdates,
+    content: secContent,
+    playback: secPlayback,
+    subtitles: secSubtitles,
+    downloads: secDownloads,
+    interface: secInterface,
+    library: secLibrary,
+    backup: secBackup,
+    storage: secStorage,
+  };
 
   // Age Rating
   const [ratingCountry, setRatingCountry] = useState(
@@ -1883,7 +2539,10 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
         />
       )}
 
-      <div className="fade-in" style={{ padding: "48px 48px 80px" }}>
+      {/* ── Sticky search & navigation bar ── */}
+      <SettingsTopBar sectionRefs={sectionRefs} />
+
+      <div className="fade-in" style={{ padding: "40px 48px 80px" }}>
         {/* Page title */}
         <div
           style={{
@@ -1899,510 +2558,552 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
           App configuration for Streambert
         </div>
 
-        {/* ── Version & Updates ── */}
-        <VersionSection />
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* GROUP: GENERAL                                                     */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <div ref={secUpdates} style={{ scrollMarginTop: 80 }}>
+          <SectionGroupHeader
+            title="General"
+            subtitle="App version, updates, and API credentials"
+          />
 
-        <div
-          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
-        />
+          {/* Version & Updates */}
+          <VersionSection />
 
-        {/* ── TMDB API Key/Read Access Token ── */}
-        <div style={{ marginBottom: 40 }}>
-          <div className="settings-section-title">TMDB Read Access Token</div>
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <code
+          <Divider />
+
+          {/* TMDB API Token */}
+          <div style={{ marginBottom: 40 }}>
+            <div className="settings-section-title">TMDB Read Access Token</div>
+            <div
               style={{
                 fontSize: 13,
-                color: "var(--text2)",
-                background: "var(--surface2)",
-                padding: "6px 14px",
-                borderRadius: 6,
-                border: "1px solid var(--border)",
+                color: "var(--text3)",
+                marginBottom: 16,
+                lineHeight: 1.6,
               }}
             >
-              {apiKey ? apiKey.slice(0, 8) + "••••••••••••••••" : "(not set)"}
-            </code>
-            <button className="btn btn-ghost" onClick={onChangeApiKey}>
-              Change API Token
-            </button>
-          </div>
-        </div>
-
-        <div
-          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
-        />
-
-        {/* ── Age Rating ── */}
-        <div style={{ marginBottom: 40 }}>
-          <div className="settings-section-title">
-            Age Rating &amp; Parental Controls
-          </div>
-          <div
-            style={{
-              fontSize: 13,
-              color: "var(--text3)",
-              marginBottom: 20,
-              lineHeight: 1.6,
-            }}
-          >
-            Set a maximum age rating. Content rated above this Age will still be
-            visible but{" "}
-            <strong style={{ color: "var(--text)" }}>
-              you wont be able to play it.
-            </strong>{" "}
-            . Set to <em>No restriction</em> to disable this feature entirely.
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* Country */}
-            <div>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "var(--text2)",
-                  marginBottom: 8,
-                }}
-              >
-                Rating Country
-              </div>
-              <SettingsSelect
-                value={ratingCountry}
-                onChange={(v) => setRatingCountry(v)}
-                options={RATING_COUNTRIES.map((c) => ({
-                  value: c.code,
-                  label: c.label,
-                }))}
-              />
+              Used to fetch movie and TV metadata, posters, ratings, and cast
+              info from The Movie Database.
             </div>
-
-            {/* Age limit */}
-            <div>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "var(--text2)",
-                  marginBottom: 8,
-                }}
-              >
-                Maximum Allowed Age Rating
-              </div>
-              <SettingsSelect
-                value={ageLimit}
-                onChange={(v) => setAgeLimit(v)}
-                options={AGE_LIMIT_OPTIONS}
-              />
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <button className="btn btn-primary" onClick={saveAgeSettings}>
-                Save
-              </button>
-              {ageSaved && (
-                <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
-        />
-
-        {/* ── Invidious Base URL ── */}
-        <div style={{ marginBottom: 40 }}>
-          <div className="settings-section-title">Invidious Instance</div>
-          <div
-            style={{
-              fontSize: 13,
-              color: "var(--text3)",
-              marginBottom: 16,
-              lineHeight: 1.6,
-            }}
-          >
-            Trailers are played via{" "}
-            <span style={{ color: "var(--text)", fontWeight: 600 }}>
-              Invidious
-            </span>
-            , a privacy-friendly YouTube frontend. Your configured instance is
-            tried first; if it should fail, the app automatically falls back
-            through a list of known working instances. The default is{" "}
-            <code style={{ fontSize: 12 }}>{DEFAULT_INVIDIOUS_BASE}</code>. The
-            instance must have its API enabled (
-            <code style={{ fontSize: 12 }}>/api/v1/stats</code> reachable).
-          </div>
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <input
-              className="apikey-input"
-              style={{ flex: 1, minWidth: 260, marginBottom: 0 }}
-              placeholder={DEFAULT_INVIDIOUS_BASE}
-              value={invidiousBase}
-              onChange={(e) => {
-                setInvidiousBase(e.target.value);
-                setInvidiousStatus(null);
-              }}
-            />
-            <button
-              className="btn btn-ghost"
-              disabled={invidiousChecking}
-              onClick={() => checkInvidious(invidiousBase)}
-              style={{ opacity: invidiousChecking ? 0.5 : 1 }}
-            >
-              {invidiousChecking ? "Checking…" : "Check"}
-            </button>
-            <button className="btn btn-primary" onClick={saveInvidiousBase}>
-              Save
-            </button>
-          </div>
-
-          {/* Status indicator */}
-          {invidiousStatus && (
             <div
               style={{
                 display: "flex",
+                gap: 12,
                 alignItems: "center",
-                gap: 8,
-                marginTop: 12,
+                flexWrap: "wrap",
               }}
             >
-              <div
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  flexShrink: 0,
-                  background: invidiousStatus.ok ? "#48c774" : "#ff3860",
-                  boxShadow: invidiousStatus.ok
-                    ? "0 0 6px rgba(72,199,116,0.6)"
-                    : "0 0 6px rgba(255,56,96,0.6)",
-                }}
-              />
-              <span
+              <code
                 style={{
                   fontSize: 13,
-                  fontWeight: 500,
-                  color: invidiousStatus.ok ? "#48c774" : "#ff3860",
+                  color: "var(--text2)",
+                  background: "var(--surface2)",
+                  padding: "6px 14px",
+                  borderRadius: 6,
+                  border: "1px solid var(--border)",
                 }}
               >
-                {invidiousStatus.msg}
-              </span>
-            </div>
-          )}
-
-          {invidiousSaved && (
-            <div style={{ marginTop: 10, fontSize: 13, color: "#48c774" }}>
-              ✓ Saved
-            </div>
-          )}
-        </div>
-
-        <div
-          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
-        />
-
-        {/* ── Auto-Watched Threshold ── */}
-        <div style={{ marginBottom: 40 }}>
-          <div className="settings-section-title">Auto-Watched Threshold</div>
-          <div
-            style={{
-              fontSize: 13,
-              color: "var(--text3)",
-              marginBottom: 16,
-              lineHeight: 1.6,
-            }}
-          >
-            A movie or episode is automatically marked as{" "}
-            <span style={{ color: "#48c774", fontWeight: 600 }}>Watched ✓</span>{" "}
-            when the remaining time drops to this value or below. Set between 1
-            and 300 seconds.
-          </div>
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                type="number"
-                min={1}
-                max={300}
-                className="apikey-input"
-                style={{ width: 90, marginBottom: 0 }}
-                value={watchedThreshold}
-                onChange={(e) => setWatchedThreshold(e.target.value)}
-              />
-              <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                seconds
-              </span>
-            </div>
-            <button className="btn btn-primary" onClick={handleSaveThreshold}>
-              Save
-            </button>
-          </div>
-          {saved && (
-            <div style={{ marginTop: 10, fontSize: 13, color: "#48c774" }}>
-              ✓ Saved
-            </div>
-          )}
-        </div>
-
-        <div
-          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
-        />
-
-        {/* ── Download Folder ── */}
-        <div style={{ marginBottom: 56 }}>
-          <div className="settings-section-title">Download Folder</div>
-          <div
-            style={{
-              fontSize: 13,
-              color: "var(--text3)",
-              marginBottom: 16,
-              lineHeight: 1.6,
-            }}
-          >
-            Downloaded videos will be saved here.
-          </div>
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <input
-              className="apikey-input"
-              style={{ flex: 1, minWidth: 260, marginBottom: 0 }}
-              placeholder="/home/you/Movies"
-              value={downloadPath}
-              onChange={(e) => setDownloadPath(e.target.value)}
-            />
-            {isElectron && (
-              <button className="btn btn-secondary" onClick={pickFolder}>
-                Browse …
+                {apiKey ? apiKey.slice(0, 8) + "••••••••••••••••" : "(not set)"}
+              </code>
+              <button className="btn btn-ghost" onClick={onChangeApiKey}>
+                Change API Token
               </button>
-            )}
-            <button className="btn btn-primary" onClick={handleSavePath}>
-              Save
-            </button>
-          </div>
-          {saved && (
-            <div style={{ marginTop: 10, fontSize: 13, color: "#4caf50" }}>
-              ✓ Saved
             </div>
-          )}
-          {!downloadPath && (
-            <div style={{ marginTop: 10, fontSize: 13, color: "var(--red)" }}>
-              ⚠ No download folder set, videos cannot be downloaded until you
-              set one.
+          </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* GROUP: CONTENT                                                     */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <div ref={secContent} style={{ scrollMarginTop: 80 }}>
+          <SectionGroupHeader
+            title="Content"
+            subtitle="Parental controls and content filtering by age rating"
+          />
+
+          <div style={{ marginBottom: 40 }}>
+            <div className="settings-section-title">
+              Age Rating &amp; Parental Controls
             </div>
-          )}
-        </div>
-
-        {/* ══ HOME PAGE LAYOUT ═════════════════════════════════════════════════ */}
-        <div
-          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
-        />
-
-        {/* ── Subtitle Downloads ── */}
-        <SubtitleSettingsSection />
-
-        <div
-          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
-        />
-        <HomeLayoutSection />
-
-        <div
-          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
-        />
-        <StartPageSection />
-
-        <div
-          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
-        />
-        <AppearanceSection />
-
-        <div
-          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
-        />
-        <LibraryPrivacySection />
-
-        <div
-          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
-        />
-
-        {/* ══ BACKUP & RESTORE ════════════════════════════════════════════════ */}
-        <div
-          style={{ height: 1, background: "var(--border)", marginBottom: 40 }}
-        />
-        <BackupRestoreSection />
-
-        {/* ══ STORAGE & DATA ══════════════════════════════════════════════════ */}
-        <div
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 22,
-            letterSpacing: 1,
-            marginBottom: 6,
-          }}
-        >
-          STORAGE & DATA
-        </div>
-        <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 28 }}>
-          Manage cached data, watch history, and app storage
-        </div>
-
-        <div
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 10,
-            overflow: "hidden",
-          }}
-        >
-          {/* Cache */}
-          <div style={{ padding: "22px 24px" }}>
-            <CleanRow
-              title="Clear Cache"
-              description="Removes temporary browser cache, shader cache, and service worker data from all internal sessions (main, video player, trailer). Does not affect your personal data or settings."
-              buttonLabel="Clear Cache"
-              onAction={handleClearCache}
-              sizeLabel={formatBytes(sizes.cache)}
-            />
-          </div>
-
-          <div style={{ height: 1, background: "var(--border)" }} />
-
-          {/* Watch Progress */}
-          <div style={{ padding: "22px 24px" }}>
-            <CleanRow
-              title="Clear Watch Progress"
-              description="Resets all watch history, continue-watching progress, and watched / completed markings for movies and series. Also clears internal video player session data."
-              buttonLabel="Clear Progress"
-              onAction={() =>
-                new Promise((resolve) => {
-                  setShowProgressConfirm(true);
-                  // store resolve so confirm dialog can call it
-                  window.__progressConfirmResolve = resolve;
-                })
-              }
-              danger
-            />
-          </div>
-
-          <div style={{ height: 1, background: "var(--border)" }} />
-
-          {/* Delete Downloads */}
-          <div style={{ padding: "22px 24px" }}>
-            <CleanRow
-              title="Delete All Downloads"
-              description="Permanently deletes all video files that were downloaded through Streambert and removes them from the download list. Only files downloaded through the app will be deleted, nothing else in your folder is touched."
-              buttonLabel="Delete All"
-              onAction={() =>
-                new Promise((resolve) => {
-                  setShowDeleteDlConfirm(true);
-                  window.__deleteDlConfirmResolve = resolve;
-                })
-              }
-              sizeLabel={formatBytes(sizes.downloads)}
-              danger
-            />
-          </div>
-
-          <div style={{ height: 1, background: "var(--border)" }} />
-
-          {/* Full Reset */}
-          <div
-            style={{ padding: "22px 24px", background: "rgba(229,9,20,0.03)" }}
-          >
             <div
               style={{
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "space-between",
-                gap: 24,
+                fontSize: 13,
+                color: "var(--text3)",
+                marginBottom: 20,
+                lineHeight: 1.6,
               }}
             >
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 600,
-                    color: "var(--text)",
-                    marginBottom: 4,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  Reset App
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: 1,
-                      color: "var(--red)",
-                      background: "rgba(229,9,20,0.12)",
-                      border: "1px solid rgba(229,9,20,0.25)",
-                      padding: "2px 7px",
-                      borderRadius: 4,
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Irreversible
-                  </span>
-                </div>
+              Set a maximum age rating. Content rated above this age will still
+              be visible but{" "}
+              <strong style={{ color: "var(--text)" }}>
+                you won't be able to play it.
+              </strong>{" "}
+              Set to <em>No restriction</em> to disable this feature entirely.
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div>
                 <div
                   style={{
                     fontSize: 13,
-                    color: "var(--text3)",
-                    lineHeight: 1.6,
+                    fontWeight: 600,
+                    color: "var(--text2)",
+                    marginBottom: 8,
                   }}
                 >
-                  Completely resets Streambert to factory defaults, clears all
-                  settings, API Token, saved library, watch history/progress,
-                  and all cached data. Your downloaded video files will not be
-                  touched.
+                  Rating Country
                 </div>
+                <SettingsSelect
+                  value={ratingCountry}
+                  onChange={(v) => setRatingCountry(v)}
+                  options={RATING_COUNTRIES.map((c) => ({
+                    value: c.code,
+                    label: c.label,
+                  }))}
+                />
               </div>
-              <div style={{ flexShrink: 0, paddingTop: 2 }}>
-                <button
-                  className="btn"
-                  onClick={() => setShowResetConfirm(true)}
-                  onMouseEnter={() => setResetHovered(true)}
-                  onMouseLeave={() => setResetHovered(false)}
+
+              <div>
+                <div
                   style={{
-                    color: resetHovered ? "#fff" : "var(--red)",
-                    background: resetHovered
-                      ? "rgba(229,9,20,0.85)"
-                      : "rgba(229,9,20,0.08)",
-                    border: resetHovered
-                      ? "1px solid transparent"
-                      : "1px solid rgba(229,9,20,0.3)",
-                    transition: "all 0.2s",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "var(--text2)",
+                    marginBottom: 8,
                   }}
                 >
-                  Reset App
+                  Maximum Allowed Age Rating
+                </div>
+                <SettingsSelect
+                  value={ageLimit}
+                  onChange={(v) => setAgeLimit(v)}
+                  options={AGE_LIMIT_OPTIONS}
+                />
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <button className="btn btn-primary" onClick={saveAgeSettings}>
+                  Save
                 </button>
+                {ageSaved && (
+                  <span style={{ fontSize: 13, color: "#48c774" }}>
+                    ✓ Saved
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* GROUP: PLAYBACK                                                    */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <div ref={secPlayback} style={{ scrollMarginTop: 80 }}>
+          <SectionGroupHeader
+            title="Playback"
+            subtitle="Trailer source and auto-watched behavior"
+          />
+
+          {/* Invidious */}
+          <div style={{ marginBottom: 40 }}>
+            <div className="settings-section-title">Invidious Instance</div>
+            <div
+              style={{
+                fontSize: 13,
+                color: "var(--text3)",
+                marginBottom: 16,
+                lineHeight: 1.6,
+              }}
+            >
+              Trailers are played via{" "}
+              <span style={{ color: "var(--text)", fontWeight: 600 }}>
+                Invidious
+              </span>
+              , a privacy-friendly YouTube frontend. Your configured instance is
+              tried first; if it fails, the app automatically falls back through
+              a list of known working instances. The default is{" "}
+              <code style={{ fontSize: 12 }}>{DEFAULT_INVIDIOUS_BASE}</code>.
+              The instance must have its API enabled (
+              <code style={{ fontSize: 12 }}>/api/v1/stats</code> reachable).
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <input
+                className="apikey-input"
+                style={{ flex: 1, minWidth: 260, marginBottom: 0 }}
+                placeholder={DEFAULT_INVIDIOUS_BASE}
+                value={invidiousBase}
+                onChange={(e) => {
+                  setInvidiousBase(e.target.value);
+                  setInvidiousStatus(null);
+                }}
+              />
+              <button
+                className="btn btn-ghost"
+                disabled={invidiousChecking}
+                onClick={() => checkInvidious(invidiousBase)}
+                style={{ opacity: invidiousChecking ? 0.5 : 1 }}
+              >
+                {invidiousChecking ? "Checking…" : "Check"}
+              </button>
+              <button className="btn btn-primary" onClick={saveInvidiousBase}>
+                Save
+              </button>
+            </div>
+
+            {invidiousStatus && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginTop: 12,
+                }}
+              >
+                <div
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    flexShrink: 0,
+                    background: invidiousStatus.ok ? "#48c774" : "#ff3860",
+                    boxShadow: invidiousStatus.ok
+                      ? "0 0 6px rgba(72,199,116,0.6)"
+                      : "0 0 6px rgba(255,56,96,0.6)",
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: invidiousStatus.ok ? "#48c774" : "#ff3860",
+                  }}
+                >
+                  {invidiousStatus.msg}
+                </span>
+              </div>
+            )}
+
+            {invidiousSaved && (
+              <div style={{ marginTop: 10, fontSize: 13, color: "#48c774" }}>
+                ✓ Saved
+              </div>
+            )}
+          </div>
+
+          <Divider />
+
+          {/* Auto-Watched Threshold */}
+          <div style={{ marginBottom: 40 }}>
+            <div className="settings-section-title">Auto-Watched Threshold</div>
+            <div
+              style={{
+                fontSize: 13,
+                color: "var(--text3)",
+                marginBottom: 16,
+                lineHeight: 1.6,
+              }}
+            >
+              A movie or episode is automatically marked as{" "}
+              <span style={{ color: "#48c774", fontWeight: 600 }}>
+                Watched ✓
+              </span>{" "}
+              when the remaining time drops to this value or below. Set between
+              1 and 300 seconds.
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="number"
+                  min={1}
+                  max={300}
+                  className="apikey-input"
+                  style={{ width: 90, marginBottom: 0 }}
+                  value={watchedThreshold}
+                  onChange={(e) => setWatchedThreshold(e.target.value)}
+                />
+                <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                  seconds
+                </span>
+              </div>
+              <button className="btn btn-primary" onClick={handleSaveThreshold}>
+                Save
+              </button>
+            </div>
+            {saved && (
+              <div style={{ marginTop: 10, fontSize: 13, color: "#48c774" }}>
+                ✓ Saved
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* GROUP: SUBTITLES                                                   */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <div ref={secSubtitles} style={{ scrollMarginTop: 80 }}>
+          <SectionGroupHeader
+            title="Subtitles"
+            subtitle="Subtitle download source, preferred language, and API key"
+          />
+          <SubtitleSettingsSection />
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* GROUP: DOWNLOADS                                                   */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <div ref={secDownloads} style={{ scrollMarginTop: 80 }}>
+          <SectionGroupHeader
+            title="Downloads"
+            subtitle="Where downloaded video files are saved on disk"
+          />
+
+          <div style={{ marginBottom: 40 }}>
+            <div className="settings-section-title">Download Folder</div>
+            <div
+              style={{
+                fontSize: 13,
+                color: "var(--text3)",
+                marginBottom: 16,
+                lineHeight: 1.6,
+              }}
+            >
+              Downloaded videos will be saved here. Make sure the folder exists
+              and Streambert has write access to it.
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <input
+                className="apikey-input"
+                style={{ flex: 1, minWidth: 260, marginBottom: 0 }}
+                placeholder="/home/you/Movies"
+                value={downloadPath}
+                onChange={(e) => setDownloadPath(e.target.value)}
+              />
+              {isElectron && (
+                <button className="btn btn-secondary" onClick={pickFolder}>
+                  Browse …
+                </button>
+              )}
+              <button className="btn btn-primary" onClick={handleSavePath}>
+                Save
+              </button>
+            </div>
+            {saved && (
+              <div style={{ marginTop: 10, fontSize: 13, color: "#4caf50" }}>
+                ✓ Saved
+              </div>
+            )}
+            {!downloadPath && (
+              <div style={{ marginTop: 10, fontSize: 13, color: "var(--red)" }}>
+                ⚠ No download folder set — videos cannot be downloaded until you
+                set one.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* GROUP: INTERFACE                                                   */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <div ref={secInterface} style={{ scrollMarginTop: 80 }}>
+          <SectionGroupHeader
+            title="Interface"
+            subtitle="Home layout, start page, appearance, and display options"
+          />
+          <HomeLayoutSection />
+          <Divider />
+          <StartPageSection />
+          <Divider />
+          <AppearanceSection />
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* GROUP: LIBRARY                                                     */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <div ref={secLibrary} style={{ scrollMarginTop: 80 }}>
+          <SectionGroupHeader
+            title="Library"
+            subtitle="Watchlist sort order and watch history preferences"
+          />
+          <LibraryPrivacySection />
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* GROUP: BACKUP                                                      */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <div ref={secBackup} style={{ scrollMarginTop: 80 }}>
+          <SectionGroupHeader
+            title="Backup & Restore"
+            subtitle="Export your data or restore from a previous backup file"
+          />
+          <BackupRestoreSection />
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* GROUP: STORAGE & DATA                                              */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <div ref={secStorage} style={{ scrollMarginTop: 80 }}>
+          <SectionGroupHeader
+            title="Storage & Data"
+            subtitle="Clear cache, watch progress, downloads, or reset the entire app"
+          />
+
+          <div
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 10,
+              overflow: "hidden",
+            }}
+          >
+            {/* Cache */}
+            <div style={{ padding: "22px 24px" }}>
+              <CleanRow
+                title="Clear Cache"
+                description="Removes temporary browser cache, shader cache, and service worker data from all internal sessions (main, video player, trailer). Does not affect your personal data or settings."
+                buttonLabel="Clear Cache"
+                onAction={handleClearCache}
+                sizeLabel={formatBytes(sizes.cache)}
+              />
+            </div>
+
+            <div style={{ height: 1, background: "var(--border)" }} />
+
+            {/* Watch Progress */}
+            <div style={{ padding: "22px 24px" }}>
+              <CleanRow
+                title="Clear Watch Progress"
+                description="Resets all watch history, continue-watching progress, and watched / completed markings for movies and series. Also clears internal video player session data."
+                buttonLabel="Clear Progress"
+                onAction={() =>
+                  new Promise((resolve) => {
+                    setShowProgressConfirm(true);
+                    window.__progressConfirmResolve = resolve;
+                  })
+                }
+                danger
+              />
+            </div>
+
+            <div style={{ height: 1, background: "var(--border)" }} />
+
+            {/* Delete Downloads */}
+            <div style={{ padding: "22px 24px" }}>
+              <CleanRow
+                title="Delete All Downloads"
+                description="Permanently deletes all video files that were downloaded through Streambert and removes them from the download list. Only files downloaded through the app will be deleted, nothing else in your folder is touched."
+                buttonLabel="Delete All"
+                onAction={() =>
+                  new Promise((resolve) => {
+                    setShowDeleteDlConfirm(true);
+                    window.__deleteDlConfirmResolve = resolve;
+                  })
+                }
+                sizeLabel={formatBytes(sizes.downloads)}
+                danger
+              />
+            </div>
+
+            <div style={{ height: 1, background: "var(--border)" }} />
+
+            {/* Full Reset */}
+            <div
+              style={{
+                padding: "22px 24px",
+                background: "rgba(229,9,20,0.03)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: 24,
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: 15,
+                      fontWeight: 600,
+                      color: "var(--text)",
+                      marginBottom: 4,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    Reset App
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        letterSpacing: 1,
+                        color: "var(--red)",
+                        background: "rgba(229,9,20,0.12)",
+                        border: "1px solid rgba(229,9,20,0.25)",
+                        padding: "2px 7px",
+                        borderRadius: 4,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Irreversible
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "var(--text3)",
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    Completely resets Streambert to factory defaults, clears all
+                    settings, API Token, saved library, watch history/progress,
+                    and all cached data. Your downloaded video files will not be
+                    touched.
+                  </div>
+                </div>
+                <div style={{ flexShrink: 0, paddingTop: 2 }}>
+                  <button
+                    className="btn"
+                    onClick={() => setShowResetConfirm(true)}
+                    onMouseEnter={() => setResetHovered(true)}
+                    onMouseLeave={() => setResetHovered(false)}
+                    style={{
+                      color: resetHovered ? "#fff" : "var(--red)",
+                      background: resetHovered
+                        ? "rgba(229,9,20,0.85)"
+                        : "rgba(229,9,20,0.08)",
+                      border: resetHovered
+                        ? "1px solid transparent"
+                        : "1px solid rgba(229,9,20,0.3)",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    Reset App
+                  </button>
+                </div>
               </div>
             </div>
           </div>
