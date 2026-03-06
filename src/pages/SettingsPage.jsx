@@ -661,8 +661,8 @@ function VersionSection() {
             Check for updates on startup
           </div>
           <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
-            Shows a notification banner if a new version is available. Off by
-            default.
+            Shows a notification banner if a new version is available. Turned on
+            by default.
           </div>
         </div>
         {autoSaved && (
