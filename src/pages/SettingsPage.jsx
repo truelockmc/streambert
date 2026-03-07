@@ -1711,6 +1711,8 @@ function Divider() {
 }
 
 // ── Search & Nav Bar ──────────────────────────────────────────────────────────
+const SUPPORTS_HIGHLIGHT =
+  typeof CSS !== "undefined" && typeof CSS.highlights !== "undefined";
 const SECTION_NAV = [
   {
     id: "updates",
@@ -1868,12 +1870,11 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
   const inputRef = useRef(null);
   const navRef = useRef(null);
   const searchBarRef = useRef(null);
-
-  const supportsHighlight =
-    typeof CSS !== "undefined" && typeof CSS.highlights !== "undefined";
+  const debounceTimer = useRef(null);
+  const rafHandle = useRef(null);
 
   const clearHighlights = () => {
-    if (supportsHighlight) {
+    if (SUPPORTS_HIGHLIGHT) {
       CSS.highlights.delete("settings-search");
       CSS.highlights.delete("settings-search-active");
     }
@@ -1886,7 +1887,9 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
 
   const scrollToRange = (range) => {
     if (!range) return;
-    requestAnimationFrame(() => {
+    if (rafHandle.current) cancelAnimationFrame(rafHandle.current);
+    rafHandle.current = requestAnimationFrame(() => {
+      rafHandle.current = null;
       try {
         const el = range.startContainer.parentElement;
         if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1897,7 +1900,7 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
   const setActiveMatch = (idx) => {
     const range = matchRanges.current[idx];
     if (!range) return;
-    if (supportsHighlight) {
+    if (SUPPORTS_HIGHLIGHT) {
       CSS.highlights.set("settings-search-active", new Highlight(range));
     }
     scrollToRange(range);
@@ -1905,7 +1908,7 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
     setCurrentMatch(idx + 1);
   };
 
-  const findMatches = (searchQuery) => {
+  const runSearch = (searchQuery) => {
     clearHighlights();
     if (!contentRef?.current || !searchQuery.trim()) return;
 
@@ -1934,11 +1937,21 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
     setMatchCount(ranges.length);
 
     if (ranges.length > 0) {
-      if (supportsHighlight) {
-        CSS.highlights.set("settings-search", new Highlight(...ranges));
+      if (SUPPORTS_HIGHLIGHT) {
+        const hl = new Highlight();
+        for (const r of ranges) hl.add(r);
+        CSS.highlights.set("settings-search", hl);
       }
       setActiveMatch(0);
     }
+  };
+
+  const findMatches = (searchQuery) => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      debounceTimer.current = null;
+      runSearch(searchQuery);
+    }, 80);
   };
 
   const goNext = () => {
@@ -1973,7 +1986,14 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
   }, [searchOpen]);
 
   // Clean up on unmount
-  useEffect(() => () => clearHighlights(), []);
+  useEffect(
+    () => () => {
+      clearHighlights();
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      if (rafHandle.current) cancelAnimationFrame(rafHandle.current);
+    },
+    [],
+  );
 
   // Keyboard shortcuts
   useEffect(() => {
