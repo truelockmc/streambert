@@ -8,6 +8,7 @@ const path = require("path");
 const fs = require("fs");
 const https = require("https");
 const http = require("http");
+const os = require("os");
 
 // ── Download store ────────────────────────────────────────────────────────────
 
@@ -217,6 +218,7 @@ function register(getMainWindow) {
     ) => {
       try {
         const id = crypto.randomUUID();
+        const logPath = path.join(os.tmpdir(), `streambert_dl_${id}.log`);
 
         const entry = {
           id,
@@ -241,7 +243,18 @@ function register(getMainWindow) {
           tmdbId: tmdbId || mediaId || null,
           subtitles: Array.isArray(subtitles) ? subtitles : [],
           subtitlePaths: [],
+          logPath,
         };
+
+        // Create log file with header
+        try {
+          fs.writeFileSync(
+            logPath,
+            `Streambert Download Log\nName: ${name}\nURL: ${m3u8Url}\nStarted: ${new Date().toISOString()}\n${"─".repeat(60)}\n`,
+            "utf8",
+          );
+        } catch {}
+
         downloads.push(entry);
 
         // Remove stale entries for the same media
@@ -445,29 +458,75 @@ function register(getMainWindow) {
         };
 
         let buf = "";
+        let stderrBuf = "";
+
+        const appendLog = (line) => {
+          try {
+            fs.appendFileSync(logPath, line + "\n", "utf8");
+          } catch {}
+        };
+
         proc.stdout.on("data", (chunk) => {
           buf += chunk.toString();
           const lines = buf.split(/\r\n|\r|\n/);
           buf = lines.pop();
-          lines.forEach(handleLine);
+          lines.forEach((l) => {
+            appendLog(l);
+            handleLine(l);
+          });
         });
         proc.stderr.on("data", (chunk) => {
-          chunk
-            .toString()
-            .split(/\r\n|\r|\n/)
-            .forEach(handleLine);
+          const text = chunk.toString();
+          stderrBuf += text;
+          text.split(/\r\n|\r|\n/).forEach((l) => {
+            appendLog(l);
+            handleLine(l);
+          });
         });
 
         proc.on("close", (code) => {
           activeProcs.delete(id);
-          if (buf.trim()) handleLine(buf.trim());
+          if (buf.trim()) {
+            appendLog(buf.trim());
+            handleLine(buf.trim());
+          }
           const idx = downloads.findIndex((d) => d.id === id);
           if (idx === -1) return;
 
           const status = code === 0 ? "completed" : "error";
           downloads[idx].status = status;
           downloads[idx].completedAt = Date.now();
-          if (code === 0) downloads[idx].progress = 100;
+          if (code === 0) {
+            downloads[idx].progress = 100;
+            // Success: delete log file, clear logPath
+            downloads[idx].logPath = null;
+            try {
+              fs.unlinkSync(logPath);
+            } catch {}
+          } else {
+            // Failure: append footer to log and keep the path
+            try {
+              fs.appendFileSync(
+                logPath,
+                `${"─".repeat(60)}\nFailed: exit code ${code}\nFinished: ${new Date().toISOString()}\n`,
+                "utf8",
+              );
+            } catch {}
+            // Extract most meaningful error line from stderr
+            const errorLine =
+              stderrBuf
+                .split(/\r\n|\r|\n/)
+                .map((l) => l.trim())
+                .filter(Boolean)
+                .reverse()
+                .find((l) => /error|failed|unable|cannot|denied/i.test(l)) ||
+              "";
+            const prev = downloads[idx].lastMessage || "";
+            const base = errorLine || prev;
+            downloads[idx].lastMessage = base
+              ? `${base} (exit ${code})`
+              : `Download failed (exit code ${code})`;
+          }
 
           // Detect output file if destination line wasn't caught
           if (code === 0 && !downloads[idx].filePath) {
@@ -596,6 +655,7 @@ function register(getMainWindow) {
 
           sendProgress({
             id,
+            name,
             status: downloads[idx].status,
             progress: downloads[idx].progress,
             completedAt: downloads[idx].completedAt,
@@ -603,6 +663,8 @@ function register(getMainWindow) {
             size: downloads[idx].size,
             completedFragments: downloads[idx].completedFragments,
             totalFragments: downloads[idx].totalFragments,
+            lastMessage: downloads[idx].lastMessage,
+            logPath: downloads[idx].logPath,
           });
           saveDownloads();
         });

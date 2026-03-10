@@ -365,6 +365,11 @@ export default function DownloadsPage({
                   onOpenSubtitleDownloader={
                     dl.tmdbId ? () => setSubtitleModalDl(dl) : null
                   }
+                  onOpenLog={
+                    dl.logPath && dl.status === "error"
+                      ? () => window.electron.openPath(dl.logPath)
+                      : null
+                  }
                 />
               );
             })}
@@ -503,6 +508,7 @@ function LocalFileCard({
   watchedKey,
   onHistory,
   onOpenSubtitleDownloader,
+  onOpenLog,
 }) {
   const isDownload = !dl.isLocalOnly;
   const canWatch = !!fileExists && !!dl.filePath;
@@ -966,6 +972,16 @@ function LocalFileCard({
           {onDelete && (
             <button className="icon-btn" onClick={onDelete} title="Delete">
               <TrashIcon />
+            </button>
+          )}
+          {onOpenLog && dl.logPath && dl.status === "error" && (
+            <button
+              className="btn btn-ghost dl-btn--sm"
+              onClick={onOpenLog}
+              title="Open error log"
+              style={{ color: "var(--red)", fontSize: 11 }}
+            >
+              View Log
             </button>
           )}
         </div>
