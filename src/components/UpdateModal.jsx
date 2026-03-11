@@ -172,7 +172,13 @@ export default function UpdateModal({
   // Detect install format on mount
   useEffect(() => {
     if (!window.electron?.detectUpdateFormat) return;
-    window.electron.detectUpdateFormat().then((fmt) => setFormat(fmt));
+    let mounted = true;
+    window.electron.detectUpdateFormat().then((fmt) => {
+      if (mounted) setFormat(fmt);
+    });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Listen for download progress from main process

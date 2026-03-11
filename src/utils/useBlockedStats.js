@@ -21,9 +21,13 @@ export function useBlockedStats(resetKey) {
   // Load alltime total from main process on mount
   useEffect(() => {
     if (!window.electron?.getBlockStats) return;
+    let mounted = true;
     window.electron.getBlockStats().then((stats) => {
-      if (stats) setAlltimeTotal(stats.total || 0);
+      if (mounted && stats) setAlltimeTotal(stats.total || 0);
     });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Reset session counters when the media changes
