@@ -44,7 +44,23 @@
       "package.json",
       "!**/*.map",
       "!**/*.md",
-      "!**/node_modules/.cache/**"
+      "!**/*.ts",
+      "!**/*.d.ts",
+      "!**/node_modules/.cache/**",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,readme.md,changelog.md,CHANGES,LICENCE,LICENSE}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples,benchmark,benchmarks}/**",
+      "!**/node_modules/.bin/**",
+      "!**/node_modules/*/*.d.ts",
+      "!**/{.eslintrc,.babelrc,.editorconfig,.nycrc}",
+      "!**/{jest.config,jest.config.js,jest.config.ts}",
+      "!**/node_modules/*/docs/**",
+      "!**/node_modules/vite/**",
+      "!**/node_modules/@vitejs/**",
+      "!**/node_modules/terser/**",
+      "!**/node_modules/rollup/**",
+      "!**/node_modules/esbuild/**",
+      "!**/node_modules/@esbuild/**",
+      "!**/node_modules/@rollup/**"
     ],
     "nsis": {
       "oneClick": false,
@@ -80,6 +96,13 @@
       ],
       "category": "Utility",
       "icon": "public/icon.png"
-    }
+    },
+    "electronLanguages": [
+      "en-US",
+      "de"
+    ],
+    "asarUnpack": [
+      "src/styles/fonts/**"
+    ]
   }
 }

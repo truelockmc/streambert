@@ -16,14 +16,6 @@
 
 @font-face {
     font-family: "DM Sans";
-    src: url("fonts/dm-sans-300italic.woff2") format("woff2");
-    font-weight: 300;
-    font-style: italic;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: "DM Sans";
     src: url("fonts/dm-sans-regular.woff2") format("woff2");
     font-weight: 400;
     font-style: normal;

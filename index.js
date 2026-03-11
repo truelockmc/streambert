@@ -5,6 +5,11 @@
 const { app, BrowserWindow, ipcMain, session } = require("electron");
 const path = require("path");
 
+// ── Startup benchmark ─────────────────────────────────────────────────────────
+const _t0 = Date.now();
+const _bench = (label) =>
+  console.log(`[boot] ${label}: +${Date.now() - _t0}ms`);
+
 // ── Sub-modules ───────────────────────────────────────────────────────────────
 const blockStats = require("./src/ipc/blockStats");
 const storageIpc = require("./src/ipc/storage");
@@ -197,6 +202,7 @@ function createWindow() {
 
   // Trigger scheduled backup after load
   mainWindow.webContents.once("did-finish-load", () => {
+    _bench("renderer loaded");
     const sbSettings = storageIpc.loadScheduledBackupSettings();
     if (storageIpc.shouldRunScheduledBackup(sbSettings)) {
       mainWindow.webContents.send("scheduled-backup-requested");
@@ -259,7 +265,10 @@ if (!gotTheLock) {
     }
   });
 
-  app.whenReady().then(createWindow);
+  app.whenReady().then(() => {
+    _bench("app ready");
+    createWindow();
+  });
   app.on("window-all-closed", () => app.quit());
   app.on("activate", () => {
     if (mainWindow === null) createWindow();
