@@ -397,9 +397,13 @@ export default function DownloadModal({
   );
   const [subdlApiKey, setSubdlApiKey] = useState("");
   useEffect(() => {
+    let mounted = true;
     secureStorage.get(STORAGE_KEYS.SUBDL_API_KEY).then((val) => {
-      if (val) setSubdlApiKey(val);
+      if (mounted && val) setSubdlApiKey(val);
     });
+    return () => {
+      mounted = false;
+    };
   }, []);
   const defaultLang = storage.get(STORAGE_KEYS.SUBTITLE_LANG) || "en";
 
@@ -422,11 +426,16 @@ export default function DownloadModal({
 
   useEffect(() => {
     if (!downloaderFolder || !isElectron) return;
+    let mounted = true;
     setChecking(true);
     window.electron.checkDownloader(downloaderFolder).then((result) => {
+      if (!mounted) return;
       setDownloader(result);
       setChecking(false);
     });
+    return () => {
+      mounted = false;
+    };
   }, [downloaderFolder]);
 
   const searchSubtitles = useCallback(

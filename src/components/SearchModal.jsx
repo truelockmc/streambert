@@ -22,7 +22,8 @@ export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
   const inputRef = useRef();
 
   useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 50);
+    const tid = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(tid);
   }, []);
 
   useEffect(() => {
@@ -30,6 +31,7 @@ export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
       setResults([]);
       return;
     }
+    let mounted = true;
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
@@ -37,15 +39,20 @@ export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
           `/search/multi?query=${encodeURIComponent(query)}&page=1`,
           apiKey,
         );
-        setResults(
-          (data.results || [])
-            .filter((r) => r.media_type !== "person")
-            .slice(0, 12),
-        );
+        if (mounted) {
+          setResults(
+            (data.results || [])
+              .filter((r) => r.media_type !== "person")
+              .slice(0, 12),
+          );
+        }
       } catch {}
-      setLoading(false);
+      if (mounted) setLoading(false);
     }, 380);
-    return () => clearTimeout(timer);
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
   }, [query, apiKey]);
 
   const addToHistory = useCallback((term) => {

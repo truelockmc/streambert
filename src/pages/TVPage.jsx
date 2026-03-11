@@ -369,9 +369,11 @@ export default function TVPage({
   const seekBackCooldownRef = useRef(0);
 
   useEffect(() => {
+    let mounted = true;
     setLoading(true);
     tmdbFetch(`/tv/${item.id}`, apiKey)
       .then((d) => {
+        if (!mounted) return;
         setDetails(d);
         // Only fall back to first season when no specific season was requested
         if (item.season == null) {
@@ -380,13 +382,22 @@ export default function TVPage({
           if (first) setSelectedSeason(first.season_number);
         }
       })
-      .catch(() => setDetails(item))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (mounted) setDetails(item);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
   }, [item.id, apiKey]);
 
   useEffect(() => {
+    let mounted = true;
     tmdbFetch(`/tv/${item.id}/videos`, apiKey)
       .then((data) => {
+        if (!mounted) return;
         const videos = data.results || [];
         const trailer =
           videos.find((v) => v.type === "Trailer" && v.site === "YouTube") ||
@@ -394,10 +405,19 @@ export default function TVPage({
         if (trailer) setTrailerKey(trailer.key);
       })
       .catch(() => {});
+    return () => {
+      mounted = false;
+    };
   }, [item.id, apiKey]);
 
   useEffect(() => {
-    fetchTVRating(item.id, apiKey, ratingCountry).then(setRating);
+    let mounted = true;
+    fetchTVRating(item.id, apiKey, ratingCountry).then((r) => {
+      if (mounted) setRating(r);
+    });
+    return () => {
+      mounted = false;
+    };
   }, [item.id, apiKey, ratingCountry]);
 
   useEffect(() => {
@@ -411,10 +431,18 @@ export default function TVPage({
       isAnime && anilistSeasons?.length > 0 && tmdbSeasons.length <= 1
         ? 1
         : selectedSeason;
+    let mounted = true;
     tmdbFetch(`/tv/${item.id}/season/${tmdbSeasonToFetch}`, apiKey)
-      .then(setSeasonData)
+      .then((d) => {
+        if (mounted) setSeasonData(d);
+      })
       .catch(() => {})
-      .finally(() => setLoadingSeason(false));
+      .finally(() => {
+        if (mounted) setLoadingSeason(false);
+      });
+    return () => {
+      mounted = false;
+    };
   }, [item.id, selectedSeason, apiKey, anilistSeasons]);
 
   // Reset m3u8 URL, subtitle URL and source menu whenever the series, episode, or source changes
@@ -436,16 +464,16 @@ export default function TVPage({
 
   // Fetch AniList metadata + auto-set anime source
   useEffect(() => {
+    let mounted = true;
     setAnilistData(null);
     setAnilistSeasons(null);
     if (isAnime) {
       fetchAnilistData(item.name || item.title, "ANIME", item.id).then(
         (data) => {
-          if (data) {
-            setAnilistData(data);
-            const seasons = buildAnilistSeasons(data);
-            if (seasons?.length) setAnilistSeasons(seasons);
-          }
+          if (!mounted || !data) return;
+          setAnilistData(data);
+          const seasons = buildAnilistSeasons(data);
+          if (seasons?.length) setAnilistSeasons(seasons);
         },
       );
       // Switch to anime source if current source is not an anime source
@@ -464,6 +492,9 @@ export default function TVPage({
         setPlayerSource(!savedSrc?.tag ? saved : NON_ANIME_DEFAULT_SOURCE);
       }
     }
+    return () => {
+      mounted = false;
+    };
   }, [item.id, isAnime]);
 
   // Resolve allmanga episode URL via main-process IPC (GraphQL, no CORS)
@@ -475,6 +506,7 @@ export default function TVPage({
     const epNum = selectedEp.episode_number;
     const progressKey = `tv_${item.id}_s${selectedSeason}e${epNum}`;
     const startTime = storage.get("dlTime_" + progressKey) || 0;
+    let mounted = true;
     window.electron
       .resolveAllManga({
         title,
@@ -483,6 +515,7 @@ export default function TVPage({
         translationType: dubMode,
       })
       .then((res) => {
+        if (!mounted) return;
         if (res?.ok && res.url) {
           if (res.isDirectMp4 !== undefined) {
             window.electron
@@ -492,11 +525,14 @@ export default function TVPage({
                 startTime,
               })
               .then((r) => {
+                if (!mounted) return;
                 setResolvedPlayerUrl(r.playerUrl);
                 // Also expose raw url so download button can use it
                 setM3u8Url(res.url);
               })
-              .catch(() => setResolveError("Failed to start local player"));
+              .catch(() => {
+                if (mounted) setResolveError("Failed to start local player");
+              });
           } else {
             setResolvedPlayerUrl(res.url);
           }
@@ -504,8 +540,15 @@ export default function TVPage({
           setResolveError(res?.error || "Episode not found on AllManga");
         }
       })
-      .catch((e) => setResolveError(e.message || "Error"))
-      .finally(() => setResolvingUrl(false));
+      .catch((e) => {
+        if (mounted) setResolveError(e.message || "Error");
+      })
+      .finally(() => {
+        if (mounted) setResolvingUrl(false);
+      });
+    return () => {
+      mounted = false;
+    };
   }, [playing, selectedEp, playerSource, selectedSeason, dubMode]);
 
   useEffect(() => {

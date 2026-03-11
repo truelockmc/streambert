@@ -90,22 +90,31 @@ export default function App() {
 
   // ── Load API key from secure storage on startup ──
   useEffect(() => {
+    let mounted = true;
     secureStorage.get("apikey").then((val) => {
+      if (!mounted) return;
       setApiKey(val || null);
       setApiKeyLoaded(true);
     });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // ── Detect platform for Windows titlebar ──────────────────────────────────
   useEffect(() => {
-    if (window.electron?.getPlatform) {
-      window.electron.getPlatform().then((p) => {
-        setPlatform(p);
-        if (p === "win32" || p === "linux") {
-          document.documentElement.setAttribute("data-win-titlebar", "1");
-        }
-      });
-    }
+    if (!window.electron?.getPlatform) return;
+    let mounted = true;
+    window.electron.getPlatform().then((p) => {
+      if (!mounted) return;
+      setPlatform(p);
+      if (p === "win32" || p === "linux") {
+        document.documentElement.setAttribute("data-win-titlebar", "1");
+      }
+    });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Listen for close confirmation request from main process
@@ -153,8 +162,9 @@ export default function App() {
   // Load persisted downloads on startup + immediately prune missing files
   useEffect(() => {
     if (!window.electron) return;
+    let mounted = true;
     window.electron.getDownloads().then(async (list) => {
-      if (!Array.isArray(list)) return;
+      if (!mounted || !Array.isArray(list)) return;
 
       const pruned = [...list];
       const toRemove = new Set();
@@ -180,8 +190,11 @@ export default function App() {
         }),
       );
 
-      setDownloads(pruned.filter((d) => !toRemove.has(d.id)));
+      if (mounted) setDownloads(pruned.filter((d) => !toRemove.has(d.id)));
     });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Listen for live progress events from main process
@@ -350,9 +363,11 @@ export default function App() {
   }, [navigateBack]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
+  const toastTimerRef = useRef(null);
   const showToast = useCallback((msg) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast(msg);
-    setTimeout(() => setToast(null), 2500);
+    toastTimerRef.current = setTimeout(() => setToast(null), 2500);
   }, []);
 
   const handleSelectResult = useCallback(

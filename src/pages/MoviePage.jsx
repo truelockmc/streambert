@@ -132,18 +132,34 @@ export default function MoviePage({
   const seekBackCooldownRef = useRef(0);
 
   useEffect(() => {
+    let mounted = true;
     tmdbFetch(`/movie/${item.id}`, apiKey)
-      .then(setDetails)
-      .catch(() => setDetails(item));
+      .then((d) => {
+        if (mounted) setDetails(d);
+      })
+      .catch(() => {
+        if (mounted) setDetails(item);
+      });
+    return () => {
+      mounted = false;
+    };
   }, [item.id, apiKey]);
 
   useEffect(() => {
-    fetchMovieRating(item.id, apiKey, ratingCountry).then(setRating);
+    let mounted = true;
+    fetchMovieRating(item.id, apiKey, ratingCountry).then((r) => {
+      if (mounted) setRating(r);
+    });
+    return () => {
+      mounted = false;
+    };
   }, [item.id, apiKey, ratingCountry]);
 
   useEffect(() => {
+    let mounted = true;
     tmdbFetch(`/movie/${item.id}/videos`, apiKey)
       .then((data) => {
+        if (!mounted) return;
         const videos = data.results || [];
         const trailer =
           videos.find((v) => v.type === "Trailer" && v.site === "YouTube") ||
@@ -151,14 +167,19 @@ export default function MoviePage({
         if (trailer) setTrailerKey(trailer.key);
       })
       .catch(() => {});
+    return () => {
+      mounted = false;
+    };
   }, [item.id, apiKey]);
 
   // Fetch movie collection (sequels/prequels)
   useEffect(() => {
     setCollection(null);
     if (!details?.belongs_to_collection?.id) return;
+    let mounted = true;
     tmdbFetch(`/collection/${details.belongs_to_collection.id}`, apiKey)
       .then((data) => {
+        if (!mounted) return;
         const parts = (data.parts || [])
           .map((p) => ({ ...p, media_type: "movie" }))
           .sort((a, b) =>
@@ -169,6 +190,9 @@ export default function MoviePage({
         }
       })
       .catch(() => {});
+    return () => {
+      mounted = false;
+    };
   }, [details?.belongs_to_collection?.id, apiKey]);
 
   // Reset m3u8 URL, subtitle URL and source menu whenever the movie or source changes
@@ -185,10 +209,11 @@ export default function MoviePage({
 
   // Fetch AniList data + auto-set source for anime/non-anime
   useEffect(() => {
+    let mounted = true;
     if (isAnime) {
       fetchAnilistData(item.title || item.name, "ANIME", item.id).then(
         (data) => {
-          if (data) setAnilistData(data);
+          if (mounted && data) setAnilistData(data);
         },
       );
       // Switch to anime source if current source is not an anime source
@@ -207,6 +232,9 @@ export default function MoviePage({
         setPlayerSource(!savedSrc?.tag ? saved : NON_ANIME_DEFAULT_SOURCE);
       }
     }
+    return () => {
+      mounted = false;
+    };
   }, [item.id, isAnime]);
 
   // Resolve AllManga movie URL via main-process IPC
@@ -216,6 +244,7 @@ export default function MoviePage({
     setResolvingUrl(true);
     setResolveError(null);
     const startTime = storage.get("dlTime_" + progressKey) || 0;
+    let mounted = true;
     window.electron
       .resolveAllManga({
         title,
@@ -225,6 +254,7 @@ export default function MoviePage({
         translationType: dubMode,
       })
       .then((res) => {
+        if (!mounted) return;
         if (res?.ok && res.url) {
           if (res.isDirectMp4 !== undefined) {
             window.electron
@@ -234,10 +264,13 @@ export default function MoviePage({
                 startTime,
               })
               .then((r) => {
+                if (!mounted) return;
                 setResolvedPlayerUrl(r.playerUrl);
                 setM3u8Url(res.url);
               })
-              .catch(() => setResolveError("Failed to start local player"));
+              .catch(() => {
+                if (mounted) setResolveError("Failed to start local player");
+              });
           } else {
             setResolvedPlayerUrl(res.url);
           }
@@ -245,8 +278,15 @@ export default function MoviePage({
           setResolveError(res?.error || "Movie not found on AllManga");
         }
       })
-      .catch((e) => setResolveError(e.message || "Error"))
-      .finally(() => setResolvingUrl(false));
+      .catch((e) => {
+        if (mounted) setResolveError(e.message || "Error");
+      })
+      .finally(() => {
+        if (mounted) setResolvingUrl(false);
+      });
+    return () => {
+      mounted = false;
+    };
   }, [playing, playerSource, dubMode]);
 
   useEffect(() => {
