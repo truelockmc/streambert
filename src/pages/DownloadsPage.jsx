@@ -519,11 +519,16 @@ function LocalFileCard({
   );
   const [showPopover, setShowPopover] = useState(false);
   const [popoverSecs, setPopoverSecs] = useState(0);
-  const [popoverText, setPopoverText] = useState("");
+  const [popoverHH, setPopoverHH] = useState("00");
+  const [popoverMM, setPopoverMM] = useState("00");
+  const [popoverSS, setPopoverSS] = useState("00");
   const [videoDuration, setVideoDuration] = useState(null);
   const [durationLoading, setDurationLoading] = useState(false);
   const popoverRef = useRef(null);
   const fetchingRef = useRef(false);
+  const hhRef = useRef(null);
+  const mmRef = useRef(null);
+  const ssRef = useRef(null);
 
   // Re-sync from storage when key changes (picks up progress from online watching)
   useEffect(() => {
@@ -569,24 +574,54 @@ function LocalFileCard({
   const openPopover = useCallback(() => {
     const s = savedSecs ?? 0;
     setPopoverSecs(s);
-    setPopoverText(secsToHms(s) ?? "00:00:00");
+    const hms = secsToHms(s) ?? "00:00:00";
+    const [hh, mm, ss] = hms.split(":");
+    setPopoverHH(hh ?? "00");
+    setPopoverMM(mm ?? "00");
+    setPopoverSS(ss ?? "00");
     setShowPopover(true);
   }, [savedSecs]);
 
   const handleSliderChange = useCallback((e) => {
     const s = Number(e.target.value);
     setPopoverSecs(s);
-    setPopoverText(secsToHms(s) ?? "00:00:00");
+    const hms = secsToHms(s) ?? "00:00:00";
+    const [hh, mm, ss] = hms.split(":");
+    setPopoverHH(hh ?? "00");
+    setPopoverMM(mm ?? "00");
+    setPopoverSS(ss ?? "00");
   }, []);
 
-  const handleTextChange = useCallback((e) => {
-    setPopoverText(e.target.value);
-    const s = hmsToSecs(e.target.value);
-    if (s !== null) setPopoverSecs(s);
-  }, []);
+  const makeSegmentHandler = useCallback(
+    (setter, nextRef, max) => (e) => {
+      let raw = e.target.value.replace(/\D/g, "").slice(0, 2);
+      if (raw.length === 2 && max !== undefined && Number(raw) > max) {
+        raw = String(max).padStart(2, "0");
+      }
+      setter(raw);
+      if (raw.length === 2 && nextRef?.current) nextRef.current.focus();
+      const hh = setter === setPopoverHH ? raw : popoverHH;
+      const mm = setter === setPopoverMM ? raw : popoverMM;
+      const ss = setter === setPopoverSS ? raw : popoverSS;
+      const s = hmsToSecs(`${hh}:${mm}:${ss}`);
+      if (s !== null) setPopoverSecs(s);
+    },
+    [popoverHH, popoverMM, popoverSS],
+  );
+
+  const makeSegmentBlurHandler = useCallback(
+    (setter, max) => () => {
+      setter((prev) => {
+        const num = prev === "" ? 0 : Math.min(Number(prev), max ?? Infinity);
+        return String(isNaN(num) ? 0 : num).padStart(2, "0");
+      });
+    },
+    [],
+  );
 
   const commitPopover = useCallback(() => {
-    let s = hmsToSecs(popoverText);
+    const str = `${popoverHH}:${popoverMM}:${popoverSS}`;
+    let s = hmsToSecs(str);
     if (s === null) s = popoverSecs;
     if (s !== null && storageKey) {
       const clamped = videoDuration
@@ -596,7 +631,7 @@ function LocalFileCard({
       setSavedSecs(clamped);
     }
     setShowPopover(false);
-  }, [popoverText, popoverSecs, storageKey, videoDuration]);
+  }, [popoverHH, popoverMM, popoverSS, popoverSecs, storageKey, videoDuration]);
 
   const resetProgress = useCallback(() => {
     if (storageKey) {
@@ -605,14 +640,6 @@ function LocalFileCard({
     }
     setShowPopover(false);
   }, [storageKey]);
-
-  const handlePopoverKeyDown = useCallback(
-    (e) => {
-      if (e.key === "Enter") commitPopover();
-      if (e.key === "Escape") setShowPopover(false);
-    },
-    [commitPopover],
-  );
 
   const handleWatch = useCallback(() => {
     if (!dl.filePath) return;
@@ -879,34 +906,104 @@ function LocalFileCard({
 
                     {/* Text input + Reset + Save */}
                     <div style={{ display: "flex", gap: 5 }}>
-                      <input
-                        type="text"
-                        value={popoverText}
-                        onChange={handleTextChange}
-                        onKeyDown={handlePopoverKeyDown}
-                        placeholder="HH:MM:SS"
-                        autoFocus
+                      <div
                         style={{
                           flex: 1,
                           minWidth: 0,
+                          display: "flex",
+                          alignItems: "center",
                           background: "var(--surface2)",
                           border: "1px solid var(--border)",
                           borderRadius: 6,
-                          color: "var(--text)",
-                          fontSize: 12,
-                          fontVariantNumeric: "tabular-nums",
-                          fontWeight: 600,
-                          padding: "5px 8px",
-                          outline: "none",
-                          letterSpacing: "0.04em",
+                          padding: "4px 8px",
+                          gap: 2,
                         }}
                         onFocus={(e) => {
-                          e.target.style.borderColor = "var(--red)";
+                          e.currentTarget.style.borderColor = "var(--red)";
                         }}
                         onBlur={(e) => {
-                          e.target.style.borderColor = "var(--border)";
+                          if (!e.currentTarget.contains(e.relatedTarget))
+                            e.currentTarget.style.borderColor = "var(--border)";
                         }}
-                      />
+                      >
+                        {[
+                          {
+                            ref: hhRef,
+                            value: popoverHH,
+                            setter: setPopoverHH,
+                            next: mmRef,
+                            label: "HH",
+                            max: undefined,
+                          },
+                          {
+                            ref: mmRef,
+                            value: popoverMM,
+                            setter: setPopoverMM,
+                            next: ssRef,
+                            label: "MM",
+                            max: 59,
+                          },
+                          {
+                            ref: ssRef,
+                            value: popoverSS,
+                            setter: setPopoverSS,
+                            next: null,
+                            label: "SS",
+                            max: 59,
+                          },
+                        ].map(({ ref, value, setter, next, label, max }, i) => (
+                          <span
+                            key={label}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 2,
+                            }}
+                          >
+                            {i > 0 && (
+                              <span
+                                style={{
+                                  color: "var(--text3)",
+                                  fontWeight: 700,
+                                  fontSize: 13,
+                                  userSelect: "none",
+                                }}
+                              >
+                                :
+                              </span>
+                            )}
+                            <input
+                              ref={ref}
+                              type="text"
+                              inputMode="numeric"
+                              maxLength={2}
+                              value={value}
+                              placeholder={label}
+                              autoFocus={i === 0}
+                              onChange={makeSegmentHandler(setter, next, max)}
+                              onBlur={makeSegmentBlurHandler(setter, max)}
+                              onFocus={(e) => e.target.select()}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") commitPopover();
+                                if (e.key === "Escape") setShowPopover(false);
+                              }}
+                              style={{
+                                width: 26,
+                                background: "transparent",
+                                border: "none",
+                                outline: "none",
+                                color: "var(--text)",
+                                fontSize: 12,
+                                fontVariantNumeric: "tabular-nums",
+                                fontWeight: 600,
+                                textAlign: "center",
+                                letterSpacing: "0.04em",
+                                padding: 0,
+                              }}
+                            />
+                          </span>
+                        ))}
+                      </div>
                       <button
                         className="btn btn-ghost btn--sm"
                         onClick={resetProgress}
