@@ -14,7 +14,8 @@
     "start": "vite build && electron .",
     "dist": "cross-env ELECTRON_DIST=1 vite build && npm run dist:win && npm run dist:linux",
     "dist:linux": "cross-env ELECTRON_DIST=1 vite build && electron-builder --linux deb && electron-builder --linux AppImage",
-    "dist:win": "cross-env ELECTRON_DIST=1 vite build && electron-builder --win"
+    "dist:win": "cross-env ELECTRON_DIST=1 vite build && electron-builder --win",
+    "dist:mac": "cross-env ELECTRON_DIST=1 vite build && electron-builder --mac"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -96,6 +97,13 @@
       ],
       "category": "Utility",
       "icon": "public/icon.png"
+    },
+    "mac": {
+      "icon": "public/icon.png",
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.entertainment"
     },
     "electronLanguages": [
       "en-US",
