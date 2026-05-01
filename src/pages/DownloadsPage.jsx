@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, memo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import {
   DownloadIcon,
   TrashIcon,
@@ -8,7 +8,7 @@ import {
   WatchedIcon,
   SubtitlesIcon,
 } from "../components/Icons";
-import { storage, isElectron } from "../utils/storage";
+import { storage, isElectron, STORAGE_KEYS } from "../utils/storage";
 import SubtitleDownloaderModal from "../components/SubtitleDownloaderModal";
 import { imgUrl } from "../utils/api";
 
@@ -107,15 +107,32 @@ export default function DownloadsPage({
   const highlightRef = useRef(null);
   const [subtitleModalDl, setSubtitleModalDl] = useState(null);
 
-  // ── Toolbar state ─────────────────────────────────────────────────────────
-  const [showUntracked, setShowUntracked] = useState(true);
-  const [sortBy, setSortBy] = useState("date");
-  const [sortDir, setSortDir] = useState("desc");
+  // ── Toolbar state ─────────────────────────────────────────────
+  const [showUntracked, setShowUntracked] = useState(
+    () => storage.get(STORAGE_KEYS.DL_SHOW_UNTRACKED) ?? true,
+  );
+  const [sortBy, setSortBy] = useState(
+    () => storage.get(STORAGE_KEYS.DL_SORT_BY) ?? "date",
+  );
+  const [sortDir, setSortDir] = useState(
+    () => storage.get(STORAGE_KEYS.DL_SORT_DIR) ?? "desc",
+  );
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef(null);
 
-  // Sync open
+  // Persist whenever values change
+  useEffect(() => {
+    storage.set(STORAGE_KEYS.DL_SORT_BY, sortBy);
+  }, [sortBy]);
+  useEffect(() => {
+    storage.set(STORAGE_KEYS.DL_SORT_DIR, sortDir);
+  }, [sortDir]);
+  useEffect(() => {
+    storage.set(STORAGE_KEYS.DL_SHOW_UNTRACKED, showUntracked);
+  }, [showUntracked]);
+
+  // Sync externally-triggered open (Ctrl+K from App.jsx)
   useEffect(() => {
     if (searchOpenProp) {
       setSearchOpen(true);
@@ -136,15 +153,78 @@ export default function DownloadsPage({
   }, []);
 
   useEffect(() => {
-    if (searchOpen) {
-      setTimeout(() => searchInputRef.current?.focus(), 50);
-    }
+    if (searchOpen) setTimeout(() => searchInputRef.current?.focus(), 50);
   }, [searchOpen]);
 
-  const active = downloads.filter((d) => d.status === "downloading");
-  const finished = downloads
-    .filter((d) => d.status !== "downloading")
-    .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
+  // ── Stable derived lists ──────────────────────────────────────
+  const active = useMemo(
+    () => downloads.filter((d) => d.status === "downloading"),
+    [downloads],
+  );
+
+  const finished = useMemo(
+    () =>
+      downloads
+        .filter((d) => d.status !== "downloading")
+        .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0)),
+    [downloads],
+  );
+
+  const localFileItems = useMemo(
+    () =>
+      localFiles.map((f) => ({
+        id: f.filePath,
+        name: f.name,
+        filePath: f.filePath,
+        size: f.size,
+        status: "local",
+        isLocalOnly: true,
+      })),
+    [localFiles],
+  );
+
+  const allLocalItemsRaw = useMemo(() => {
+    const finishedVisible = finished.filter(
+      (d) => fileExistsCache[d.id] !== false,
+    );
+    const finishedPaths = new Set(finished.map((d) => d.filePath));
+    const extraLocal = localFileItems.filter(
+      (lf) => !finishedPaths.has(lf.filePath),
+    );
+    return [...finishedVisible, ...extraLocal];
+  }, [finished, localFileItems, fileExistsCache]);
+
+  const untrackedCount = useMemo(
+    () => allLocalItemsRaw.filter((d) => d.isLocalOnly).length,
+    [allLocalItemsRaw],
+  );
+
+  const allLocalItems = useMemo(() => {
+    // 1. Untracked filter
+    const step1 = showUntracked
+      ? allLocalItemsRaw
+      : allLocalItemsRaw.filter((d) => !d.isLocalOnly);
+
+    // 2. Search filter
+    const q = searchQuery.trim().toLowerCase();
+    const step2 = q
+      ? step1.filter((d) => (d.name || "").toLowerCase().includes(q))
+      : step1;
+
+    // 3. Sort (spread once here, not in render)
+    return [...step2].sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === "date") cmp = (a.completedAt || 0) - (b.completedAt || 0);
+      if (sortBy === "name") cmp = (a.name || "").localeCompare(b.name || "");
+      if (sortBy === "size") cmp = parseSize(a.size) - parseSize(b.size);
+      if (sortBy === "type")
+        cmp = (a.mediaType || "local").localeCompare(b.mediaType || "local");
+      return sortDir === "desc" ? -cmp : cmp;
+    });
+  }, [allLocalItemsRaw, showUntracked, searchQuery, sortBy, sortDir]);
+
+  const q = searchQuery.trim().toLowerCase();
+  const searchResultCount = q ? allLocalItems.length : null;
 
   useEffect(() => {
     if (!highlightId || !highlightRef.current) return;
@@ -198,7 +278,7 @@ export default function DownloadsPage({
     return () => {
       mounted = false;
     };
-  }, [finished.length, onDeleteDownload]);
+  }, [finished, onDeleteDownload, onUpdateDownload]);
 
   const handleScanFolder = useCallback(async () => {
     if (!isElectron || !scanFolder) return;
@@ -231,65 +311,28 @@ export default function DownloadsPage({
     }
   }, [scanFolder, downloads, finished, onUpdateDownload]);
 
-  const handleDelete = async (dl) => {
-    if (!confirm(`Delete "${dl.name}"${dl.filePath ? " and its file" : ""}?`))
-      return;
-    await window.electron.deleteDownload({ id: dl.id, filePath: dl.filePath });
-    // Clean up persisted duration
-    if (dl.id) storage.set(DURATION_PREFIX + dl.id, null);
-    // Clean up persisted progress time
-    const watchedKey =
-      dl.mediaType === "movie"
-        ? `movie_${dl.tmdbId || dl.mediaId}`
-        : dl.mediaType === "tv" && dl.tmdbId && dl.season && dl.episode
-          ? `tv_${dl.tmdbId}_s${dl.season}e${dl.episode}`
-          : null;
-    if (watchedKey) storage.set(PROGRESS_TIME_PREFIX + watchedKey, null);
-    onDeleteDownload(dl.id);
-  };
-
-  const localFileItems = localFiles.map((f) => ({
-    id: f.filePath,
-    name: f.name,
-    filePath: f.filePath,
-    size: f.size,
-    status: "local",
-    isLocalOnly: true,
-  }));
-
-  const allLocalItemsRaw = [
-    ...finished.filter((d) => fileExistsCache[d.id] !== false),
-    ...localFileItems.filter(
-      (lf) => !finished.some((d) => d.filePath === lf.filePath),
-    ),
-  ];
-
-  // ── Filter: untracked toggle ──────────────────────────────────────────────
-  const afterUntrackedFilter = showUntracked
-    ? allLocalItemsRaw
-    : allLocalItemsRaw.filter((d) => !d.isLocalOnly);
-
-  // ── Filter: search query ──────────────────────────────────────────────────
-  const q = searchQuery.trim().toLowerCase();
-  const afterSearch = q
-    ? afterUntrackedFilter.filter((d) =>
-        (d.name || "").toLowerCase().includes(q),
-      )
-    : afterUntrackedFilter;
-
-  // ── Sort ──────────────────────────────────────────────────────────────────
-  const allLocalItems = [...afterSearch].sort((a, b) => {
-    let cmp = 0;
-    if (sortBy === "date") cmp = (a.completedAt || 0) - (b.completedAt || 0);
-    if (sortBy === "name") cmp = (a.name || "").localeCompare(b.name || "");
-    if (sortBy === "size") cmp = parseSize(a.size) - parseSize(b.size);
-    if (sortBy === "type")
-      cmp = (a.mediaType || "local").localeCompare(b.mediaType || "local");
-    return sortDir === "desc" ? -cmp : cmp;
-  });
-
-  const untrackedCount = allLocalItemsRaw.filter((d) => d.isLocalOnly).length;
-  const searchResultCount = q ? afterSearch.length : null;
+  const handleDelete = useCallback(
+    async (dl) => {
+      if (!confirm(`Delete "${dl.name}"${dl.filePath ? " and its file" : ""}?`))
+        return;
+      await window.electron.deleteDownload({
+        id: dl.id,
+        filePath: dl.filePath,
+      });
+      // Clean up persisted duration
+      if (dl.id) storage.set(DURATION_PREFIX + dl.id, null);
+      // Clean up persisted progress time
+      const watchedKey =
+        dl.mediaType === "movie"
+          ? `movie_${dl.tmdbId || dl.mediaId}`
+          : dl.mediaType === "tv" && dl.tmdbId && dl.season && dl.episode
+            ? `tv_${dl.tmdbId}_s${dl.season}e${dl.episode}`
+            : null;
+      if (watchedKey) storage.set(PROGRESS_TIME_PREFIX + watchedKey, null);
+      onDeleteDownload(dl.id);
+    },
+    [onDeleteDownload],
+  );
 
   return (
     <div className="fade-in dl-page">
@@ -407,17 +450,16 @@ export default function DownloadsPage({
 
         {/* Right: untracked toggle + search shortcut hint */}
         <div className="dl-toolbar__group">
-          {untrackedCount > 0 && (
-            <button
-              className={`dl-toolbar__toggle${showUntracked ? " dl-toolbar__toggle--on" : ""}`}
-              onClick={() => setShowUntracked((v) => !v)}
-              title={
-                showUntracked ? "Hide untracked files" : "Show untracked files"
-              }
-            >
-              {showUntracked ? "⊙" : "⊘"} Untracked ({untrackedCount})
-            </button>
-          )}
+          <button
+            className={`dl-toolbar__toggle${showUntracked ? " dl-toolbar__toggle--on" : ""}`}
+            onClick={() => setShowUntracked((v) => !v)}
+            title={
+              showUntracked ? "Hide untracked files" : "Show untracked files"
+            }
+          >
+            {showUntracked ? "⊙" : "⊘"} Untracked
+            {untrackedCount > 0 ? ` (${untrackedCount})` : ""}
+          </button>
           {!searchOpen && (
             <button
               className="dl-toolbar__search-hint"
