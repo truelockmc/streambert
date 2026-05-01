@@ -40,6 +40,7 @@ export default function App() {
   const [page, setPage] = useState(() => storage.get("startPage") || "home");
   const [selected, setSelected] = useState(null);
   const [showSearch, setShowSearch] = useState(false);
+  const [dlSearchOpen, setDlSearchOpen] = useState(false);
   const [librarySort, setLibrarySort] = useState(
     () => storage.get(STORAGE_KEYS.LIBRARY_SORT) || "manual",
   );
@@ -575,6 +576,12 @@ export default function App() {
         e.preventDefault();
         setShowSearch(true);
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        if (pageRef.current === "downloads") {
+          e.preventDefault();
+          setDlSearchOpen(true);
+        }
+      }
       if (e.key === "Escape") {
         setShowSearch(false);
         setShowShortcuts(false);
@@ -966,6 +973,8 @@ export default function App() {
                 highlightId={highlightDownload}
                 onClearHighlight={() => setHighlightDownload(null)}
                 onSelect={handleSelectResult}
+                searchOpen={dlSearchOpen}
+                onSearchClose={() => setDlSearchOpen(false)}
                 onSettings={(section) =>
                   navigate("settings", { section: section || null })
                 }

@@ -2627,7 +2627,204 @@ kbd {
 .dl-page__subtitle {
     color: var(--text3);
     font-size: 14px;
-    margin-bottom: 40px;
+    margin-bottom: 16px;
+}
+
+/* ── Downloads search bar ──────────────────────────────────── */
+.dl-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--red);
+    border-radius: 8px;
+    padding: 6px 10px 6px 12px;
+    box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.1);
+    margin-bottom: 12px;
+    max-width: 520px;
+}
+
+.dl-search-bar__input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    color: var(--text);
+    font-family: var(--font-body);
+    min-width: 0;
+}
+
+.dl-search-bar__count {
+    font-size: 12px;
+    color: var(--text3);
+    white-space: nowrap;
+    padding: 0 8px;
+    border-left: 1px solid var(--border);
+    margin-left: 4px;
+    font-variant-numeric: tabular-nums;
+}
+
+.dl-search-bar__close {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    line-height: 1;
+    transition:
+        color 0.15s,
+        background 0.15s;
+    flex-shrink: 0;
+}
+
+.dl-search-bar__close:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Downloads toolbar ────────────────────────────────────────────────────── */
+.dl-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+    padding: 5px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.dl-toolbar__group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.dl-toolbar__label {
+    font-size: 11px;
+    color: var(--text3);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.dl-toolbar__sort-btns {
+    display: flex;
+    gap: 2px;
+}
+
+.dl-toolbar__sort-btn {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--text3);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        color 0.15s;
+    font-family: var(--font-body);
+}
+
+.dl-toolbar__sort-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text2);
+}
+
+.dl-toolbar__sort-btn--active {
+    background: color-mix(in srgb, var(--red) 15%, var(--surface2));
+    border-color: var(--red);
+    color: var(--text);
+}
+
+.dl-toolbar__dir-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text2);
+    font-size: 14px;
+    width: 26px;
+    height: 24px;
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        color 0.15s;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.dl-toolbar__dir-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+    border-color: var(--text3);
+}
+
+.dl-toolbar__toggle {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--text3);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--font-body);
+}
+
+.dl-toolbar__toggle:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text2);
+}
+
+.dl-toolbar__toggle--on {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--border);
+    color: var(--text2);
+}
+
+.dl-toolbar__search-hint {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text3);
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--font-body);
+}
+
+.dl-toolbar__search-hint:hover {
+    color: var(--text2);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.dl-toolbar__search-hint-key {
+    font-size: 10px;
+    color: var(--text3);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 3px;
+    font-family: monospace;
 }
 
 .dl-page__section {
