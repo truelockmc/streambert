@@ -8,14 +8,28 @@ import { isRestricted } from "../utils/ageRating";
 import { storage } from "../utils/storage";
 import { loadHomeLayout, loadHomeViewMode } from "../utils/homeLayout";
 
-function getRecentHistoryItem(history) {
-  if (!history || history.length === 0) return null;
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const recent = history.filter(
-    (h) => h.watchedAt && h.watchedAt > sevenDaysAgo,
-  );
-  if (recent.length === 0) return null;
-  return recent[Math.floor(Math.random() * recent.length)];
+/**
+ * Extract up to `count` unique, recently watched items from the user's
+ * history (within the last 30 days).  Returns newest-first and dedupes
+ * by TMDB id + media_type so we don't fire duplicate API calls.
+ */
+function getRecentHistoryItems(history, count = 5) {
+  if (!history || history.length === 0) return [];
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const recent = history
+    .filter((h) => h.watchedAt && h.watchedAt > thirtyDaysAgo)
+    .sort((a, b) => b.watchedAt - a.watchedAt);
+
+  const seen = new Set();
+  const unique = [];
+  for (const item of recent) {
+    const key = `${item.media_type || "movie"}_${item.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(item);
+    if (unique.length >= count) break;
+  }
+  return unique;
 }
 
 export default function HomePage({
@@ -35,8 +49,7 @@ export default function HomePage({
 }) {
   const hero = trending[0];
 
-  const [similarItems, setSimilarItems] = useState([]);
-  const [similarSource, setSimilarSource] = useState(null);
+  const [recommendedItems, setRecommendedItems] = useState([]);
   const [topRatedItems, setTopRatedItems] = useState([]);
 
   // Load layout config (order + visibility) once on mount
@@ -51,10 +64,10 @@ export default function HomePage({
       ...inProgress,
       ...trending.map((i) => ({ ...i, media_type: "movie" })),
       ...trendingTV.map((i) => ({ ...i, media_type: "tv" })),
-      ...similarItems,
+      ...recommendedItems,
       ...topRatedItems,
     ],
-    [inProgress, trending, trendingTV, similarItems, topRatedItems],
+    [inProgress, trending, trendingTV, recommendedItems, topRatedItems],
   );
 
   const { ratingsMap, ageLimitSetting } = useRatings(allItems);
@@ -79,32 +92,73 @@ export default function HomePage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ratingsMap, ageLimitSetting]);
 
-  // Fetch similar items based on recent watch history
+  // Fetch personalised recommendations from multiple recent history items
   useEffect(() => {
     if (!apiKey || offline || !history || history.length === 0) return;
-    const source = getRecentHistoryItem(history);
-    if (!source) return;
-    setSimilarSource(source);
-    const type = source.media_type === "tv" ? "tv" : "movie";
-    const tryFetch = (endpoint) =>
-      tmdbFetch(`/${type}/${source.id}/${endpoint}`, apiKey).then((data) =>
-        (data.results || [])
-          .slice(0, 10)
-          .map((item) => ({ ...item, media_type: type })),
-      );
-    tryFetch("similar")
-      .then((results) => {
-        if (results.length > 0) {
-          setSimilarItems(results);
-          return;
+    const sources = getRecentHistoryItems(history, 5);
+    if (sources.length === 0) return;
+
+    const controller = new AbortController();
+
+    // Build a Set of already-watched TMDB ids for dedup
+    const watchedIds = new Set(
+      (history || []).map((h) => `${h.media_type || "movie"}_${h.id}`),
+    );
+
+    // For each source, try /recommendations first, fall back to /similar
+    const fetches = sources.map((source) => {
+      const type = source.media_type === "tv" ? "tv" : "movie";
+      return tmdbFetch(
+        `/${type}/${source.id}/recommendations`,
+        apiKey,
+        { signal: controller.signal },
+      )
+        .then((data) => {
+          const results = (data.results || []).map((i) => ({
+            ...i,
+            media_type: type,
+          }));
+          if (results.length > 0) return results;
+          // Fall back to /similar if /recommendations returned nothing
+          return tmdbFetch(
+            `/${type}/${source.id}/similar`,
+            apiKey,
+            { signal: controller.signal },
+          ).then((d) =>
+            (d.results || []).map((i) => ({ ...i, media_type: type })),
+          );
+        })
+        .catch(() => []);
+    });
+
+    Promise.all(fetches)
+      .then((arrays) => {
+        // Interleave results from each source for variety
+        const merged = [];
+        const maxLen = Math.max(...arrays.map((a) => a.length));
+        for (let i = 0; i < maxLen; i++) {
+          for (const arr of arrays) {
+            if (arr[i]) merged.push(arr[i]);
+          }
         }
-        return tryFetch("recommendations").then(setSimilarItems);
+
+        // Deduplicate and filter out already-watched items
+        const seen = new Set();
+        const deduped = merged.filter((item) => {
+          const key = `${item.media_type}_${item.id}`;
+          if (seen.has(key) || watchedIds.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+
+        setRecommendedItems(deduped.slice(0, 20));
       })
-      .catch(() =>
-        tryFetch("recommendations")
-          .then(setSimilarItems)
-          .catch(() => {}),
-      );
+      .catch((e) => {
+        if (e.name !== "AbortError")
+          console.warn("Recommendations fetch failed", e);
+      });
+
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey, offline, history?.length]);
 
@@ -306,20 +360,19 @@ export default function HomePage({
         };
 
         if (id === "similar") {
-          if (!similarSource || similarItems.length === 0) return null;
+          if (recommendedItems.length === 0) return null;
           if (viewMode === "list")
             return renderList(
               "similar",
-              "Similar to",
-              similarSource.title || similarSource.name,
-              similarItems,
+              "Recommended for You",
+              null,
+              recommendedItems,
             );
           return (
             <TrendingCarousel
               key="similar"
-              items={similarItems}
-              title="Similar to"
-              titleHighlight={similarSource.title || similarSource.name}
+              items={recommendedItems}
+              title="Recommended for You"
               onSelect={onSelect}
               ratingsMap={enrichedRatingsMap}
             />
