@@ -455,6 +455,11 @@ export default function TVPage({
   const restricted = isRestricted(rating.minAge, ageLimitSetting);
   const [seasonMenu, setSeasonMenu] = useState(null); // { x, y, seasonNum }
 
+  const [autoplayCountdown, setAutoplayCountdown] = useState(null);
+  const countdownIntervalRef = useRef(null);
+  const countdownStartedRef = useRef(false);
+  const startAutoplayRef = useRef(() => {});
+
   // Read threshold from settings (default 20s), stable across renders
   const [watchedThreshold] = useState(
     () => storage.get("watchedThreshold") ?? 20,
@@ -1008,6 +1013,12 @@ export default function TVPage({
     lastKnownTimeRef.current = 0;
     seekBackCooldownRef.current = 0;
     durationRef.current = 0;
+    setAutoplayCountdown(null);
+    countdownStartedRef.current = false;
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
   }, [currentProgressKey]);
 
   // Show loader instantly when playback starts
@@ -1272,6 +1283,12 @@ export default function TVPage({
               autoMarkedRef.current = true;
               onMarkWatchedRef.current?.(currentProgressKey);
             }
+
+            // Autoplay trigger
+            if (remaining <= 5 && !countdownStartedRef.current) {
+              countdownStartedRef.current = true;
+              startAutoplayRef.current?.();
+            }
           }
         } catch {}
       }, TICK);
@@ -1354,6 +1371,36 @@ export default function TVPage({
     },
     [d, selectedSeason, onHistory],
   );
+
+  const nextEp = useMemo(() => {
+    if (!selectedEp || !currentSeasonEpisodes) return null;
+    const idx = currentSeasonEpisodes.findIndex(e => e.episode_number === selectedEp.episode_number);
+    if (idx >= 0 && idx < currentSeasonEpisodes.length - 1) {
+      return currentSeasonEpisodes[idx + 1];
+    }
+    return null;
+  }, [selectedEp, currentSeasonEpisodes]);
+
+  useEffect(() => {
+    startAutoplayRef.current = () => {
+      if (!nextEp) return;
+      const epUnreleased = nextEp.air_date ? new Date(nextEp.air_date) > _todayForEpisodes : false;
+      if (restricted || epUnreleased) return;
+
+      setAutoplayCountdown(5);
+      countdownIntervalRef.current = setInterval(() => {
+        setAutoplayCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+            playEpisode(nextEp);
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    };
+  }, [nextEp, restricted, playEpisode]);
 
   const handleSetDownloaderFolder = useCallback((folder) => {
     setDownloaderFolder(folder);
@@ -1663,6 +1710,52 @@ export default function TVPage({
                     >
                       Close pop-out &amp; return
                     </button>
+                  </div>
+                )}
+                {autoplayCountdown !== null && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      zIndex: 30,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "rgba(0,0,0,0.85)",
+                      gap: 16,
+                      borderRadius: "inherit",
+                      backdropFilter: "blur(4px)",
+                    }}
+                  >
+                    <span style={{ fontSize: 24, fontWeight: "bold", color: "white" }}>
+                      Up Next: {nextEp?.name}
+                    </span>
+                    <span style={{ fontSize: 16, color: "var(--text2)" }}>
+                      Starting in {autoplayCountdown}...
+                    </span>
+                    <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+                      <button 
+                        className="player-overlay-btn" 
+                        onClick={() => {
+                          if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+                          setAutoplayCountdown(null);
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        className="player-overlay-btn" 
+                        style={{ background: "var(--red)", color: "white", borderColor: "var(--red)" }}
+                        onClick={() => {
+                          if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+                          setAutoplayCountdown(null);
+                          playEpisode(nextEp);
+                        }}
+                      >
+                        <PlayIcon /> Play Now
+                      </button>
+                    </div>
                   </div>
                 )}
                 <webview
