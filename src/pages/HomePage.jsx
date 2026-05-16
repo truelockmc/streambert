@@ -18,6 +18,61 @@ function getRecentHistoryItem(history) {
   return recent[Math.floor(Math.random() * recent.length)];
 }
 
+const MOVIE_GENRES = [
+  { id: 28, name: "Action" },
+  { id: 12, name: "Adventure" },
+  { id: 16, name: "Animation" },
+  { id: 35, name: "Comedy" },
+  { id: 80, name: "Crime" },
+  { id: 99, name: "Documentary" },
+  { id: 18, name: "Drama" },
+  { id: 10751, name: "Family" },
+  { id: 14, name: "Fantasy" },
+  { id: 36, name: "History" },
+  { id: 27, name: "Horror" },
+  { id: 10402, name: "Music" },
+  { id: 9648, name: "Mystery" },
+  { id: 10749, name: "Romance" },
+  { id: 878, name: "Science Fiction" },
+  { id: 53, name: "Thriller" },
+  { id: 10752, name: "War" },
+  { id: 37, name: "Western" }
+];
+
+const TV_GENRES = [
+  { id: 10759, name: "Action & Adventure" },
+  { id: 16, name: "Animation" },
+  { id: 35, name: "Comedy" },
+  { id: 80, name: "Crime" },
+  { id: 99, name: "Documentary" },
+  { id: 18, name: "Drama" },
+  { id: 10751, name: "Family" },
+  { id: 10762, name: "Kids" },
+  { id: 9648, name: "Mystery" },
+  { id: 10763, name: "News" },
+  { id: 10764, name: "Reality" },
+  { id: 10765, name: "Sci-Fi & Fantasy" },
+  { id: 10766, name: "Soap" },
+  { id: 10767, name: "Talk" },
+  { id: 10768, name: "War & Politics" },
+  { id: 37, name: "Western" }
+];
+
+const LANGUAGES = [
+  { code: "en", name: "English" },
+  { code: "ja", name: "Japanese" },
+  { code: "ko", name: "Korean" },
+  { code: "zh", name: "Chinese" },
+  { code: "es", name: "Spanish" },
+  { code: "fr", name: "French" },
+  { code: "de", name: "German" },
+  { code: "hi", name: "Hindi" },
+];
+
+const YEARS = Array.from({ length: 50 }, (_, i) => new Date().getFullYear() - i);
+
+const ALL_GENRES = Array.from(new Map([...MOVIE_GENRES, ...TV_GENRES].map(g => [g.id, g])).values()).sort((a,b) => a.name.localeCompare(b.name));
+
 export default function HomePage({
   trending,
   trendingTV,
@@ -39,6 +94,16 @@ export default function HomePage({
   const [similarSource, setSimilarSource] = useState(null);
   const [topRatedItems, setTopRatedItems] = useState([]);
 
+  // Filter state
+  const [filterType, setFilterType] = useState("all");
+  const [filterGenre, setFilterGenre] = useState("");
+  const [filterYear, setFilterYear] = useState("");
+  const [filterLanguage, setFilterLanguage] = useState("");
+  const [filteredResults, setFilteredResults] = useState([]);
+  const [loadingFilters, setLoadingFilters] = useState(false);
+  const [loadingRandom, setLoadingRandom] = useState(false);
+  const isActiveFilter = filterType !== "all" || filterGenre !== "" || filterYear !== "" || filterLanguage !== "";
+
   // Load layout config (order + visibility) once on mount
   const [layout] = useState(() => loadHomeLayout());
   const { order: rowOrder, visible: rowVisible } = layout;
@@ -53,11 +118,46 @@ export default function HomePage({
       ...trendingTV.map((i) => ({ ...i, media_type: "tv" })),
       ...similarItems,
       ...topRatedItems,
+      ...filteredResults,
     ],
-    [inProgress, trending, trendingTV, similarItems, topRatedItems],
+    [inProgress, trending, trendingTV, similarItems, topRatedItems, filteredResults],
   );
 
   const { ratingsMap, ageLimitSetting } = useRatings(allItems);
+
+  const handleRandomSuggestion = async () => {
+    if (!apiKey || offline) return;
+    setLoadingRandom(true);
+    try {
+      // Pick random page between 1 and 20 to ensure good quality results but decent variety
+      const randomPage = Math.floor(Math.random() * 20) + 1;
+      const type = filterType === "all" ? (Math.random() > 0.5 ? "movie" : "tv") : filterType;
+      let endpoint = `/discover/${type}?sort_by=popularity.desc&page=${randomPage}`;
+      if (filterGenre) endpoint += `&with_genres=${filterGenre}`;
+      if (filterYear) {
+        if (type === "movie") endpoint += `&primary_release_year=${filterYear}`;
+        else endpoint += `&first_air_date_year=${filterYear}`;
+      }
+      if (filterLanguage) endpoint += `&with_original_language=${filterLanguage}`;
+
+      const data = await tmdbFetch(endpoint, apiKey);
+      if (data.results && data.results.length > 0) {
+        const randomItem = data.results[Math.floor(Math.random() * data.results.length)];
+        onSelect({ ...randomItem, media_type: type });
+      } else {
+         // If no results on random page, fallback to page 1
+         const fallbackData = await tmdbFetch(endpoint.replace(`page=${randomPage}`, 'page=1'), apiKey);
+         if (fallbackData.results && fallbackData.results.length > 0) {
+            const randomItem = fallbackData.results[Math.floor(Math.random() * fallbackData.results.length)];
+            onSelect({ ...randomItem, media_type: type });
+         }
+      }
+    } catch (e) {
+      console.error("Failed to fetch random suggestion", e);
+    } finally {
+      setLoadingRandom(false);
+    }
+  };
 
   const getRating = useCallback(
     (item) => getRatingForItem(item, ratingsMap),
@@ -140,6 +240,55 @@ export default function HomePage({
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey, offline]);
+
+  // Fetch filtered results
+  useEffect(() => {
+    if (!apiKey || offline || !isActiveFilter) return;
+    setLoadingFilters(true);
+
+    const controller = new AbortController();
+
+    const fetchType = async (type) => {
+      let endpoint = `/discover/${type}?sort_by=popularity.desc&page=1`;
+      if (filterGenre) endpoint += `&with_genres=${filterGenre}`;
+      if (filterYear) {
+        if (type === "movie") endpoint += `&primary_release_year=${filterYear}`;
+        else endpoint += `&first_air_date_year=${filterYear}`;
+      }
+      if (filterLanguage) endpoint += `&with_original_language=${filterLanguage}`;
+
+      const data = await tmdbFetch(endpoint, apiKey, { signal: controller.signal });
+      return (data.results || []).map((i) => ({ ...i, media_type: type }));
+    };
+
+    if (filterType === "all") {
+      Promise.all([fetchType("movie"), fetchType("tv")])
+        .then(([movies, tvs]) => {
+          const merged = [];
+          const max = Math.max(movies.length, tvs.length);
+          for (let i = 0; i < max; i++) {
+            if (movies[i]) merged.push(movies[i]);
+            if (tvs[i]) merged.push(tvs[i]);
+          }
+          setFilteredResults(merged);
+          setLoadingFilters(false);
+        })
+        .catch((e) => {
+          if (e.name !== "AbortError") setLoadingFilters(false);
+        });
+    } else {
+      fetchType(filterType)
+        .then((res) => {
+          setFilteredResults(res);
+          setLoadingFilters(false);
+        })
+        .catch((e) => {
+          if (e.name !== "AbortError") setLoadingFilters(false);
+        });
+    }
+
+    return () => controller.abort();
+  }, [apiKey, offline, isActiveFilter, filterType, filterGenre, filterYear, filterLanguage]);
 
   // Stable pre-built item arrays for carousels, capped at 10
   const trendingMovieItems = useMemo(
@@ -228,8 +377,92 @@ export default function HomePage({
         </div>
       )}
 
+      {/* ── Filters ── */}
+      {!loading && !offline && (
+        <div className="section" style={{ paddingTop: 0 }}>
+          <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", marginBottom: 24 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text3)" }}>Discover</span>
+            
+            <select className="filter-select" value={filterType} onChange={e => { setFilterType(e.target.value); setFilterGenre(""); }}>
+              <option value="all">Movies & Series</option>
+              <option value="movie">Movies</option>
+              <option value="tv">Series</option>
+            </select>
+
+            <select className="filter-select" value={filterGenre} onChange={e => setFilterGenre(e.target.value)}>
+              <option value="">All Genres</option>
+              {(filterType === "movie" ? MOVIE_GENRES : filterType === "tv" ? TV_GENRES : ALL_GENRES).map(g => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+
+            <select className="filter-select" value={filterYear} onChange={e => setFilterYear(e.target.value)}>
+              <option value="">All Years</option>
+              {YEARS.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+
+            <select className="filter-select" value={filterLanguage} onChange={e => setFilterLanguage(e.target.value)}>
+              <option value="">All Languages</option>
+              {LANGUAGES.map(l => (
+                <option key={l.code} value={l.code}>{l.name}</option>
+              ))}
+            </select>
+            
+            {isActiveFilter && (
+               <button className="btn btn-secondary" onClick={() => {
+                  setFilterType("all");
+                  setFilterGenre("");
+                  setFilterYear("");
+                  setFilterLanguage("");
+               }} style={{ padding: "6px 12px", fontSize: 12 }}>
+                 Clear
+               </button>
+            )}
+
+            <button 
+              className="btn btn-primary" 
+              onClick={handleRandomSuggestion} 
+              disabled={loadingRandom}
+              style={{ padding: "6px 12px", fontSize: 12, marginLeft: "auto" }}
+            >
+              {loadingRandom ? "Finding..." : "Surprise Me"}
+            </button>
+          </div>
+          
+          {isActiveFilter && (
+            <div className="cards-grid" style={{ marginTop: -8 }}>
+              {loadingFilters ? (
+                <div style={{ color: "var(--text3)" }}>Loading...</div>
+              ) : filteredResults.length > 0 ? (
+                filteredResults.map(item => {
+                  const rk = `${item.media_type}_${item.id}`;
+                  const rd = enrichedRatingsMap[rk] || {};
+                  return (
+                    <MediaCard
+                      key={`${item.media_type}_${item.id}`}
+                      item={item}
+                      onClick={() => onSelect(item)}
+                      progress={0}
+                      watched={watched}
+                      onMarkWatched={onMarkWatched}
+                      onMarkUnwatched={onMarkUnwatched}
+                      ageRating={rd.cert}
+                      restricted={rd.restricted}
+                    />
+                  );
+                })
+              ) : (
+                <div style={{ color: "var(--text3)" }}>No results found for these filters.</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Rows in user-configured order ── */}
-      {rowOrder.map((id) => {
+      {!isActiveFilter && rowOrder.map((id) => {
         if (!rowVisible[id]) return null;
 
         if (id === "continue") {
