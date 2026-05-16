@@ -1122,9 +1122,15 @@ body.no-anim *::after {
     align-items: flex-start;
 }
 
-.episode-card:hover {
+.episode-card:hover,
+.episode-card.focused {
     border-color: var(--red);
     background: var(--surface3);
+}
+
+.episode-card.focused {
+    outline: 2px solid var(--red);
+    outline-offset: 2px;
 }
 
 .episode-card.playing {

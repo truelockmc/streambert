@@ -371,6 +371,7 @@ export default function TVPage({
     item.season != null ? Number(item.season) : 1,
   );
   const [selectedEp, setSelectedEp] = useState(null);
+  const [focusedEpisodeIndex, setFocusedEpisodeIndex] = useState(-1);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingSeason, setLoadingSeason] = useState(false);
@@ -554,6 +555,7 @@ export default function TVPage({
     }
     setLoadingSeason(true);
     setSelectedEp(null);
+    setFocusedEpisodeIndex(-1);
     setPlaying(false);
     setSeasonData(null); // clear stale episodes immediately
     // AniList virtual seasons on a single-season show: always fetch TMDB S1.
@@ -1416,6 +1418,47 @@ export default function TVPage({
     ? !!watched?.[currentProgressKey]
     : false;
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't intercept if user is typing
+      const active = document.activeElement;
+      if (active && active.matches('input, textarea, [contenteditable="true"]')) return;
+      // Don't intercept if player is actively focused
+      if (playing) return;
+
+      const maxIndex = currentSeasonEpisodes.length - 1;
+      if (maxIndex < 0) return;
+
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+        e.preventDefault();
+        setFocusedEpisodeIndex((prev) => {
+          const next = prev < maxIndex ? prev + 1 : prev;
+          document.getElementById(`ep-card-${next}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          return next;
+        });
+      } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        setFocusedEpisodeIndex((prev) => {
+          const next = prev > 0 ? prev - 1 : prev === -1 ? 0 : 0;
+          document.getElementById(`ep-card-${next}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          return next;
+        });
+      } else if (e.key === "Enter") {
+        if (focusedEpisodeIndex >= 0 && focusedEpisodeIndex <= maxIndex) {
+          e.preventDefault();
+          const ep = currentSeasonEpisodes[focusedEpisodeIndex];
+          const epUnreleased = ep.air_date ? new Date(ep.air_date) > _todayForEpisodes : false;
+          if (!restricted && !epUnreleased) {
+            playEpisode(ep);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentSeasonEpisodes, focusedEpisodeIndex, playing, restricted, playEpisode]);
+
   return (
     <div className="fade-in">
       {loading && (
@@ -2076,11 +2119,13 @@ export default function TVPage({
             {!loadingSeason &&
               (seasonData?.episodes || episodeGroupCurrentEpisodes?.length) && (
                 <div className="episodes-grid">
-                  {currentSeasonEpisodes.map((ep) => {
+                  {currentSeasonEpisodes.map((ep, idx) => {
                     const pk = `tv_${item.id}_s${selectedSeason}e${ep.episode_number}`;
                     return (
                       <EpisodeCard
                         key={ep.episode_number}
+                        id={`ep-card-${idx}`}
+                        isFocused={focusedEpisodeIndex === idx}
                         ep={ep}
                         itemId={item.id}
                         selectedSeason={selectedSeason}
@@ -2195,6 +2240,8 @@ const EpisodeCard = memo(function EpisodeCard({
   onPlay,
   onContextMenu,
   onGoToDownloads,
+  isFocused,
+  id,
 }) {
   const pk = `tv_${itemId}_s${selectedSeason}e${ep.episode_number}`;
   const isPlaying = playing && selectedEpNumber === ep.episode_number;
@@ -2207,7 +2254,8 @@ const EpisodeCard = memo(function EpisodeCard({
 
   return (
     <div
-      className={`episode-card ${isPlaying ? "playing" : ""} ${epWatched ? "ep-watched" : ""} ${restricted ? "episode-card--restricted" : ""} ${epUnreleased ? "episode-card--unreleased" : ""}`}
+      id={id}
+      className={`episode-card ${isPlaying ? "playing" : ""} ${epWatched ? "ep-watched" : ""} ${restricted ? "episode-card--restricted" : ""} ${epUnreleased ? "episode-card--unreleased" : ""} ${isFocused ? "focused" : ""}`}
       onClick={() => (restricted || epUnreleased ? null : onPlay(ep))}
       onContextMenu={(e) => {
         e.preventDefault();
