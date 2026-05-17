@@ -178,23 +178,31 @@ function register(getMainWindow) {
 
   // ── downloader binary detection ──────────────────────────────────────────
   ipcMain.handle("check-downloader", (_, folderPath) => {
-    if (!folderPath) return { exists: false };
+    if (!folderPath) return { exists: false, reason: "no_folder" };
+    let entries;
     try {
-      const entries = fs.readdirSync(folderPath);
-      if (!entries.includes("_internal")) return { exists: false };
-      const binary = entries.find((e) => {
-        if (e === "_internal" || e.startsWith(".")) return false;
-        try {
-          return fs.statSync(path.join(folderPath, e)).isFile();
-        } catch {
-          return false;
-        }
-      });
-      const binaryPath = binary ? path.join(folderPath, binary) : null;
-      return { exists: !!binaryPath, binaryPath };
-    } catch {
-      return { exists: false };
+      entries = fs.readdirSync(folderPath);
+    } catch (e) {
+      const reason = e.code === "EACCES" ? "folder_permission" : "folder_unreadable";
+      return { exists: false, reason };
     }
+    if (!entries.includes("_internal")) {
+      return { exists: false, reason: "no_internal" };
+    }
+    const binary = entries.find((e) => {
+      if (e === "_internal" || e.startsWith(".")) return false;
+      try {
+        const stat = fs.statSync(path.join(folderPath, e));
+        if (!stat.isFile()) return false;
+        return process.platform === "win32"
+          ? e.endsWith(".exe")
+          : !!(stat.mode & 0o111);
+      } catch {
+        return false;
+      }
+    });
+    if (!binary) return { exists: false, reason: "no_executable" };
+    return { exists: true, binaryPath: path.join(folderPath, binary) };
   });
 
   // ── start download ────────────────────────────────────────────────────────
@@ -482,6 +490,23 @@ function register(getMainWindow) {
             appendLog(l);
             handleLine(l);
           });
+        });
+
+        proc.on("error", (err) => {
+          activeProcs.delete(id);
+          const idx = downloads.findIndex((d) => d.id === id);
+          if (idx === -1) return;
+          const msg =
+            err.code === "EACCES"
+              ? `Permission denied, binary is not executable: ${binaryPath}`
+              : err.code === "ENOENT"
+                ? `Binary not found: ${binaryPath}`
+                : `Failed to start downloader: ${err.message}`;
+          downloads[idx].status = "error";
+          downloads[idx].completedAt = Date.now();
+          downloads[idx].lastMessage = msg;
+          appendLog(msg);
+          sendProgress({ id, status: "error", lastMessage: msg });
         });
 
         proc.on("close", (code) => {

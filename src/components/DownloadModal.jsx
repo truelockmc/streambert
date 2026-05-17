@@ -1104,8 +1104,26 @@ export default function DownloadModal({
                     !downloader.exists &&
                     downloaderFolder && (
                       <div className="download-error">
-                        No binary found. Make sure <code>_internal</code> and
-                        the binary are inside the chosen folder.
+                        {downloader.reason === "folder_permission" && (
+                          <>Permission denied, can't read the chosen folder.</>
+                        )}
+                        {downloader.reason === "folder_unreadable" && (
+                          <>Folder could not be read. Is it still accessible?</>
+                        )}
+                        {downloader.reason === "no_internal" && (
+                          <>
+                            Missing <code>_internal</code> folder. Extract the
+                            full release archive, not just the binary.
+                          </>
+                        )}
+                        {(downloader.reason === "no_executable" ||
+                          !downloader.reason) && (
+                          <>
+                            No executable binary found. On Linux, make sure the
+                            binary has execute permissions (<code>chmod +x</code>
+                            ).
+                          </>
+                        )}
                       </div>
                     )}
                 </div>
