@@ -659,17 +659,7 @@ export default function MoviePage({
             )}
           </div>
           <div className="detail-info">
-            <div
-              className="detail-type"
-              style={{ display: "flex", alignItems: "center", gap: 8 }}
-            >
-              Movie
-              {isWatched && (
-                <span className="watched-label">
-                  <WatchedIcon size={14} /> Watched
-                </span>
-              )}
-            </div>
+            <div className="detail-type">Movie</div>
             <div className="detail-title">{title}</div>
             <div className="genres">
               {displayGenres.map((g) => (
