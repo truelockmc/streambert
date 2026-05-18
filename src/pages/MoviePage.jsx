@@ -21,6 +21,7 @@ import {
   ANIME_DEFAULT_SOURCE,
   NON_ANIME_DEFAULT_SOURCE,
   NEEDS_INTERCEPT,
+  fetchMovieCredits,
 } from "../utils/api";
 import {
   PlayIcon,
@@ -43,6 +44,7 @@ import TrailerModal from "../components/TrailerModal";
 import BlockedStatsModal from "../components/BlockedStatsModal";
 import { useBlockedStats } from "../utils/useBlockedStats";
 import MediaCard from "../components/MediaCard";
+import CastRow from "../components/CastRow";
 import { storage } from "../utils/storage";
 import {
   fetchMovieRating,
@@ -70,6 +72,8 @@ export default function MoviePage({
   onSelect,
 }) {
   const [details, setDetails] = useState(null);
+  const [castCredits, setCastCredits] = useState([]);
+  const [castLoading, setCastLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
   const [trailerKey, setTrailerKey] = useState(null);
@@ -192,6 +196,27 @@ export default function MoviePage({
       })
       .catch(() => {
         if (mounted) setDetails(item);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [item.id, apiKey]);
+
+  // Fetch cast credits
+  useEffect(() => {
+    let mounted = true;
+    setCastLoading(true);
+    fetchMovieCredits(item.id, apiKey)
+      .then((data) => {
+        if (!mounted) return;
+        setCastCredits(data.cast || []);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setCastCredits([]);
+      })
+      .finally(() => {
+        if (mounted) setCastLoading(false);
       });
     return () => {
       mounted = false;
@@ -1145,6 +1170,14 @@ export default function MoviePage({
           </div>
         </div>
       )}
+
+      {/* Cast */}
+      <CastRow
+        title="Cast"
+        credits={castCredits}
+        onPersonClick={(person) => onSelect({ ...person, media_type: "person" })}
+        loading={castLoading}
+      />
 
       {showTrailer && trailerKey && (
         <TrailerModal

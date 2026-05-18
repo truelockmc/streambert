@@ -407,3 +407,28 @@ export const fetchEpisodeGroup = async (groupId, apiKey) => {
   flushEgCache();
   return data;
 };
+
+// ── Person / Credits helpers ────────────────────────────────────────────────
+
+export const fetchPerson = (id, apiKey) => tmdbFetch(`/person/${id}`, apiKey);
+
+export const fetchPersonCombinedCredits = (id, apiKey) =>
+  tmdbFetch(`/person/${id}/combined_credits`, apiKey);
+
+export const fetchPersonImages = (id, apiKey) =>
+  tmdbFetch(`/person/${id}/images`, apiKey);
+
+export const fetchPersonMovieCredits = (id, apiKey) =>
+  tmdbFetch(`/person/${id}/movie_credits`, apiKey);
+
+export const fetchPersonTVCredits = (id, apiKey) =>
+  tmdbFetch(`/person/${id}/tv_credits`, apiKey);
+
+export const fetchPopularPeople = (apiKey) =>
+  tmdbFetch(`/person/popular?page=1`, apiKey);
+
+export const fetchMovieCredits = (id, apiKey) =>
+  tmdbFetch(`/movie/${id}/credits`, apiKey);
+
+export const fetchTVCredits = (id, apiKey) =>
+  tmdbFetch(`/tv/${id}/credits`, apiKey);

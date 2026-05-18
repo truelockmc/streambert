@@ -26,6 +26,7 @@ import UpdateModal from "./components/UpdateModal";
 const HomePage = lazy(() => import("./pages/HomePage"));
 const MoviePage = lazy(() => import("./pages/MoviePage"));
 const TVPage = lazy(() => import("./pages/TVPage"));
+const PersonPage = lazy(() => import("./pages/PersonPage"));
 const LibraryPage = lazy(() => import("./pages/LibraryPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const DownloadsPage = lazy(() => import("./pages/DownloadsPage"));
@@ -622,7 +623,13 @@ export default function App() {
 
   const handleSelectResult = useCallback(
     (item) => {
-      navigate(item.media_type === "tv" ? "tv" : "movie", item);
+      if (item.media_type === "person") {
+        navigate("person", item);
+      } else if (item.media_type === "tv") {
+        navigate("tv", item);
+      } else {
+        navigate("movie", item);
+      }
     },
     [navigate],
   );
@@ -939,6 +946,15 @@ export default function App() {
                 onMarkUnwatched={markUnwatched}
                 downloads={downloads}
                 onGoToDownloads={handleGoToDownloads}
+                onSelect={handleSelectResult}
+              />
+            )}
+            {page === "person" && selected && (
+              <PersonPage
+                item={selected}
+                apiKey={apiKey}
+                onSelect={handleSelectResult}
+                onBack={() => navigate("home")}
               />
             )}
             {page === "history" && (

@@ -28,6 +28,7 @@ import {
   ANIME_DEFAULT_SOURCE,
   NON_ANIME_DEFAULT_SOURCE,
   NEEDS_INTERCEPT,
+  fetchTVCredits,
 } from "../utils/api";
 import {
   BookmarkIcon,
@@ -48,6 +49,7 @@ import {
 import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
 import BlockedStatsModal from "../components/BlockedStatsModal";
+import CastRow from "../components/CastRow";
 import { useBlockedStats } from "../utils/useBlockedStats";
 import { storage, STORAGE_KEYS } from "../utils/storage";
 import { fetchAniSkipTimings } from "../utils/aniSkip";
@@ -363,8 +365,11 @@ export default function TVPage({
   onMarkUnwatched,
   downloads,
   onGoToDownloads,
+  onSelect,
 }) {
   const [details, setDetails] = useState(null);
+  const [castCredits, setCastCredits] = useState([]);
+  const [castLoading, setCastLoading] = useState(false);
   const [seasonData, setSeasonData] = useState(null);
   const [failedSeasons, setFailedSeasons] = useState(() => new Set()); // season numbers which give 404 on TMDB
   const [selectedSeason, setSelectedSeason] = useState(() =>
@@ -483,6 +488,27 @@ export default function TVPage({
       })
       .finally(() => {
         if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [item.id, apiKey]);
+
+  // Fetch TV cast credits
+  useEffect(() => {
+    let mounted = true;
+    setCastLoading(true);
+    fetchTVCredits(item.id, apiKey)
+      .then((data) => {
+        if (!mounted) return;
+        setCastCredits(data.cast || []);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setCastCredits([]);
+      })
+      .finally(() => {
+        if (mounted) setCastLoading(false);
       });
     return () => {
       mounted = false;
@@ -2101,6 +2127,14 @@ export default function TVPage({
           </div>
         </>
       )}
+
+      {/* Cast */}
+      <CastRow
+        title="Cast"
+        credits={castCredits}
+        onPersonClick={(person) => onSelect({ ...person, media_type: "person" })}
+        loading={castLoading}
+      />
 
       {showTrailer && trailerKey && (
         <TrailerModal

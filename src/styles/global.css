@@ -3833,3 +3833,346 @@ html[data-win-titlebar][data-maximized] .main {
 .episode-check-item:hover {
     color: var(--text) !important;
 }
+
+/* ── Person / Cast UI ──────────────────────────────────────────────────────── */
+
+/* PersonCard circle hover */
+.person-card-circle:hover {
+    border-color: var(--red) !important;
+    transform: scale(1.06);
+    box-shadow: var(--red-glow);
+}
+
+/* Person detail hero */
+.person-detail-hero {
+    min-height: 420px;
+}
+
+.person-detail-bg {
+    background-size: cover;
+    background-position: center center;
+}
+
+.person-profile-pic {
+    width: 200px;
+    height: 200px;
+    border-radius: 50% !important;
+    aspect-ratio: unset !important;
+    flex-shrink: 0;
+    border: 3px solid var(--border) !important;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+    background: var(--surface2);
+    overflow: hidden;
+}
+
+.person-profile-pic img {
+    border-radius: 50%;
+}
+
+.person-profile-fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 64px;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.5);
+    background: var(--surface2);
+}
+
+.person-detail-type {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 8px;
+}
+
+.person-detail-title {
+    font-family: var(--font-display);
+    font-size: 48px;
+    line-height: 1;
+    letter-spacing: 1px;
+    color: var(--text);
+    margin-bottom: 12px;
+}
+
+.person-detail-stats {
+    font-size: 13px;
+    color: var(--text3);
+    margin-bottom: 6px;
+}
+
+.person-detail-meta {
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 16px;
+}
+
+.person-detail-bio {
+    margin-bottom: 16px;
+}
+
+.person-bio-toggle {
+    background: none;
+    border: none;
+    color: var(--red);
+    font-size: 13px;
+    font-family: var(--font-body);
+    cursor: pointer;
+    padding: 0;
+    margin-top: 8px;
+    font-weight: 500;
+    transition: color 0.15s;
+}
+
+.person-bio-toggle:hover {
+    color: var(--red2);
+}
+
+.person-detail-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* Known for cards */
+.person-knownfor-card {
+    cursor: pointer;
+}
+
+/* CastRow */
+.cast-section {
+    padding-top: 8px;
+}
+
+.cast-member {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    width: 100px;
+}
+
+.cast-member-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    text-align: center;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 96px;
+}
+
+.cast-member-character {
+    font-size: 11px;
+    color: var(--text3);
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 96px;
+}
+
+/* Person filmography table */
+.person-filmography-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    gap: 16px;
+}
+
+.person-filmography-tabs {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.person-filmography-tab {
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--font-body);
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.person-filmography-tab:hover {
+    border-color: var(--text3);
+    color: var(--text);
+}
+
+.person-filmography-tab.active {
+    background: var(--red);
+    border-color: var(--red);
+    color: white;
+}
+
+.person-filmography-sort {
+    flex-shrink: 0;
+}
+
+.person-filmography-select {
+    font-size: 12px;
+    font-family: var(--font-body);
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.person-filmography-select:hover,
+.person-filmography-select:focus {
+    border-color: var(--red);
+}
+
+.person-filmography-table {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.person-filmography-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.person-filmography-row:hover {
+    background: var(--surface2);
+}
+
+.person-filmography-year {
+    width: 42px;
+    font-size: 13px;
+    color: var(--text3);
+    flex-shrink: 0;
+    text-align: center;
+}
+
+.person-filmography-poster {
+    width: 40px;
+    height: 58px;
+    flex-shrink: 0;
+    border-radius: 5px;
+    overflow: hidden;
+    background: var(--surface3);
+}
+
+.person-filmography-poster img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.person-filmography-no-poster {
+    width: 100%;
+    height: 100%;
+    background: var(--surface3);
+}
+
+.person-filmography-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.person-filmography-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.person-filmography-character {
+    font-size: 12px;
+    color: var(--text3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.person-filmography-rating {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #f5c518;
+    flex-shrink: 0;
+    min-width: 40px;
+}
+
+/* Search person results */
+.search-result--person {
+    gap: 12px;
+}
+
+.search-result-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+}
+
+.search-result-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.person-card-fallback {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--surface3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 600;
+    font-family: var(--font-display);
+    color: var(--text3);
+}
+
+.type-person {
+    background: rgba(139, 92, 246, 0.15);
+    color: #a78bfa;
+    border: 1px solid rgba(139, 92, 246, 0.4);
+}
+
+/* Search section labels */
+.search-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--text3);
+    padding: 8px 12px 4px;
+}

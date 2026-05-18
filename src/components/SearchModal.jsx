@@ -40,11 +40,7 @@ export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
           apiKey,
         );
         if (mounted) {
-          setResults(
-            (data.results || [])
-              .filter((r) => r.media_type !== "person")
-              .slice(0, 12),
-          );
+          setResults((data.results || []).slice(0, 14));
         }
       } catch {}
       if (mounted) setLoading(false);
@@ -166,35 +162,79 @@ export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
             <div className="search-empty">No results for "{query}"</div>
           )}
 
-          {!loading &&
-            results.map((r) => (
-              <div
-                key={r.id}
-                className="search-result"
-                onClick={() => handleSelect(r)}
-              >
-                <img
-                  src={
-                    r.poster_path
-                      ? imgUrl(r.poster_path, "w92")
-                      : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='58'%3E%3Crect fill='%23222' width='40' height='58'/%3E%3C/svg%3E"
-                  }
-                  alt=""
-                />
-                <div className="search-result-info">
-                  <div className="search-result-title">{r.title || r.name}</div>
-                  <div className="search-result-meta">
-                    {(r.release_date || r.first_air_date || "").slice(0, 4)}
-                    {r.vote_average ? ` · ★ ${r.vote_average.toFixed(1)}` : ""}
-                  </div>
-                </div>
-                <span
-                  className={`search-result-type ${r.media_type === "tv" ? "type-tv" : "type-movie"}`}
-                >
-                  {r.media_type === "tv" ? "Series" : "Movie"}
-                </span>
-              </div>
-            ))}
+          {!loading && query && (() => {
+            const people = results.filter((r) => r.media_type === "person");
+            const media = results.filter((r) => r.media_type !== "person");
+            return (
+              <>
+                {people.length > 0 && (
+                  <>
+                    <div className="search-section-label">People</div>
+                    {people.map((r) => (
+                      <div
+                        key={r.id}
+                        className="search-result search-result--person"
+                        onClick={() => handleSelect(r)}
+                      >
+                        <div className="search-result-avatar">
+                          {r.profile_path ? (
+                            <img
+                              src={imgUrl(r.profile_path, "w185")}
+                              alt={r.name}
+                            />
+                          ) : (
+                            <div className="person-card-fallback">
+                              {(r.name || "?").split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="search-result-info">
+                          <div className="search-result-title">{r.name}</div>
+                          <div className="search-result-meta">
+                            {r.known_for_department !== "Acting" ? r.known_for_department : ""}
+                          </div>
+                        </div>
+                        <span className="search-result-type type-person">Person</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {media.length > 0 && (
+                  <>
+                    {people.length > 0 && <div className="search-section-label">Movies & Series</div>}
+                    {media.map((r) => (
+                      <div
+                        key={r.id}
+                        className="search-result"
+                        onClick={() => handleSelect(r)}
+                      >
+                        <img
+                          src={
+                            r.poster_path
+                              ? imgUrl(r.poster_path, "w92")
+                              : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='58'%3E%3Crect fill='%23222' width='40' height='58'/%3E%3C/svg%3E"
+                          }
+                          alt=""
+                        />
+                        <div className="search-result-info">
+                          <div className="search-result-title">{r.title || r.name}</div>
+                          <div className="search-result-meta">
+                            {(r.release_date || r.first_air_date || "").slice(0, 4)}
+                            {r.vote_average ? ` · ★ ${r.vote_average.toFixed(1)}` : ""}
+                          </div>
+                        </div>
+                        <span
+                          className={`search-result-type ${r.media_type === "tv" ? "type-tv" : "type-movie"}`}
+                        >
+                          {r.media_type === "tv" ? "Series" : "Movie"}
+                        </span>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </>
+            );
+          })()}
 
           {showHistory && (
             <div className="search-history">
