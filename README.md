@@ -106,6 +106,27 @@ npm run dist:appimage
 > - **libcrypt.so.1 error:** `sudo pacman -S libxcrypt-compat`
 > - **http-parser dependency error:** `yay -S http-parser` (from AUR)
 
+## Legal Disclaimer
+
+**IMPORTANT: This application is for educational and personal use only.**
+
+- Streambert does not host, store, or distribute any copyrighted content
+- All content is sourced from third-party providers and websites
+- Users are solely responsible for ensuring they have legal rights to access any content
+- The developer does not endorse or encourage copyright infringement
+- Users must comply with all applicable laws in their jurisdiction
+- Any legal issues should be directed to the actual content providers
+- This app functions as a search engine aggregator only
+- No copyrighted material is stored on my side
+
+## Legal Notice
+
+This application is provided "as is" for educational purposes. The developer:
+- Does not claim ownership of any content
+- Does not profit from copyrighted material in any way
+- Does not control third-party content providers
+- Encourages users to support content creators through legal means
+
 ---
 ## Project Structure
 ```
