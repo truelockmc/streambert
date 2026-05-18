@@ -59,8 +59,12 @@ export async function checkForUpdates() {
     if (name.endsWith(".appimage"))
       assets.appimage = asset.browser_download_url;
     else if (name.endsWith(".deb")) assets.deb = asset.browser_download_url;
-    else if (name.endsWith(".exe")) assets.exe = asset.browser_download_url;
-    else if (name.endsWith(".dmg")) assets.dmg = asset.browser_download_url;
+    else if (name.endsWith(".exe"))
+      assets.exe = asset.browser_download_url;
+    else if (name.endsWith("arm64.dmg"))
+      assets.dmg_arm64 = asset.browser_download_url;
+    else if (name.endsWith(".dmg"))
+      assets.dmg = asset.browser_download_url;
   }
 
   return {
