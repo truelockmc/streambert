@@ -37,11 +37,16 @@ import {
   SourceIcon,
   ShieldBlockIcon,
   PopOutIcon,
+  CastIcon,
+  CastingIcon,
 } from "../components/Icons";
 import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
 import BlockedStatsModal from "../components/BlockedStatsModal";
+import CastPickerModal from "../components/CastPickerModal";
+import CastMiniController from "../components/CastMiniController";
 import { useBlockedStats } from "../utils/useBlockedStats";
+import { useCast } from "../utils/useCast";
 import MediaCard from "../components/MediaCard";
 import { storage } from "../utils/storage";
 import {
@@ -109,6 +114,11 @@ export default function MoviePage({
   const [pipOpen, setPipOpen] = useState(false);
   const pipUrlRef = useRef(null); // URL to restore when pop-out closes
   const pipWebContentsIdRef = useRef(null); // cached WebContents ID of the pop-out window
+  // Casting
+  const cast = useCast({ autoDiscover: true });
+  const [showCastPicker, setShowCastPicker] = useState(false);
+  // AllManga sets this from res.isDirectMp4 so cast knows mp4 vs hls
+  const [allmangaIsDirectMp4, setAllmangaIsDirectMp4] = useState(null);
 
   // Derived: detect anime before any effects so effects can use it
   const isAnime = useMemo(
@@ -310,6 +320,7 @@ export default function MoviePage({
         if (!mounted) return;
         if (res?.ok && res.url) {
           if (res.isDirectMp4 !== undefined) {
+            setAllmangaIsDirectMp4(!!res.isDirectMp4);
             window.electron
               .setPlayerVideo({
                 url: res.url,
@@ -980,6 +991,31 @@ export default function MoviePage({
                   <span className="player-blocked-badge">{blockedSession}</span>
                 )}
               </button>
+              {/* Cast button */}
+              <button
+                className="player-overlay-btn"
+                onClick={() => {
+                  setShowSourceMenu(false);
+                  setShowCastPicker(true);
+                }}
+                title={
+                  cast.currentDevice
+                    ? `Casting to ${cast.currentDevice.friendlyName || cast.currentDevice.name}`
+                    : m3u8Url || (sourceIsAsync(playerSource) && resolvedPlayerUrl)
+                      ? "Cast to a device"
+                      : "Start the video first to enable casting"
+                }
+                disabled={
+                  !cast.currentDevice &&
+                  !m3u8Url &&
+                  !(sourceIsAsync(playerSource) && resolvedPlayerUrl)
+                }
+                style={
+                  cast.currentDevice ? { color: "var(--red)" } : undefined
+                }
+              >
+                {cast.currentDevice ? <CastingIcon /> : <CastIcon />}
+              </button>
               {/* Pop-out button*/}
               <button
                 className="player-overlay-btn"
@@ -1179,6 +1215,51 @@ export default function MoviePage({
           tmdbId={item.id}
         />
       )}
+
+      <CastPickerModal
+        open={showCastPicker}
+        onClose={() => setShowCastPicker(false)}
+        cast={cast}
+        loadArgs={(() => {
+          const title = item.title || item.name || "Streambert";
+          const posterUrl = d.poster_path
+            ? imgUrl(d.poster_path, "w500")
+            : null;
+          const subs = interceptedSubs.map((s) => ({
+            url: s.url,
+            lang: s.lang,
+          }));
+          if (sourceIsAsync(playerSource) && m3u8Url) {
+            const isMp4 = allmangaIsDirectMp4 !== false;
+            return {
+              mode: isMp4 ? "mp4Remote" : "hlsRemote",
+              url: m3u8Url,
+              referer: "https://allmanga.to",
+              title,
+              posterUrl,
+              remoteVttSubs: subs,
+            };
+          }
+          if (m3u8Url) {
+            let refererOrigin = null;
+            try {
+              refererOrigin = new URL(
+                getSourceUrl(playerSource, "movie", item.id, null, null),
+              ).origin;
+            } catch {}
+            return {
+              mode: "hlsRemote",
+              url: m3u8Url,
+              referer: refererOrigin,
+              title,
+              posterUrl,
+              remoteVttSubs: subs,
+            };
+          }
+          return null;
+        })()}
+      />
+      {cast.currentDevice && <CastMiniController cast={cast} variant="player" />}
     </div>
   );
 }

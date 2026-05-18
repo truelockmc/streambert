@@ -21,6 +21,9 @@
     "dist:mac": "cross-env ELECTRON_DIST=1 vite build && electron-builder --mac --publish never"
   },
   "dependencies": {
+    "bonjour-service": "^1.3.0",
+    "castv2-client": "^1.2.0",
+    "dlnacasts3": "^1.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

@@ -44,11 +44,16 @@ import {
   SourceIcon,
   ShieldBlockIcon,
   PopOutIcon,
+  CastIcon,
+  CastingIcon,
 } from "../components/Icons";
 import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
 import BlockedStatsModal from "../components/BlockedStatsModal";
+import CastPickerModal from "../components/CastPickerModal";
+import CastMiniController from "../components/CastMiniController";
 import { useBlockedStats } from "../utils/useBlockedStats";
+import { useCast } from "../utils/useCast";
 import { storage, STORAGE_KEYS } from "../utils/storage";
 import { fetchAniSkipTimings } from "../utils/aniSkip";
 import {
@@ -379,6 +384,10 @@ export default function TVPage({
   const [showTrailer, setShowTrailer] = useState(false);
   const [m3u8Url, setM3u8Url] = useState(null);
   const [interceptedSubs, setInterceptedSubs] = useState([]);
+  // Casting
+  const cast = useCast({ autoDiscover: true });
+  const [showCastPicker, setShowCastPicker] = useState(false);
+  const [allmangaIsDirectMp4, setAllmangaIsDirectMp4] = useState(null);
   const [playerSource, setPlayerSource] = useState(
     () => storage.get("playerSource") || NON_ANIME_DEFAULT_SOURCE,
   );
@@ -663,6 +672,7 @@ export default function TVPage({
         if (!mounted) return;
         if (res?.ok && res.url) {
           if (res.isDirectMp4 !== undefined) {
+            setAllmangaIsDirectMp4(!!res.isDirectMp4);
             window.electron
               .setPlayerVideo({
                 url: res.url,
@@ -1751,6 +1761,31 @@ export default function TVPage({
                       </span>
                     )}
                   </button>
+                  {/* Cast button */}
+                  <button
+                    className="player-overlay-btn"
+                    onClick={() => {
+                      setShowSourceMenu(false);
+                      setShowCastPicker(true);
+                    }}
+                    title={
+                      cast.currentDevice
+                        ? `Casting to ${cast.currentDevice.friendlyName || cast.currentDevice.name}`
+                        : m3u8Url || (isAsync && resolvedPlayerUrl)
+                          ? "Cast to a device"
+                          : "Start the video first to enable casting"
+                    }
+                    disabled={
+                      !cast.currentDevice &&
+                      !m3u8Url &&
+                      !(isAsync && resolvedPlayerUrl)
+                    }
+                    style={
+                      cast.currentDevice ? { color: "var(--red)" } : undefined
+                    }
+                  >
+                    {cast.currentDevice ? <CastingIcon /> : <CastIcon />}
+                  </button>
                   {/* Pop-out button */}
                   <button
                     className="player-overlay-btn"
@@ -2169,6 +2204,61 @@ export default function TVPage({
           tmdbId={item.id}
         />
       )}
+
+      <CastPickerModal
+        open={showCastPicker}
+        onClose={() => setShowCastPicker(false)}
+        cast={cast}
+        loadArgs={(() => {
+          const baseTitle = item.name || item.title || "Streambert";
+          const epLabel = playerEp
+            ? ` · S${playerEp.season}E${playerEp.episode}`
+            : "";
+          const title = `${baseTitle}${epLabel}`;
+          const posterUrl = d.poster_path
+            ? imgUrl(d.poster_path, "w500")
+            : null;
+          const subs = interceptedSubs.map((s) => ({
+            url: s.url,
+            lang: s.lang,
+          }));
+          if (isAsync && m3u8Url) {
+            const isMp4 = allmangaIsDirectMp4 !== false;
+            return {
+              mode: isMp4 ? "mp4Remote" : "hlsRemote",
+              url: m3u8Url,
+              referer: "https://allmanga.to",
+              title,
+              posterUrl,
+              remoteVttSubs: subs,
+            };
+          }
+          if (m3u8Url && playerEp) {
+            let refererOrigin = null;
+            try {
+              refererOrigin = new URL(
+                getSourceUrl(
+                  playerSource,
+                  "tv",
+                  item.id,
+                  playerEp.season,
+                  playerEp.episode,
+                ),
+              ).origin;
+            } catch {}
+            return {
+              mode: "hlsRemote",
+              url: m3u8Url,
+              referer: refererOrigin,
+              title,
+              posterUrl,
+              remoteVttSubs: subs,
+            };
+          }
+          return null;
+        })()}
+      />
+      {cast.currentDevice && <CastMiniController cast={cast} variant="player" />}
     </div>
   );
 }

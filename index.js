@@ -42,6 +42,7 @@ const downloadsIpc = require("./src/ipc/downloads");
 const subtitlesIpc = require("./src/ipc/subtitles");
 const allmangaIpc = require("./src/ipc/allmanga");
 const playerIpc = require("./src/ipc/player");
+const castIpc = require("./src/ipc/cast");
 
 // -- Ad/tracker block list -----------------------------------------------------
 const BLOCKED_HOSTS = [
@@ -319,6 +320,7 @@ playerIpc.register(getMainWindow, {
   writeSecretMigration: storageIpc.writeSecretMigration,
 });
 blockStats.init(getMainWindow);
+castIpc.register(getMainWindow);
 
 // get-block-stats lives with its data
 ipcMain.handle("get-block-stats", () => blockStats.getBlockStats());

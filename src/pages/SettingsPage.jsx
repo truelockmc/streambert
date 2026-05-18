@@ -1992,6 +1992,263 @@ function NotificationsSection() {
   );
 }
 
+// ── Cast & Devices Section ────────────────────────────────────────────────────
+function CastSettingsSection() {
+  const [autoDiscover, setAutoDiscover] = useState(
+    () => storage.get(STORAGE_KEYS.CAST_AUTO_DISCOVER) ?? true,
+  );
+  const [enableDlna, setEnableDlna] = useState(
+    () => storage.get(STORAGE_KEYS.CAST_ENABLE_DLNA) ?? true,
+  );
+  const [autoStop, setAutoStop] = useState(
+    () => storage.get(STORAGE_KEYS.CAST_AUTO_STOP_ON_PLAYER_STOP) ?? false,
+  );
+  const [preferredId, setPreferredId] = useState(
+    () => storage.get(STORAGE_KEYS.CAST_PREFERRED_DEVICE_ID) || "",
+  );
+  const [devices, setDevices] = useState([]);
+  const [scanning, setScanning] = useState(false);
+
+  useEffect(() => {
+    if (!window.electron) return;
+    let mounted = true;
+    setScanning(true);
+    window.electron
+      .castStartDiscovery?.()
+      .finally(() => mounted && setScanning(false));
+    window.electron.castListDevices?.().then((list) => {
+      if (mounted && Array.isArray(list)) setDevices(list);
+    });
+    const h = window.electron.onCastDevicesUpdated?.((list) => {
+      if (mounted && Array.isArray(list)) setDevices(list);
+    });
+    return () => {
+      mounted = false;
+      if (h) window.electron.offCastDevicesUpdated?.(h);
+    };
+  }, []);
+
+  const toggleAuto = (v) => {
+    setAutoDiscover(v);
+    storage.set(STORAGE_KEYS.CAST_AUTO_DISCOVER, v);
+  };
+  const toggleDlna = (v) => {
+    setEnableDlna(v);
+    storage.set(STORAGE_KEYS.CAST_ENABLE_DLNA, v);
+  };
+  const toggleAutoStop = (v) => {
+    setAutoStop(v);
+    storage.set(STORAGE_KEYS.CAST_AUTO_STOP_ON_PLAYER_STOP, v);
+  };
+  const handlePreferred = (id) => {
+    setPreferredId(id);
+    storage.set(STORAGE_KEYS.CAST_PREFERRED_DEVICE_ID, id || null);
+  };
+
+  const visibleDevices = enableDlna
+    ? devices
+    : devices.filter((d) => d.type !== "dlna");
+
+  return (
+    <div>
+      {/* Auto-discover */}
+      <div
+        style={{
+          padding: 16,
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: 8,
+          marginBottom: 12,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <Toggle value={autoDiscover} onChange={toggleAuto} />
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>
+            Auto-discover devices on app start
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
+            Streambert scans the LAN for Chromecast and DLNA receivers so the
+            picker is ready instantly.
+          </div>
+        </div>
+      </div>
+
+      {/* DLNA toggle */}
+      <div
+        style={{
+          padding: 16,
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: 8,
+          marginBottom: 12,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <Toggle value={enableDlna} onChange={toggleDlna} />
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>
+            Include DLNA (UPnP) devices
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
+            Useful for older smart TVs and non-AndroidTV XGIMI models. Disable
+            if SSDP discovery is noisy on your network.
+          </div>
+        </div>
+      </div>
+
+      {/* Auto-stop */}
+      <div
+        style={{
+          padding: 16,
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: 8,
+          marginBottom: 12,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <Toggle value={autoStop} onChange={toggleAutoStop} />
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>
+            Disconnect cast when in-app player stops
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
+            Leave off if you want to keep casting after closing the player view.
+          </div>
+        </div>
+      </div>
+
+      {/* Preferred device */}
+      <div
+        style={{
+          padding: 16,
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: 8,
+          marginBottom: 12,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <div
+              style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}
+            >
+              Preferred device
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
+              When set, the in-player Cast button one-taps to this device
+              instead of opening the picker.
+            </div>
+          </div>
+          <SettingsSelect
+            value={preferredId}
+            onChange={handlePreferred}
+            options={[
+              { value: "", label: "None — always open picker" },
+              ...visibleDevices.map((d) => ({
+                value: d.id,
+                label: `${d.friendlyName || d.name} (${d.type.toUpperCase()})`,
+              })),
+            ]}
+          />
+        </div>
+        <div
+          style={{
+            marginTop: 10,
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+          }}
+        >
+          <button
+            className="btn btn-ghost"
+            onClick={() => {
+              setScanning(true);
+              window.electron
+                ?.castStartDiscovery?.()
+                .finally(() => setScanning(false));
+            }}
+            disabled={scanning}
+            style={{ padding: "5px 12px", fontSize: 12 }}
+          >
+            {scanning ? "Scanning…" : "Rescan"}
+          </button>
+          <span style={{ fontSize: 11, color: "var(--text3)" }}>
+            {visibleDevices.length === 0
+              ? "No devices found yet"
+              : `${visibleDevices.length} device${visibleDevices.length === 1 ? "" : "s"} found`}
+          </span>
+        </div>
+      </div>
+
+      {/* Notes & limitations */}
+      <div
+        style={{
+          padding: 14,
+          background: "var(--surface2)",
+          border: "1px solid var(--border)",
+          borderRadius: 8,
+          fontSize: 12,
+          color: "var(--text3)",
+          lineHeight: 1.55,
+        }}
+      >
+        <div
+          style={{
+            fontWeight: 700,
+            color: "var(--text2)",
+            marginBottom: 6,
+            fontSize: 12,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+          }}
+        >
+          Notes & limitations
+        </div>
+        <ul style={{ margin: 0, paddingLeft: 18 }}>
+          <li>
+            Some streams use one-time signed segment URLs — restart playback if
+            casting stalls after long sessions.
+          </li>
+          <li>
+            DRM-protected content (Widevine / PlayReady) will not play on cast
+            receivers.
+          </li>
+          <li>
+            Non-AndroidTV DLNA-only renderers usually reject HLS — prefer MP4
+            anime sources or local downloads on those.
+          </li>
+          <li>
+            Mid-segment seeks on rewritten HLS can take 2–3 seconds.
+          </li>
+          <li>Only one active session at a time (mirrors pop-out).</li>
+          <li>
+            The cast proxy injects Referer + User-Agent only — sources that
+            require cookies will not work.
+          </li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 // ── Section Group Header ──────────────────────────────────────────────────────
 function SectionGroupHeader({ title, subtitle }) {
   return (
@@ -2122,6 +2379,25 @@ const SECTION_NAV = [
       "video",
       "movies",
       "files",
+    ],
+  },
+  {
+    id: "cast",
+    label: "Cast & Devices",
+    icon: "📡",
+    keywords: [
+      "cast",
+      "chromecast",
+      "dlna",
+      "upnp",
+      "tv",
+      "projector",
+      "xgimi",
+      "screen",
+      "mirror",
+      "device",
+      "network",
+      "discover",
     ],
   },
   {
@@ -2842,6 +3118,7 @@ export default function SettingsPage({
   const secPlayback = useRef(null);
   const secSubtitles = useRef(null);
   const secDownloads = useRef(null);
+  const secCast = useRef(null);
   const secNotifications = useRef(null);
   const secInterface = useRef(null);
   const secLibrary = useRef(null);
@@ -2854,6 +3131,7 @@ export default function SettingsPage({
     playback: secPlayback,
     subtitles: secSubtitles,
     downloads: secDownloads,
+    cast: secCast,
     notifications: secNotifications,
     interface: secInterface,
     library: secLibrary,
@@ -3591,6 +3869,17 @@ export default function SettingsPage({
               </div>
             )}
           </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* GROUP: CAST & DEVICES                                              */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <div ref={secCast} style={{ scrollMarginTop: 80 }}>
+          <SectionGroupHeader
+            title="Cast & Devices"
+            subtitle="Stream to Chromecast, Chromecast-built-in TVs, XGIMI Android TV projectors, and DLNA renderers"
+          />
+          <CastSettingsSection />
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════ */}

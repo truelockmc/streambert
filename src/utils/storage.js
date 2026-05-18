@@ -78,6 +78,12 @@ export const STORAGE_KEYS = {
   DL_SHOW_UNTRACKED: "dlShowUntracked",
   // Cache for new-episode startup check
   EPISODE_RELEASE_CACHE: "episodeReleaseCache",
+  // Casting (Chromecast + DLNA)
+  CAST_AUTO_DISCOVER: "cast.autoDiscover",
+  CAST_PREFERRED_DEVICE_ID: "cast.preferredDeviceId",
+  CAST_AUTO_STOP_ON_PLAYER_STOP: "cast.autoStopOnPlayerStop",
+  CAST_ENABLE_DLNA: "cast.enableDlna",
+  CAST_RECENT_DEVICE_IDS: "cast.recentDeviceIds",
 };
 
 export const getApiKey = () => storage.get(STORAGE_KEYS.API_KEY);

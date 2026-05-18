@@ -170,6 +170,49 @@ contextBridge.exposeInMainWorld("electron", {
     return h;
   },
   offUpdateProgress: (h) => ipcRenderer.removeListener("update-progress", h),
+  // ── Casting (Chromecast + DLNA) ─────────────────────────────────────────
+  castStartDiscovery: () => ipcRenderer.invoke("cast:start-discovery"),
+  castStopDiscovery: () => ipcRenderer.invoke("cast:stop-discovery"),
+  castListDevices: () => ipcRenderer.invoke("cast:list-devices"),
+  castConnect: (deviceId) => ipcRenderer.invoke("cast:connect", { deviceId }),
+  castDisconnect: () => ipcRenderer.invoke("cast:disconnect"),
+  castLoad: (args) => ipcRenderer.invoke("cast:load", args),
+  castPlay: () => ipcRenderer.invoke("cast:play"),
+  castPause: () => ipcRenderer.invoke("cast:pause"),
+  castStop: () => ipcRenderer.invoke("cast:stop"),
+  castSeek: (seconds) => ipcRenderer.invoke("cast:seek", { seconds }),
+  castSetVolume: (level) => ipcRenderer.invoke("cast:set-volume", { level }),
+  castSetMute: (muted) => ipcRenderer.invoke("cast:set-mute", { muted }),
+  castGetStatus: () => ipcRenderer.invoke("cast:get-status"),
+  castSetSubtitleTrack: (trackIndex) =>
+    ipcRenderer.invoke("cast:set-subtitle-track", { trackIndex }),
+  onCastDevicesUpdated: (cb) => {
+    const h = (_, d) => cb(d);
+    ipcRenderer.on("cast:devices-updated", h);
+    return h;
+  },
+  offCastDevicesUpdated: (h) =>
+    ipcRenderer.removeListener("cast:devices-updated", h),
+  onCastStatus: (cb) => {
+    const h = (_, d) => cb(d);
+    ipcRenderer.on("cast:status", h);
+    return h;
+  },
+  offCastStatus: (h) => ipcRenderer.removeListener("cast:status", h),
+  onCastSessionEnded: (cb) => {
+    const h = (_, d) => cb(d);
+    ipcRenderer.on("cast:session-ended", h);
+    return h;
+  },
+  offCastSessionEnded: (h) =>
+    ipcRenderer.removeListener("cast:session-ended", h),
+  onCastError: (cb) => {
+    const h = (_, d) => cb(d);
+    ipcRenderer.on("cast:error", h);
+    return h;
+  },
+  offCastError: (h) => ipcRenderer.removeListener("cast:error", h),
+
   // Scheduled backups
   getScheduledBackupSettings: () =>
     ipcRenderer.invoke("get-scheduled-backup-settings"),

@@ -7,9 +7,13 @@ import {
   FilmIcon,
   WatchedIcon,
   SubtitlesIcon,
+  CastIcon,
 } from "../components/Icons";
 import { storage, isElectron, STORAGE_KEYS } from "../utils/storage";
 import SubtitleDownloaderModal from "../components/SubtitleDownloaderModal";
+import CastPickerModal from "../components/CastPickerModal";
+import CastMiniController from "../components/CastMiniController";
+import { useCast } from "../utils/useCast";
 import { imgUrl } from "../utils/api";
 
 const STATUS_CLASS = {
@@ -100,6 +104,22 @@ export default function DownloadsPage({
   const [localFiles, setLocalFiles] = useState(
     () => storage.get("localFiles") || [],
   );
+  // Casting
+  const cast = useCast({ autoDiscover: true });
+  const [castDl, setCastDl] = useState(null);
+  const castLoadArgs = useMemo(() => {
+    if (!castDl || !castDl.filePath) return null;
+    const subs = (castDl.subtitlePaths || [])
+      .filter((sp) => sp && sp.path)
+      .map((sp) => ({ path: sp.path, lang: sp.lang || "und" }));
+    return {
+      mode: "localFile",
+      filePath: castDl.filePath,
+      title: castDl.name || "Streambert",
+      posterUrl: castDl.posterPath ? imgUrl(castDl.posterPath, "w500") : null,
+      localVttSubs: subs,
+    };
+  }, [castDl]);
   const [scanning, setScanning] = useState(false);
   const [scanFolder, setScanFolder] = useState(
     () => storage.get("downloadPath") || "",
@@ -336,6 +356,13 @@ export default function DownloadsPage({
 
   return (
     <div className="fade-in dl-page">
+      <CastPickerModal
+        open={!!castDl}
+        onClose={() => setCastDl(null)}
+        cast={cast}
+        loadArgs={castLoadArgs}
+      />
+      {cast.currentDevice && <CastMiniController cast={cast} variant="global" />}
       {subtitleModalDl && (
         <SubtitleDownloaderModal
           dl={subtitleModalDl}
@@ -585,6 +612,7 @@ export default function DownloadsPage({
                   onShowFolder={() =>
                     window.electron?.showInFolder(dl.filePath)
                   }
+                  onCast={() => setCastDl(dl)}
                   onDelete={dl.isLocalOnly ? undefined : () => handleDelete(dl)}
                   isHighlighted={isHighlighted}
                   highlightRef={isHighlighted ? highlightRef : null}
@@ -763,6 +791,7 @@ const LocalFileCard = memo(function LocalFileCard({
   onHistory,
   onOpenSubtitleDownloader,
   onOpenLog,
+  onCast,
 }) {
   const isDownload = !dl.isLocalOnly;
   const canWatch = !!fileExists && !!dl.filePath;
@@ -1310,6 +1339,15 @@ const LocalFileCard = memo(function LocalFileCard({
               }
             >
               <PlayIcon /> {savedSecs > 0 ? "Resume" : "Watch"}
+            </button>
+          )}
+          {canWatch && onCast && (
+            <button
+              className="btn btn-ghost dl-btn--sm-icon"
+              onClick={onCast}
+              title="Cast to a device"
+            >
+              <CastIcon />
             </button>
           )}
           {dl.filePath && (

@@ -361,3 +361,40 @@ export const PopOutIcon = ({ size = 16 }) => (
     <path d="M10 14L21 3" />
   </svg>
 );
+
+export const CastIcon = ({ size = 16 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M2 16v2a2 2 0 0 0 2 2h2" />
+    <path d="M2 12a8 8 0 0 1 8 8" />
+    <path d="M2 8a12 12 0 0 1 12 12" />
+    <path d="M2 4h18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" />
+  </svg>
+);
+
+export const CastingIcon = ({ size = 16 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M2 16v2a2 2 0 0 0 2 2h2" />
+    <path d="M2 12a8 8 0 0 1 8 8" />
+    <path d="M2 8a12 12 0 0 1 12 12" />
+    <path d="M2 4h18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" />
+    <rect x="5" y="7" width="11" height="8" rx="1" fill="currentColor" />
+  </svg>
+);
