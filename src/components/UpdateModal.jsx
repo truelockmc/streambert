@@ -68,6 +68,42 @@ function renderChangelog(text) {
       );
       continue;
     }
+    // standalone image ![alt](url)
+    const imgMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (imgMatch) {
+      const [, alt, src] = imgMatch;
+      elements.push(
+        <div key={key++} style={{ margin: "10px 0" }}>
+          <img
+            src={src}
+            alt={alt}
+            style={{
+              maxWidth: "100%",
+              borderRadius: 8,
+              border: "1px solid var(--border)",
+              display: "block",
+            }}
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+          {alt && (
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--text3)",
+                textAlign: "center",
+                marginTop: 4,
+                fontStyle: "italic",
+              }}
+            >
+              {alt}
+            </div>
+          )}
+        </div>,
+      );
+      continue;
+    }
     // bullet - or *
     if (/^[-*] /.test(line)) {
       elements.push(
@@ -114,9 +150,9 @@ function renderChangelog(text) {
 }
 
 function inlineFormat(text) {
-  // Split on **bold**, `code`, then render
+  // Split on **bold**, `code`, ![img](url), then render
   const parts = [];
-  const re = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  const re = /(\*\*[^*]+\*\*|`[^`]+`|!\[[^\]]*\]\([^)]+\))/g;
   let last = 0,
     m,
     k = 0;
@@ -130,6 +166,27 @@ function inlineFormat(text) {
           {raw.slice(2, -2)}
         </strong>,
       );
+    } else if (raw.startsWith("![")) {
+      const imgInline = raw.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+      if (imgInline) {
+        const [, alt, src] = imgInline;
+        parts.push(
+          <img
+            key={k++}
+            src={src}
+            alt={alt}
+            style={{
+              maxWidth: "100%",
+              verticalAlign: "middle",
+              borderRadius: 6,
+              border: "1px solid var(--border)",
+            }}
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />,
+        );
+      }
     } else {
       parts.push(
         <code
