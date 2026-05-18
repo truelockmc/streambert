@@ -45,7 +45,6 @@ const CastRow = memo(function CastRow({
               key={i}
               loading
               size={80}
-              showName
             />
           ))}
         </div>
@@ -69,7 +68,6 @@ const CastRow = memo(function CastRow({
               item={member}
               onClick={handlePersonClick}
               size={80}
-              showName
             />
             <div className="cast-member-name">{member.name}</div>
             <div

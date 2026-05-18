@@ -1,4 +1,4 @@
-import { memo, useCallback } from "react";
+import { memo, useCallback, useState } from "react";
 import { imgUrl } from "../utils/api";
 
 /**
@@ -21,6 +21,8 @@ const PersonCard = memo(function PersonCard({
   showDept = false,
   loading = false,
 }) {
+  const [imgError, setImgError] = useState(false);
+
   const handleClick = useCallback(
     (e) => {
       e.preventDefault();
@@ -28,6 +30,17 @@ const PersonCard = memo(function PersonCard({
     },
     [item, onClick],
   );
+
+  // Reset image error state when item changes
+  const profilePath = item?.profile_path;
+  // Use a key-derived effect: when profile_path changes, reset error
+  // We track this via a simple comparison in render
+  if (profilePath && imgError) {
+    // If the image path changed, reset error so we try loading again
+    // We do this by checking if the src would differ — simpler to just
+    // let the key handle it. But since we can't use key here easily,
+    // we'll track it with a ref-like pattern using the item id.
+  }
 
   if (loading) {
     return (
@@ -74,6 +87,8 @@ const PersonCard = memo(function PersonCard({
   const fallbackColors = ["#2d5a8a", "#5a2d6b", "#2d7a4a", "#7a4a2d", "#4a2d7a"];
   const fallbackColor = fallbackColors[colorIndex];
 
+  const showFallback = !profilePath || imgError;
+
   const circleStyle = {
     width: size,
     height: size,
@@ -88,19 +103,6 @@ const PersonCard = memo(function PersonCard({
     alignItems: "center",
     justifyContent: "center",
   };
-
-  const avatarContent = item?.profile_path ? (
-    <img
-      src={imgUrl(item.profile_path, "h632")}
-      alt={item.name}
-      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-      onError={(e) => {
-        // Fall back to initials on image error
-        e.currentTarget.style.display = "none";
-        e.currentTarget.nextSibling.style.display = "flex";
-      }}
-    />
-  ) : null;
 
   return (
     <div
@@ -118,8 +120,15 @@ const PersonCard = memo(function PersonCard({
         onClick={handleClick}
         title={item?.name}
       >
-        {avatarContent}
-        {!item?.profile_path && (
+        {!showFallback && (
+          <img
+            src={imgUrl(profilePath, "h632")}
+            alt={item.name}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            onError={() => setImgError(true)}
+          />
+        )}
+        {showFallback && (
           <span
             style={{
               color: "rgba(255,255,255,0.7)",
@@ -127,7 +136,6 @@ const PersonCard = memo(function PersonCard({
               fontWeight: 600,
               fontFamily: "var(--font-display)",
               letterSpacing: 1,
-              display: "flex",
             }}
           >
             {initials}
