@@ -172,7 +172,7 @@ export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
                     <div className="search-section-label">People</div>
                     {people.map((r) => (
                       <div
-                        key={r.id}
+                        key={`person_${r.id}`}
                         className="search-result search-result--person"
                         onClick={() => handleSelect(r)}
                       >
@@ -204,7 +204,7 @@ export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
                     {people.length > 0 && <div className="search-section-label">Movies & Series</div>}
                     {media.map((r) => (
                       <div
-                        key={r.id}
+                        key={`${r.media_type}_${r.id}`}
                         className="search-result"
                         onClick={() => handleSelect(r)}
                       >
