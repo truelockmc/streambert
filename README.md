@@ -127,8 +127,11 @@ This application is provided "as is" for educational purposes. The developer:
 - Does not control third-party content providers
 - Encourages users to support content creators through legal means
 
----
-## Project Structure
+[![RepoStars](https://repostars.dev/api/embed?repo=truelockmc%2Fstreambert&theme=dark)](https://repostars.dev/?repos=truelockmc%2Fstreambert&theme=dark)
+
+<details>
+    <summary>Project Structure</summary>
+    
 ```
 Project Root
 ├── index.html
@@ -212,3 +215,4 @@ Project Root
         ├── useBlockedStats.js
         └── useRatings.js
 ```
+</details>
