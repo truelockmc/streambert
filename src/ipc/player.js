@@ -198,6 +198,8 @@ function register(getMainWindow, { writeSecretMigration }) {
   // ── Auto-updater ──────────────────────────────────────────────────────────
   ipcMain.handle("detect-update-format", () => {
     if (process.platform === "win32") return "exe";
+    if (process.platform === "darwin")
+      return process.arch === "arm64" ? "dmg_arm64" : "dmg";
     if (process.platform === "linux")
       return process.env.APPIMAGE ? "appimage" : "deb";
     return null;
@@ -209,7 +211,10 @@ function register(getMainWindow, { writeSecretMigration }) {
       const { signal } = _updateAbortController;
 
       const ext =
-        format === "exe" ? ".exe" : format === "deb" ? ".deb" : ".AppImage";
+        format === "exe" ? ".exe"
+        : format === "deb" ? ".deb"
+        : format === "dmg" || format === "dmg_arm64" ? ".dmg"
+        : ".AppImage";
       const destPath = path.join(os.tmpdir(), `streambert-update${ext}`);
 
       await new Promise((resolve, reject) => {
@@ -340,6 +345,12 @@ function register(getMainWindow, { writeSecretMigration }) {
       } else if (format === "exe") {
         spawn(destPath, [], { detached: true, stdio: "ignore" }).unref();
         app.exit(0);
+      } else if (format === "dmg" || format === "dmg_arm64") {
+        // Mount the DMG and open it
+        spawn("hdiutil", ["attach", destPath], {
+          detached: true,
+          stdio: "ignore",
+        }).unref();
       }
 
       return { ok: true };
