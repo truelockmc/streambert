@@ -204,14 +204,17 @@ function register() {
       const backupDir = settings.path;
       if (!backupDir) return { ok: false, error: "No backup path set" };
 
-      fs.mkdirSync(backupDir, { recursive: true });
+      const resolvedBackupDir = path.resolve(backupDir);
+      fs.mkdirSync(resolvedBackupDir, { recursive: true });
 
       const timestamp = new Date()
         .toISOString()
         .replace(/[:.]/g, "-")
         .slice(0, 19);
       const filename = `streambert-backup-${timestamp}.json`;
-      const fullPath = path.join(backupDir, filename);
+      const fullPath = path.join(resolvedBackupDir, filename);
+      if (!fullPath.startsWith(resolvedBackupDir + path.sep))
+        return { ok: false, error: "Invalid backup path" };
       fs.writeFileSync(
         fullPath,
         JSON.stringify(
@@ -229,19 +232,19 @@ function register() {
 
       // Prune old backups
       const keepCount = Math.max(1, Number(settings.keepCount) || 5);
-      fs.readdirSync(backupDir)
+      fs.readdirSync(resolvedBackupDir)
         .filter(
           (f) => f.startsWith("streambert-backup-") && f.endsWith(".json"),
         )
         .map((f) => ({
           name: f,
-          mtime: fs.statSync(path.join(backupDir, f)).mtimeMs,
+          mtime: fs.statSync(path.join(resolvedBackupDir, f)).mtimeMs,
         }))
         .sort((a, b) => b.mtime - a.mtime)
         .slice(keepCount)
         .forEach(({ name }) => {
           try {
-            fs.unlinkSync(path.join(backupDir, name));
+            fs.unlinkSync(path.join(resolvedBackupDir, name));
           } catch {}
         });
 

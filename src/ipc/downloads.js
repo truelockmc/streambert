@@ -104,7 +104,9 @@ function killAllDownloads() {
 
 // ── Subtitle file downloader (used during run-download completion) ─────────────
 
-function downloadSubtitleFile(url, destPath) {
+const MAX_SUBTITLE_REDIRECTS = 5;
+
+function downloadSubtitleFile(url, destPath, redirectCount = 0) {
   return new Promise((resolve) => {
     try {
       const parsedUrl = new URL(url);
@@ -134,10 +136,15 @@ function downloadSubtitleFile(url, destPath) {
             res.statusCode < 400 &&
             res.headers.location
           ) {
+            if (redirectCount >= MAX_SUBTITLE_REDIRECTS) {
+              res.resume();
+              resolve(false);
+              return;
+            }
             const loc = res.headers.location.startsWith("http")
               ? res.headers.location
               : parsedUrl.origin + res.headers.location;
-            downloadSubtitleFile(loc, destPath).then(resolve);
+            downloadSubtitleFile(loc, destPath, redirectCount + 1).then(resolve);
             return;
           }
           if (res.statusCode !== 200) {
@@ -688,9 +695,12 @@ function register(getMainWindow) {
         activeProcs.delete(id);
       }
       if (filePath) {
-        try {
-          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        } catch {}
+        // Only unlink if the path matches the recorded entry to prevent arbitrary deletion
+        if (dlEntry && dlEntry.filePath === filePath) {
+          try {
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+          } catch {}
+        }
       }
       for (const sp of dlEntry?.subtitlePaths || []) {
         try {
