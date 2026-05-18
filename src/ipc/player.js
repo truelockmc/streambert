@@ -200,8 +200,12 @@ function register(getMainWindow, { writeSecretMigration }) {
     if (process.platform === "win32") return "exe";
     if (process.platform === "darwin")
       return process.arch === "arm64" ? "dmg_arm64" : "dmg";
-    if (process.platform === "linux")
-      return process.env.APPIMAGE ? "appimage" : "deb";
+    if (process.platform === "linux") {
+      if (process.env.APPIMAGE) return "appimage";
+      const isArch =
+        spawnSync("which", ["pacman"], { encoding: "utf8" }).status === 0;
+      return isArch ? "pacman" : "deb";
+    }
     return null;
   });
 
@@ -213,6 +217,7 @@ function register(getMainWindow, { writeSecretMigration }) {
       const ext =
         format === "exe" ? ".exe"
         : format === "deb" ? ".deb"
+        : format === "pacman" ? ".pacman"
         : format === "dmg" || format === "dmg_arm64" ? ".dmg"
         : ".AppImage";
       const destPath = path.join(os.tmpdir(), `streambert-update${ext}`);
@@ -317,6 +322,42 @@ function register(getMainWindow, { writeSecretMigration }) {
         }
         writeSecretMigration();
         app.exit(0);
+      } else if (format === "pacman") {
+        fs.chmodSync(destPath, 0o644);
+        // notify renderer
+        const mwPac = getMainWindow();
+        if (mwPac && !mwPac.isDestroyed()) {
+          mwPac.webContents.send("update-progress", {
+            percent: 100,
+            label: "Installing…",
+          });
+        }
+        const pacmanLaunchers = [
+          { bin: "pkexec", args: ["pacman", "-U", "--noconfirm", destPath] },
+          { bin: "pamac-installer", args: [destPath] },
+        ];
+        let launched = false;
+        for (const { bin, args } of pacmanLaunchers) {
+          try {
+            const which = spawnSync("which", [bin], { encoding: "utf8" });
+            if (which.status !== 0) continue;
+            // spawnSync, to wait for pacman to finish before relaunching
+            const result = spawnSync(bin, args, { stdio: "inherit" });
+            if (result.status === 0) {
+              launched = true;
+              break;
+            }
+          } catch {
+            continue;
+          }
+        }
+        if (launched) {
+          writeSecretMigration();
+          app.relaunch();
+          app.exit(0);
+        } else {
+          shell.openPath(destPath);
+        }
       } else if (format === "deb") {
         fs.chmodSync(destPath, 0o644);
         const debLaunchers = [

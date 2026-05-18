@@ -484,6 +484,7 @@ export default function UpdateModal({
   const formatLabel = {
     appimage: "AppImage",
     deb: ".deb package",
+    pacman: ".pacman (Arch)",
     exe: "Windows installer",
     dmg: "macOS installer",
     dmg_arm64: "macOS (Apple Silicon)",
