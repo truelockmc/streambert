@@ -734,7 +734,6 @@ function getPlayerServer() {
               ]) {
                 if (proxyRes.headers[h]) passHeaders[h] = proxyRes.headers[h];
               }
-              passHeaders["Access-Control-Allow-Origin"] = "*";
               passHeaders["Cache-Control"] = "no-store";
               res.writeHead(proxyRes.statusCode, passHeaders);
               proxyRes.pipe(res);

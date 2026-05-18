@@ -106,6 +106,10 @@ const playerWcIds = new Set();
 let sessionsConfigured = false;
 
 function setupSession(playerSession, trailerSession) {
+  // Streaming sites set CSP and X-Frame-Options to block embedding. These headers
+  // are stripped only on the dedicated player/trailer sessions (never the main window)
+  // so webviews can load the content. Both sessions run with contextIsolation and
+  // nodeIntegration disabled for additional isolation.
   const stripHeaders = (details, callback) => {
     const headers = { ...details.responseHeaders };
     for (const key of Object.keys(headers)) {

@@ -227,7 +227,7 @@ const INJECT_SKIP_CONTROLS = `
 (function() {
   if (window.__skipControlsInjected) return;
   var style = document.createElement('style');
-  style.innerHTML =
+  style.textContent =
     '*:focus, *:focus-visible {' +
     'outline: none !important;' +
     'box-shadow: none !important;' +
@@ -255,7 +255,14 @@ const INJECT_SKIP_CONTROLS = `
 
   function makeBtn(seconds, svg, label, side) {
     var btn = document.createElement('button');
-    btn.innerHTML = svg + '<span style="font-size:11px;font-family:system-ui,sans-serif">' + label + '</span>';
+    var svgWrap = document.createElement('span');
+    svgWrap.innerHTML = svg;
+    var span = document.createElement('span');
+    span.style.fontSize = '11px';
+    span.style.fontFamily = 'system-ui,sans-serif';
+    span.textContent = label;
+    btn.appendChild(svgWrap.firstChild || svgWrap);
+    btn.appendChild(span);
     btn.setAttribute('tabindex', '-1');
     btn.title = label;
     btn.style.cssText = [
