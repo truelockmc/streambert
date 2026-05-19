@@ -143,7 +143,16 @@
         }
       ],
       "category": "Utility",
-      "icon": "public/icon.png"
+      "icon": "public/sized",
+      "desktop": {
+        "entry": {
+          "Name": "Streambert",
+          "Comment": "Streambert Desktop App",
+          "Categories": "AudioVideo;Video;Player;Multimedia;Internet;",
+          "Icon": "streambert",
+          "StartupWMClass": "Streambert"
+        }
+      }
     },
     "electronLanguages": [
       "en-US",
