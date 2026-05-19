@@ -3833,3 +3833,22 @@ html[data-win-titlebar][data-maximized] .main {
 .episode-check-item:hover {
     color: var(--text) !important;
 }
+
+/* Homepage Filters */
+.filter-select {
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+.filter-select:hover {
+    border-color: var(--text3);
+}
+.filter-select:focus {
+    border-color: var(--red);
+}
