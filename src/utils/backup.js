@@ -15,6 +15,7 @@ export const BACKUP_KEYS = [
   // UI / layout preferences
   "homeRowOrder",
   "homeRowVisible",
+  "homeViewMode",
   "startPage",
   // Player preferences
   "playerSource",
@@ -42,6 +43,8 @@ export const BACKUP_KEYS = [
   "reduceAnimations",
   "librarySort",
   "historyEnabled",
+  // TMDB metadata language (e.g. "de-DE")
+  "tmdbLang",
   // Notification preferences
   "notifyDownloadComplete",
   "notifyNewEpisode",
