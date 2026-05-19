@@ -1521,7 +1521,7 @@ const TMDB_LANGUAGES = [
   { value: "fr-FR", label: "Français (fr-FR)" },
   { value: "es-ES", label: "Español (es-ES)" },
   { value: "it-IT", label: "Italiano (it-IT)" },
-  { value: "pt-BR", label: "Português — Brasil (pt-BR)" },
+  { value: "pt-BR", label: "Português (Brasil) (pt-BR)" },
   { value: "nl-NL", label: "Nederlands (nl-NL)" },
   { value: "pl-PL", label: "Polski (pl-PL)" },
   { value: "sv-SE", label: "Svenska (sv-SE)" },
@@ -1532,7 +1532,7 @@ const TMDB_LANGUAGES = [
   { value: "ru-RU", label: "Русский (ru-RU)" },
   { value: "ja-JP", label: "日本語 (ja-JP)" },
   { value: "ko-KR", label: "한국어 (ko-KR)" },
-  { value: "zh-CN", label: "中文 — 简体 (zh-CN)" },
+  { value: "zh-CN", label: "中文 (简体) (zh-CN)" },
   { value: "ar-SA", label: "العربية (ar-SA)" },
 ];
 
@@ -1546,6 +1546,8 @@ function TmdbLanguageSection() {
     storage.set(STORAGE_KEYS.TMDB_LANG, lang);
     // Clear in-memory cache
     clearTmdbCache();
+    // Notify App.jsx to re-fetch trending data immediately.
+    window.dispatchEvent(new CustomEvent("streambert:tmdb-lang-changed"));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -3665,7 +3667,7 @@ export default function SettingsPage({
             )}
             {!downloadPath && (
               <div style={{ marginTop: 10, fontSize: 13, color: "var(--red)" }}>
-                ⚠ No download folder set — videos cannot be downloaded until you
+                ⚠ No download folder set - videos cannot be downloaded until you
                 set one.
               </div>
             )}

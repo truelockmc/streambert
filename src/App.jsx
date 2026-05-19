@@ -123,7 +123,7 @@ export default function App() {
     let cancelled = false;
 
     async function checkNewEpisodes() {
-      // Small grace period so the UI has fully painted before we start
+      // Small grace period so the UI has fully painted before start
       await new Promise((r) => setTimeout(r, 1200));
       if (cancelled) return;
 
@@ -199,7 +199,7 @@ export default function App() {
                 }
               } else {
                 // Subsequent checks: notify when last_episode_to_air changed
-                // (new episode aired) compared to what we cached.
+                // (new episode aired) compared to what got cached.
                 // Migration: old cache entries only have nextEpDate, not lastEpDate.
                 // In that case treat as first check to avoid false positives.
                 const prevLastDate = prev.lastEpDate ?? null;
@@ -512,6 +512,14 @@ export default function App() {
     return () =>
       window.removeEventListener("streambert:library-sort-changed", handler);
   }, []);
+
+  // ── Re-fetch trending immediately when metadata language changes ──────────
+  useEffect(() => {
+    const handler = () => fetchTrending();
+    window.addEventListener("streambert:tmdb-lang-changed", handler);
+    return () =>
+      window.removeEventListener("streambert:tmdb-lang-changed", handler);
+  }, [fetchTrending]);
   useEffect(() => {
     // Accent colour
     const accent = storage.get(STORAGE_KEYS.ACCENT_COLOR) || "red";
