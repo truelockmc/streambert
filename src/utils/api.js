@@ -1,6 +1,25 @@
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const IMG_BASE = "https://image.tmdb.org/t/p";
 
+// ── TMDB metadata language ────────────────────────────────────────────────────
+// Read lazily from localStorage so it always reflects the current setting.
+// Falls back to "en-US".
+function getTmdbLanguage() {
+  try {
+    const raw = localStorage.getItem("streambert_tmdbLang");
+    return raw ? JSON.parse(raw) : "en-US";
+  } catch {
+    return "en-US";
+  }
+}
+
+// Append the language query param to a TMDB path.
+function withLanguage(path) {
+  const lang = getTmdbLanguage();
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}language=${lang}`;
+}
+
 export const imgUrl = (path, size = "w500") =>
   path ? `${IMG_BASE}/${size}${path}` : null;
 
@@ -17,6 +36,15 @@ export const setApiErrorHandlers = (onAuth, onUnreachable) => {
 // TTL: 5 minutes
 const _tmdbCache = new Map(); // key → { data, expiresAt }
 const TMDB_CACHE_TTL = 5 * 60 * 1000;
+
+/** Clears the in-memory TMDB cache and the persisted trending cache.
+ * Calling this when the metadata language changes. */
+export function clearTmdbCache() {
+  _tmdbCache.clear();
+  try {
+    localStorage.removeItem("streambert_trendingCache");
+  } catch {}
+}
 
 // ── Request queue (max 4 concurrent TMDB fetches) ────────────────────────────
 // Prevents bursts of 10-20 parallel requests from carousel/similar-rows rapid
@@ -42,7 +70,8 @@ function _releaseSlot() {
 }
 
 export const tmdbFetch = async (path, apiKey) => {
-  const cacheKey = `${apiKey}|${path}`;
+  const localizedPath = withLanguage(path);
+  const cacheKey = `${apiKey}|${localizedPath}`;
   const cached = _tmdbCache.get(cacheKey);
   if (cached && Date.now() < cached.expiresAt) return cached.data;
 
@@ -50,7 +79,7 @@ export const tmdbFetch = async (path, apiKey) => {
 
   let res;
   try {
-    res = await fetch(`${TMDB_BASE}${path}`, {
+    res = await fetch(`${TMDB_BASE}${localizedPath}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
   } catch {
@@ -349,7 +378,7 @@ export const buildAnilistSeasons = (anilistData) => {
   return all.map((s, i) => ({ seasonNum: i + 1, ...s }));
 };
 
-// TMDB genre ID 16 = Animation. We treat it as anime when origin_country includes JP or language is jp
+// TMDB genre ID 16 = Animation. Treat it as anime when origin_country includes JP or language is jp
 export const isAnimeContent = (item, details) => {
   const d = details || item;
   const lang = d.original_language;
@@ -364,7 +393,7 @@ export const ANIME_DEFAULT_SOURCE = "allmanga";
 export const NON_ANIME_DEFAULT_SOURCE = "vidsrc";
 
 // ── Episode Group fetch (localStorage + in-memory cache, 7-day TTL) ─────────
-// Episode groups almost never change, so we cache aggressively across sessions.
+// Episode groups almost never change -> cache aggressively across sessions.
 const EG_CACHE_KEY = "streambert_episodeGroupCache";
 const EG_CACHE_TTL = 1000 * 60 * 60 * 24 * 7; // 7 days
 

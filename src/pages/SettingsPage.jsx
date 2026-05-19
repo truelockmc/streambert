@@ -7,6 +7,7 @@ import {
   isElectron,
   clearAppCaches,
 } from "../utils/storage";
+import { clearTmdbCache } from "../utils/api";
 import { ACCENT_PRESETS, applyAccentColor } from "../utils/appearance";
 import { SUBTITLE_LANGUAGES } from "../utils/subtitles";
 import { DEFAULT_INVIDIOUS_BASE } from "../components/TrailerModal";
@@ -1513,6 +1514,74 @@ function StartPageSection() {
   );
 }
 
+// ── TMDB Metadata Language ────────────────────────────────────────────────────
+const TMDB_LANGUAGES = [
+  { value: "en-US", label: "English (en-US)" },
+  { value: "de-DE", label: "Deutsch (de-DE)" },
+  { value: "fr-FR", label: "Français (fr-FR)" },
+  { value: "es-ES", label: "Español (es-ES)" },
+  { value: "it-IT", label: "Italiano (it-IT)" },
+  { value: "pt-BR", label: "Português — Brasil (pt-BR)" },
+  { value: "nl-NL", label: "Nederlands (nl-NL)" },
+  { value: "pl-PL", label: "Polski (pl-PL)" },
+  { value: "sv-SE", label: "Svenska (sv-SE)" },
+  { value: "nb-NO", label: "Norsk (nb-NO)" },
+  { value: "da-DK", label: "Dansk (da-DK)" },
+  { value: "fi-FI", label: "Suomi (fi-FI)" },
+  { value: "tr-TR", label: "Türkçe (tr-TR)" },
+  { value: "ru-RU", label: "Русский (ru-RU)" },
+  { value: "ja-JP", label: "日本語 (ja-JP)" },
+  { value: "ko-KR", label: "한국어 (ko-KR)" },
+  { value: "zh-CN", label: "中文 — 简体 (zh-CN)" },
+  { value: "ar-SA", label: "العربية (ar-SA)" },
+];
+
+function TmdbLanguageSection() {
+  const [lang, setLang] = useState(
+    () => storage.get(STORAGE_KEYS.TMDB_LANG) || "en-US",
+  );
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    storage.set(STORAGE_KEYS.TMDB_LANG, lang);
+    // Clear in-memory cache
+    clearTmdbCache();
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">Metadata Language</div>
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--text3)",
+          marginBottom: 16,
+          lineHeight: 1.6,
+        }}
+      >
+        Language used when fetching titles, descriptions, and other metadata
+        from TMDB. Changing this clears the metadata cache so updated content
+        loads immediately.
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <SettingsSelect
+          value={lang}
+          onChange={(v) => setLang(v)}
+          options={TMDB_LANGUAGES}
+        />
+        <button className="btn btn-primary" onClick={handleSave}>
+          Save
+        </button>
+        {saved && (
+          <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved, cache cleared</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Subtitle Settings ─────────────────────────────────────────────────────────
 function SubtitleSettingsSection() {
   const [enabled, setEnabled] = useState(
@@ -2056,6 +2125,12 @@ const SECTION_NAV = [
       "startup",
       "auto",
       "app",
+      "language",
+      "metadata",
+      "locale",
+      "german",
+      "french",
+      "spanish",
     ],
   },
   {
@@ -3113,7 +3188,7 @@ export default function SettingsPage({
         <div ref={secUpdates} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
             title="General"
-            subtitle="App version, updates, and API credentials"
+            subtitle="App version, updates, API credentials and Languages"
           />
 
           {/* Version & Updates */}
@@ -3160,6 +3235,10 @@ export default function SettingsPage({
               </button>
             </div>
           </div>
+
+          <Divider />
+
+          <TmdbLanguageSection />
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════ */}

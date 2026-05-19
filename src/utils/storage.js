@@ -69,6 +69,8 @@ export const STORAGE_KEYS = {
   // Notification preferences
   NOTIFY_DOWNLOAD_COMPLETE: "notifyDownloadComplete",
   NOTIFY_NEW_EPISODE: "notifyNewEpisode",
+  // TMDB metadata lang (BCP-47 locale, e.g. "de-DE")
+  TMDB_LANG: "tmdbLang",
   // Intro skip (anime only, allmanga source)
   // Values: "off" | "auto" | "manual"
   INTRO_SKIP_MODE: "introSkipMode",

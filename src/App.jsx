@@ -463,11 +463,19 @@ export default function App() {
   // ── Trending, single shared fetch fn avoids code duplication ────────────
   // Results are cached in localStorage for 30 min to avoid redundant API calls
   // and to keep trending data out of RAM between restarts.
+  // The cache stores the active metadata language; if it differs from the
+  // current setting the cache is treated as stale and data is re-fetched.
   const fetchTrending = useCallback(() => {
     if (!apiKey) return;
     const cached = storage.get("trendingCache");
     const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-    if (cached && cached.ts && Date.now() - cached.ts < CACHE_TTL) {
+    const currentLang = storage.get(STORAGE_KEYS.TMDB_LANG) || "en-US";
+    if (
+      cached &&
+      cached.ts &&
+      cached.lang === currentLang &&
+      Date.now() - cached.ts < CACHE_TTL
+    ) {
       setTrending(cached.movies || []);
       setTrendingTV(cached.tv || []);
       return;
@@ -482,7 +490,7 @@ export default function App() {
         const tv = t.results || [];
         setTrending(movies);
         setTrendingTV(tv);
-        storage.set("trendingCache", { movies, tv, ts: Date.now() });
+        storage.set("trendingCache", { movies, tv, ts: Date.now(), lang: currentLang });
       })
       .catch(() => {})
       .finally(() => setLoadingHome(false));
