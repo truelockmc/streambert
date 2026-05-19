@@ -72,6 +72,27 @@ sudo pacman -U streambert-*.pacman
 chmod +x Streambert-x64.AppImage && ./Streambert-x64.AppImage
 ```
 
+### macOS (from source)
+
+There are no prebuilt macOS binaries yet. Install and run from source:
+```bash
+git clone https://github.com/truelockmc/streambert.git
+cd streambert
+npm install
+npm run start
+```
+
+> [!TIP]
+> If you're running from inside Cursor or another Electron-based editor, you may need to unset an environment variable first:
+> ```bash
+> unset ELECTRON_RUN_AS_NODE && npm run start
+> ```
+
+To build a `.dmg` yourself:
+```bash
+npm run dist:mac
+```
+
 ### Windows
 
 Download the latest `Streambert Setup *.exe` from the [Releases](https://github.com/truelockmc/streambert/releases/latest) page and run it.
@@ -99,6 +120,10 @@ npm run dist:arch
 or (for an AppImage only)
 ```bash
 npm run dist:appimage
+```
+or (for macOS)
+```bash
+npm run dist:mac
 ```
 
 > [!IMPORTANT]
