@@ -21,6 +21,7 @@ import {
   ANIME_DEFAULT_SOURCE,
   NON_ANIME_DEFAULT_SOURCE,
   NEEDS_INTERCEPT,
+  getNextNonAsyncSource,
 } from "../utils/api";
 import {
   PlayIcon,
@@ -43,7 +44,12 @@ import TrailerModal from "../components/TrailerModal";
 import BlockedStatsModal from "../components/BlockedStatsModal";
 import { useBlockedStats } from "../utils/useBlockedStats";
 import MediaCard from "../components/MediaCard";
-import { storage } from "../utils/storage";
+import {
+  storage,
+  getFailoverSource,
+  setFailoverSource,
+  clearFailoverSource,
+} from "../utils/storage";
 import {
   fetchMovieRating,
   isRestricted,
@@ -298,7 +304,25 @@ export default function MoviePage({
 
   // Resolve AllManga movie URL via main-process IPC
   useEffect(() => {
-    if (!playing || !sourceIsAsync(playerSource)) return;
+    if (!playing) return;
+    const epKey = `movie_${item.id}_${dubMode}`;
+
+    // Auto-failover: if a previous attempt taught us AllManga doesn't have
+    // this title, skip straight to the cached fallback source.
+    if (sourceIsAsync(playerSource)) {
+      const cached = getFailoverSource(epKey);
+      if (cached && cached !== playerSource) {
+        setM3u8Url(null);
+        setInterceptedSubs([]);
+        setResolvedPlayerUrl(null);
+        setResolvingUrl(false);
+        setResolveError(null);
+        setPlayerSource(cached);
+        return;
+      }
+    }
+
+    if (!sourceIsAsync(playerSource)) return;
     if (resolvedPlayerUrl || resolvingUrl) return;
     setResolvingUrl(true);
     setResolveError(null);
@@ -315,6 +339,7 @@ export default function MoviePage({
       .then((res) => {
         if (!mounted) return;
         if (res?.ok && res.url) {
+          clearFailoverSource(epKey);
           if (res.isDirectMp4 !== undefined) {
             window.electron
               .setPlayerVideo({
@@ -334,7 +359,19 @@ export default function MoviePage({
             setResolvedPlayerUrl(res.url);
           }
         } else {
-          setResolveError(res?.error || "Movie not found on AllManga");
+          // AllManga doesn't have this title → switch to the next source
+          // automatically and remember the choice for next time.
+          const next = getNextNonAsyncSource(playerSource);
+          if (next) {
+            setFailoverSource(epKey, next);
+            setM3u8Url(null);
+            setInterceptedSubs([]);
+            setResolvedPlayerUrl(null);
+            setResolveError(null);
+            setPlayerSource(next);
+          } else {
+            setResolveError(res?.error || "Movie not found on AllManga");
+          }
         }
       })
       .catch((e) => {
@@ -1038,6 +1075,10 @@ export default function MoviePage({
                     onClick={() => {
                       setShowSourceMenu(false);
                       if (src.id === playerSource) return;
+                      // Manual selection wins over auto-failover for this
+                      // title — otherwise the resolve effect would switch
+                      // back to the cached fallback immediately.
+                      clearFailoverSource(`movie_${item.id}_${dubMode}`);
                       setPlayerSource(src.id);
                       storage.set("playerSource", src.id);
                       setM3u8Url(null);

@@ -28,6 +28,7 @@ import {
   ANIME_DEFAULT_SOURCE,
   NON_ANIME_DEFAULT_SOURCE,
   NEEDS_INTERCEPT,
+  getNextNonAsyncSource,
 } from "../utils/api";
 import {
   BookmarkIcon,
@@ -49,7 +50,13 @@ import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
 import BlockedStatsModal from "../components/BlockedStatsModal";
 import { useBlockedStats } from "../utils/useBlockedStats";
-import { storage, STORAGE_KEYS } from "../utils/storage";
+import {
+  storage,
+  STORAGE_KEYS,
+  getFailoverSource,
+  setFailoverSource,
+  clearFailoverSource,
+} from "../utils/storage";
 import { fetchAniSkipTimings } from "../utils/aniSkip";
 import {
   fetchTVRating,
@@ -649,11 +656,29 @@ export default function TVPage({
 
   // Resolve allmanga episode URL via main-process IPC (GraphQL, no CORS)
   useEffect(() => {
-    if (!playing || !selectedEp || !isAsync) return;
+    if (!playing || !selectedEp) return;
+    const epNum = selectedEp.episode_number;
+    const epKey = `tv_${item.id}_s${selectedSeason}_e${epNum}_${dubMode}`;
+
+    // Auto-failover: if a previous attempt taught us AllManga doesn't have
+    // this episode, skip straight to the cached fallback source.
+    if (isAsync) {
+      const cached = getFailoverSource(epKey);
+      if (cached && cached !== playerSource) {
+        setM3u8Url(null);
+        setInterceptedSubs([]);
+        setResolvedPlayerUrl(null);
+        setResolvingUrl(false);
+        setResolveError(null);
+        setPlayerSource(cached);
+        return;
+      }
+    }
+
+    if (!isAsync) return;
     if (resolvedPlayerUrl || resolvingUrl) return;
     setResolvingUrl(true);
     setResolveError(null);
-    const epNum = selectedEp.episode_number;
     const progressKey = `tv_${item.id}_s${selectedSeason}e${epNum}`;
     const startTime = storage.get("dlTime_" + progressKey) || 0;
     let mounted = true;
@@ -667,6 +692,7 @@ export default function TVPage({
       .then((res) => {
         if (!mounted) return;
         if (res?.ok && res.url) {
+          clearFailoverSource(epKey);
           if (res.isDirectMp4 !== undefined) {
             window.electron
               .setPlayerVideo({
@@ -687,7 +713,19 @@ export default function TVPage({
             setResolvedPlayerUrl(res.url);
           }
         } else {
-          setResolveError(res?.error || "Episode not found on AllManga");
+          // AllManga doesn't have this episode → switch to the next source
+          // automatically and remember the choice for next time.
+          const next = getNextNonAsyncSource(playerSource);
+          if (next) {
+            setFailoverSource(epKey, next);
+            setM3u8Url(null);
+            setInterceptedSubs([]);
+            setResolvedPlayerUrl(null);
+            setResolveError(null);
+            setPlayerSource(next);
+          } else {
+            setResolveError(res?.error || "Episode not found on AllManga");
+          }
         }
       })
       .catch((e) => {
@@ -1814,6 +1852,14 @@ export default function TVPage({
                         onClick={() => {
                           setShowSourceMenu(false);
                           if (src.id === playerSource) return;
+                          // Manual selection wins over auto-failover for the
+                          // current episode — otherwise the resolve effect
+                          // would immediately switch back to the cached one.
+                          if (selectedEp) {
+                            clearFailoverSource(
+                              `tv_${item.id}_s${selectedSeason}_e${selectedEp.episode_number}_${dubMode}`,
+                            );
+                          }
                           setPlayerSource(src.id);
                           storage.set("playerSource", src.id);
                           setM3u8Url(null);

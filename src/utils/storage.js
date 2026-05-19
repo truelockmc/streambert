@@ -83,9 +83,35 @@ export const STORAGE_KEYS = {
   DL_SHOW_UNTRACKED: "dlShowUntracked",
   // Cache for new-episode startup check
   EPISODE_RELEASE_CACHE: "episodeReleaseCache",
+  // Per-episode fallback source when the default (typically AllManga) lacks
+  // the title. Shape: { [epKey]: sourceId }.
+  SOURCE_FAILOVER_CACHE: "sourceFailoverCache",
 };
 
 export const getApiKey = () => storage.get(STORAGE_KEYS.API_KEY);
+
+// ── Source failover cache ────────────────────────────────────────────────────
+// AllManga doesn't always have every episode; rather than nag the user every
+// time, remember the working alternate source per (tmdbId, season, ep, dub)
+// so subsequent visits skip the failed default automatically.
+export const getFailoverSource = (epKey) => {
+  const cache = storage.get(STORAGE_KEYS.SOURCE_FAILOVER_CACHE) || {};
+  return cache[epKey] || null;
+};
+
+export const setFailoverSource = (epKey, sourceId) => {
+  const cache = storage.get(STORAGE_KEYS.SOURCE_FAILOVER_CACHE) || {};
+  cache[epKey] = sourceId;
+  storage.set(STORAGE_KEYS.SOURCE_FAILOVER_CACHE, cache);
+};
+
+export const clearFailoverSource = (epKey) => {
+  const cache = storage.get(STORAGE_KEYS.SOURCE_FAILOVER_CACHE) || {};
+  if (cache[epKey] !== undefined) {
+    delete cache[epKey];
+    storage.set(STORAGE_KEYS.SOURCE_FAILOVER_CACHE, cache);
+  }
+};
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
