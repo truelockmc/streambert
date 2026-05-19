@@ -297,7 +297,19 @@ function register(getMainWindow, { writeSecretMigration }) {
 
       if (signal.aborted) return { ok: false, error: "Cancelled" };
 
+      // ── Helper: send "Installing…" to renderer ──────────────────────────────
+      const sendInstalling = () => {
+        const mw = getMainWindow();
+        if (mw && !mw.isDestroyed()) {
+          mw.webContents.send("update-progress", {
+            percent: 100,
+            label: "Installing…",
+          });
+        }
+      };
+
       if (format === "appimage") {
+        sendInstalling();
         fs.chmodSync(destPath, 0o755);
         const currentAppImage = process.env.APPIMAGE;
         if (currentAppImage) {
@@ -323,15 +335,11 @@ function register(getMainWindow, { writeSecretMigration }) {
         writeSecretMigration();
         app.exit(0);
       } else if (format === "pacman") {
+        sendInstalling();
+        // Give the renderer a moment to process the IPC message and show
+        // "Installing…" before spawnSync blocks the main thread
+        await new Promise((r) => setTimeout(r, 150));
         fs.chmodSync(destPath, 0o644);
-        // notify renderer
-        const mwPac = getMainWindow();
-        if (mwPac && !mwPac.isDestroyed()) {
-          mwPac.webContents.send("update-progress", {
-            percent: 100,
-            label: "Installing…",
-          });
-        }
         const pacmanLaunchers = [
           { bin: "pkexec", args: ["pacman", "-U", "--noconfirm", destPath] },
           { bin: "pamac-installer", args: [destPath] },
@@ -341,7 +349,6 @@ function register(getMainWindow, { writeSecretMigration }) {
           try {
             const which = spawnSync("which", [bin], { encoding: "utf8" });
             if (which.status !== 0) continue;
-            // spawnSync, to wait for pacman to finish before relaunching
             const result = spawnSync(bin, args, { stdio: "inherit" });
             if (result.status === 0) {
               launched = true;
@@ -359,6 +366,8 @@ function register(getMainWindow, { writeSecretMigration }) {
           shell.openPath(destPath);
         }
       } else if (format === "deb") {
+        sendInstalling();
+        await new Promise((r) => setTimeout(r, 150));
         fs.chmodSync(destPath, 0o644);
         const debLaunchers = [
           { bin: "pkexec", args: ["dpkg", "-i", destPath] },
@@ -375,19 +384,29 @@ function register(getMainWindow, { writeSecretMigration }) {
               { encoding: "utf8" },
             );
             if (which.status !== 0) continue;
-            spawn(bin, args, { detached: true, stdio: "ignore" }).unref();
-            launched = true;
-            break;
+            // spawnSync, to wait for dpkg to finish before relaunching
+            const result = spawnSync(bin, args, { stdio: "inherit" });
+            if (result.status === 0) {
+              launched = true;
+              break;
+            }
           } catch {
             continue;
           }
         }
-        if (!launched) shell.openPath(destPath);
+        if (launched) {
+          writeSecretMigration();
+          app.relaunch();
+          app.exit(0);
+        } else {
+          shell.openPath(destPath);
+        }
       } else if (format === "exe") {
+        sendInstalling();
         spawn(destPath, [], { detached: true, stdio: "ignore" }).unref();
         app.exit(0);
       } else if (format === "dmg" || format === "dmg_arm64") {
-        // Mount the DMG and open it
+        sendInstalling();
         spawn("hdiutil", ["attach", destPath], {
           detached: true,
           stdio: "ignore",
