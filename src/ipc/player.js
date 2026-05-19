@@ -349,6 +349,7 @@ function register(getMainWindow, { writeSecretMigration }) {
           try {
             const which = spawnSync("which", [bin], { encoding: "utf8" });
             if (which.status !== 0) continue;
+            // spawnSync, to wait for pacman to finish before relaunching
             const result = spawnSync(bin, args, { stdio: "inherit" });
             if (result.status === 0) {
               launched = true;
