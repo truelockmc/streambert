@@ -19,10 +19,15 @@ app.commandLine.appendSwitch(
 );
 app.commandLine.appendSwitch(
   "disable-features",
-  "HardwareMediaKeyHandling,MediaSessionService,UseSandboxedXdgPortal",
+  "UseSandboxedXdgPortal",
 );
 // Run the network stack in the browser process → one less utility process
-app.commandLine.appendSwitch("enable-features", "NetworkServiceInProcess2");
+// Also enable hardware media key handling so Bluetooth earbuds, keyboard
+// media keys and the Windows media flyout (FluentFlyout) can control playback.
+app.commandLine.appendSwitch(
+  "enable-features",
+  "HardwareMediaKeyHandling,MediaSessionService,NetworkServiceInProcess2",
+);
 // NOTE: enable-low-end-device-mode removed, it cuts the GPU texture tile budget
 // and causes visible seams/stripes/dots on large images.
 
@@ -325,6 +330,23 @@ blockStats.init(getMainWindow);
 
 // get-block-stats lives with its data
 ipcMain.handle("get-block-stats", () => blockStats.getBlockStats());
+
+// -- Media Session: inject JS into ALL webview frames -------------------------
+// The renderer's executeJavaScript() only reaches the top-level frame.
+// VidSrc (and similar) load their video player in a cross-origin iframe, so
+// we need the main process to walk the WebFrameMain tree and inject into every
+// frame — including cross-origin ones that the renderer cannot touch.
+ipcMain.handle("inject-all-frames", async (_, { webContentsId, script }) => {
+  try {
+    const wc = webContents.fromId(webContentsId);
+    if (!wc || wc.isDestroyed()) return;
+    const injectFrame = async (frame) => {
+      try { await frame.executeJavaScript(script); } catch {}
+      for (const child of frame.frames ?? []) await injectFrame(child);
+    };
+    await injectFrame(wc.mainFrame);
+  } catch {}
+});
 
 // -- Player memory cleanup ---------------------------------------------
 // Called by MoviePage / TVPage on component unmount.
