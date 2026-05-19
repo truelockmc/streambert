@@ -40,6 +40,7 @@ const blockStats = require("./src/ipc/blockStats");
 const storageIpc = require("./src/ipc/storage");
 const downloadsIpc = require("./src/ipc/downloads");
 const subtitlesIpc = require("./src/ipc/subtitles");
+const subtitleProxy = require("./src/ipc/subtitleProxy");
 const allmangaIpc = require("./src/ipc/allmanga");
 const playerIpc = require("./src/ipc/player");
 
@@ -135,18 +136,31 @@ function setupSession(playerSession, trailerSession) {
     cb({ cancel: true }),
   );
 
-  // Player session: block ads + intercept m3u8/vtt URLs for renderer
+  // Player session: block ads + intercept m3u8/vtt/srt URLs for renderer
   const MEDIA_URLS = [
     "*://*/*.m3u8*",
     "*://*/*.m3u8",
     "*://*/*.vtt*",
     "*://*/*.vtt",
+    "*://*/*.srt*",
+    "*://*/*.srt",
+    // Wyzie subtitle CDN serves files at /c/<hash>/id/<id>?format=srt — no
+    // extension in path, so the wildcards above miss it. Match only the
+    // /c/ path so the unrelated /search endpoint isn't dragged into the
+    // media-only listener (which would cancel it as if it were an ad).
+    "*://*.wyzie.io/c/*",
+    "*://*.wyzie.ru/c/*",
   ];
   playerSession.webRequest.onBeforeRequest(
     { urls: [...BLOCKED_HOSTS, ...MEDIA_URLS] },
     (details, callback) => {
       const { url } = details;
-      const isMedia = url.includes(".m3u8") || url.includes(".vtt");
+      // Wyzie file URL pattern: /c/<hash>/id/<id>?format=...
+      const isWyzieFile =
+        /\bwyzie\.(io|ru)\b/i.test(url) && /\/c\/[^/]+\/id\//i.test(url);
+      const isSubtitleFile =
+        url.includes(".vtt") || url.includes(".srt") || isWyzieFile;
+      const isMedia = url.includes(".m3u8") || isSubtitleFile;
       if (!isMedia) {
         blockStats.recordBlockedRequest(url);
         callback({ cancel: true });
@@ -167,6 +181,11 @@ function setupSession(playerSession, trailerSession) {
           return;
         }
       } catch {}
+      // Skip our own transcoding proxy to avoid redirect loops.
+      if (url.startsWith("http://127.0.0.1:")) {
+        callback({});
+        return;
+      }
       // Pass through + notify renderer
       const mw = getMainWindow();
       if (mw && !mw.isDestroyed()) {
@@ -178,6 +197,18 @@ function setupSession(playerSession, trailerSession) {
             url,
             lang: extractSubtitleLang(url),
           });
+        }
+      }
+      // Redirect subtitle requests through the UTF-8 transcoding proxy so
+      // legacy single-byte encodings (e.g. CP1251 for Russian) render
+      // correctly in the embed player. Also fixes Wyzie's broken UTF-8
+      // conversion for Cyrillic subtitles. See src/ipc/subtitleProxy.js.
+      if (isSubtitleFile && subtitleProxy.getPort()) {
+        const referer = details.referrer || details.referer || "";
+        const proxied = subtitleProxy.buildProxyUrl(url, referer);
+        if (proxied) {
+          callback({ redirectURL: proxied });
+          return;
         }
       }
       callback({});
@@ -592,8 +623,13 @@ if (!gotTheLock) {
     }
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     _bench("app ready");
+    try {
+      await subtitleProxy.start();
+    } catch (e) {
+      console.error("[subtitleProxy] failed to start:", e);
+    }
     createWindow();
   });
   app.on("window-all-closed", () => app.quit());
