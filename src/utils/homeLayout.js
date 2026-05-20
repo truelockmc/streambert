@@ -5,7 +5,7 @@ import { storage } from "./storage";
 
 export const HOME_ROWS = [
   { id: "continue", label: "Continue Watching" },
-  { id: "similar", label: "Recommended for You" },
+  { id: "recommended", label: "Recommended for You" },
   { id: "trendingMovies", label: "Trending Movies" },
   { id: "trendingTV", label: "Trending Series" },
   { id: "topRated", label: "Top Rated" },
@@ -17,8 +17,20 @@ const DEFAULT_ROW_VISIBLE = Object.fromEntries(
 );
 
 export function loadHomeLayout() {
-  const savedOrder = storage.get("homeRowOrder");
-  const savedVisible = storage.get("homeRowVisible");
+  let savedOrder = storage.get("homeRowOrder");
+  let savedVisible = storage.get("homeRowVisible");
+
+  // Migration: rename 'similar' to 'recommended'
+  if (savedOrder && savedOrder.includes("similar")) {
+    savedOrder = savedOrder.map((id) => (id === "similar" ? "recommended" : id));
+    storage.set("homeRowOrder", savedOrder);
+  }
+  if (savedVisible && "similar" in savedVisible) {
+    savedVisible.recommended = savedVisible.similar;
+    delete savedVisible.similar;
+    storage.set("homeRowVisible", savedVisible);
+  }
+
   const knownIds = new Set(HOME_ROWS.map((r) => r.id));
 
   const order = savedOrder

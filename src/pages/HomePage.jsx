@@ -364,18 +364,18 @@ export default function HomePage({
           );
         };
 
-        if (id === "similar") {
+        if (id === "recommended") {
           if (filteredRecommendedItems.length === 0) return null;
           if (viewMode === "list")
             return renderList(
-              "similar",
+              "recommended",
               "Recommended for You",
               null,
               filteredRecommendedItems,
             );
           return (
             <TrendingCarousel
-              key="similar"
+              key="recommended"
               items={filteredRecommendedItems}
               title="Recommended for You"
               onSelect={onSelect}
