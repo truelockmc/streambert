@@ -10,9 +10,87 @@
 // here; we fetch, detect/repair the encoding, and re-serve as proper UTF-8.
 
 const http = require("http");
+const { isIP } = require("net");
 
 let _server = null;
 let _port = null;
+
+// ── SSRF guard ───────────────────────────────────────────────────────────────
+// The proxy only ever needs to reach public subtitle CDNs, but the target URL
+// itself is reconstructed from a base64 query param that a compromised embed
+// iframe could craft. Reject anything that resolves to loopback, link-local,
+// or RFC1918 ranges so the iframe can't pivot via our Node process to scan
+// the user's localhost / LAN or hit cloud-metadata services.
+function isPrivateHostname(hostname) {
+  if (!hostname) return true;
+  // Strip IPv6 brackets and normalize.
+  const h = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+
+  if (
+    h === "localhost" ||
+    h === "ip6-localhost" ||
+    h === "ip6-loopback" ||
+    h.endsWith(".localhost") ||
+    h.endsWith(".local") ||
+    h.endsWith(".internal")
+  ) {
+    return true;
+  }
+
+  const ipVersion = isIP(h);
+  if (ipVersion === 4) {
+    const [a, b] = h.split(".").map(Number);
+    if (a === 0 || a === 10 || a === 127) return true; // 0/8, 10/8, 127/8
+    if (a === 169 && b === 254) return true; // 169.254/16 (incl. cloud metadata)
+    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16/12
+    if (a === 192 && b === 168) return true; // 192.168/16
+    if (a >= 224) return true; // multicast / reserved
+    return false;
+  }
+  if (ipVersion === 6) {
+    if (h === "::" || h === "::1") return true;
+    // fc00::/7 unique-local, fe80::/10 link-local, fec0::/10 site-local,
+    // ff00::/8 multicast, ::ffff:127.0.0.1 IPv4-mapped loopback.
+    if (/^(fc|fd)/.test(h)) return true;
+    if (/^fe[89ab]/.test(h)) return true;
+    if (/^fe[cdef]/.test(h)) return true;
+    if (h.startsWith("ff")) return true;
+    if (h.startsWith("::ffff:")) return isPrivateHostname(h.slice(7));
+    return false;
+  }
+  // Unresolved DNS name → allow. fetch() will follow it; DNS rebinding is
+  // out of scope (single short-lived response, no credentials forwarded).
+  return false;
+}
+
+// Manual redirect handling so that a public subtitle CDN can't 30x us into a
+// loopback / LAN URL (a redirect-based SSRF). Each hop is re-validated by
+// isPrivateHostname before the next fetch.
+async function fetchWithSafeRedirects(initialUrl, referer, maxHops = 5) {
+  let current = initialUrl;
+  for (let hop = 0; hop <= maxHops; hop++) {
+    const res = await fetch(current, {
+      redirect: "manual",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+        ...(referer ? { Referer: referer } : {}),
+      },
+    });
+    if (res.status < 300 || res.status >= 400) return res;
+    const location = res.headers.get("location");
+    if (!location) return res;
+    const next = new URL(location, current);
+    if (next.protocol !== "http:" && next.protocol !== "https:") {
+      return new Response(null, { status: 502 });
+    }
+    if (isPrivateHostname(next.hostname)) {
+      return new Response(null, { status: 502 });
+    }
+    current = next.toString();
+  }
+  return new Response(null, { status: 508 }); // too many redirects
+}
 
 // ── Wyzie de-mangle ──────────────────────────────────────────────────────────
 // sub.wyzie.io converts upstream CP1251 (Russian) subtitle files to "UTF-8"
@@ -153,9 +231,12 @@ function start() {
         let target;
         try {
           target = Buffer.from(encoded, "base64url").toString("utf8");
-          // sanity: must be a valid http(s) URL
           const tu = new URL(target);
+          // Must be http(s) and point at a public host: a malicious iframe
+          // could otherwise pivot through our Node process to scan loopback
+          // / LAN / cloud-metadata services.
           if (tu.protocol !== "http:" && tu.protocol !== "https:") throw 0;
+          if (isPrivateHostname(tu.hostname)) throw 0;
         } catch {
           res.writeHead(400);
           res.end();
@@ -163,14 +244,7 @@ function start() {
         }
 
         const referer = u.searchParams.get("ref") || "";
-        const upstream = await fetch(target, {
-          redirect: "follow",
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
-            ...(referer ? { Referer: referer } : {}),
-          },
-        });
+        const upstream = await fetchWithSafeRedirects(target, referer);
         if (!upstream.ok) {
           res.writeHead(upstream.status);
           res.end();
