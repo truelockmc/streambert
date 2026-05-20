@@ -92,6 +92,11 @@ export default function HomePage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ratingsMap, ageLimitSetting]);
 
+  // Filter recommended items that exceed age limit setting
+  const filteredRecommendedItems = useMemo(() => {
+    return recommendedItems.filter((item) => !itemRestricted(item));
+  }, [recommendedItems, itemRestricted]);
+
   // Fetch personalised recommendations from multiple recent history items
   useEffect(() => {
     if (!apiKey || offline || !history || history.length === 0) return;
@@ -360,18 +365,18 @@ export default function HomePage({
         };
 
         if (id === "similar") {
-          if (recommendedItems.length === 0) return null;
+          if (filteredRecommendedItems.length === 0) return null;
           if (viewMode === "list")
             return renderList(
               "similar",
               "Recommended for You",
               null,
-              recommendedItems,
+              filteredRecommendedItems,
             );
           return (
             <TrendingCarousel
               key="similar"
-              items={recommendedItems}
+              items={filteredRecommendedItems}
               title="Recommended for You"
               onSelect={onSelect}
               ratingsMap={enrichedRatingsMap}
