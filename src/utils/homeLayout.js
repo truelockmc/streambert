@@ -17,20 +17,8 @@ const DEFAULT_ROW_VISIBLE = Object.fromEntries(
 );
 
 export function loadHomeLayout() {
-  let savedOrder = storage.get("homeRowOrder");
-  let savedVisible = storage.get("homeRowVisible");
-
-  // Migration: rename 'similar' to 'recommended'
-  if (savedOrder && savedOrder.includes("similar")) {
-    savedOrder = savedOrder.map((id) => (id === "similar" ? "recommended" : id));
-    storage.set("homeRowOrder", savedOrder);
-  }
-  if (savedVisible && "similar" in savedVisible) {
-    savedVisible.recommended = savedVisible.similar;
-    delete savedVisible.similar;
-    storage.set("homeRowVisible", savedVisible);
-  }
-
+  const savedOrder = storage.get("homeRowOrder");
+  const savedVisible = storage.get("homeRowVisible");
   const knownIds = new Set(HOME_ROWS.map((r) => r.id));
 
   const order = savedOrder
