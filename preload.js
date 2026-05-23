@@ -99,6 +99,10 @@ contextBridge.exposeInMainWorld("electron", {
   // Quit app
   quitApp: () => ipcRenderer.invoke("quit-app"),
 
+  // Keep the display awake while in-app playback is active
+  setPlaybackKeepAwake: (active) =>
+    ipcRenderer.invoke("playback-keepawake", active),
+
   // Signal to main process that the player has stopped
   playerStopped: () => ipcRenderer.send("player-stopped"),
 

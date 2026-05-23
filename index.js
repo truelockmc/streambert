@@ -9,8 +9,27 @@ const {
   session,
   webContents,
   Notification,
+  powerSaveBlocker,
 } = require("electron");
 const path = require("path");
+
+// -- Playback keep-awake -------------------------------------------------------
+// Hold a display-sleep blocker while in-app playback is active so the player
+// doesn't pause when the laptop screen sleeps. Released when paused/stopped or
+// when casting (playback then lives on the receiver, laptop may sleep).
+let _psbId = null;
+function setPlaybackKeepAwake(active) {
+  try {
+    if (active) {
+      if (_psbId == null || !powerSaveBlocker.isStarted(_psbId)) {
+        _psbId = powerSaveBlocker.start("prevent-display-sleep");
+      }
+    } else if (_psbId != null) {
+      if (powerSaveBlocker.isStarted(_psbId)) powerSaveBlocker.stop(_psbId);
+      _psbId = null;
+    }
+  } catch {}
+}
 
 // -- RAM / performance flags ---------------------------------------------------
 app.commandLine.appendSwitch(
@@ -221,7 +240,9 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true,
-      backgroundThrottling: true,
+      // Keep media alive when the window is occluded/backgrounded; pausing on
+      // background is handled deliberately, not by Chromium throttling.
+      backgroundThrottling: false,
       spellcheck: false,
       // Caps the renderer's V8 heap + exposes gc() for manual GC hints after navigation
       additionalArguments: ["--js-flags=--max-old-space-size=256 --expose-gc"],
@@ -303,6 +324,7 @@ function createWindow() {
   });
 
   mainWindow.on("closed", () => {
+    setPlaybackKeepAwake(false);
     mainWindow = null;
     app.quit();
   });
@@ -321,6 +343,13 @@ playerIpc.register(getMainWindow, {
 });
 blockStats.init(getMainWindow);
 castIpc.register(getMainWindow);
+
+// Renderer toggles the display-sleep blocker based on its play state.
+ipcMain.handle("playback-keepawake", (_event, active) => {
+  setPlaybackKeepAwake(!!active);
+});
+
+app.on("before-quit", () => setPlaybackKeepAwake(false));
 
 // get-block-stats lives with its data
 ipcMain.handle("get-block-stats", () => blockStats.getBlockStats());
@@ -512,6 +541,8 @@ ipcMain.handle("open-pip-window", (_, { url, title }) => {
       partition: "persist:player",
       nodeIntegration: false,
       contextIsolation: true,
+      // Keep the pop-out playing when it's behind other windows.
+      backgroundThrottling: false,
       // Injects the custom title bar and wires window-control IPC
       preload: path.join(__dirname, "popout-preload.js"),
     },

@@ -388,6 +388,14 @@ export default function TVPage({
   const cast = useCast({ autoDiscover: true });
   const [showCastPicker, setShowCastPicker] = useState(false);
   const [allmangaIsDirectMp4, setAllmangaIsDirectMp4] = useState(null);
+
+  // Keep the display awake while playing in-app; release while casting (the
+  // receiver plays, the laptop may sleep) or when the player closes.
+  useEffect(() => {
+    const active = playing && !cast.currentDevice;
+    window.electron?.setPlaybackKeepAwake?.(active);
+    return () => window.electron?.setPlaybackKeepAwake?.(false);
+  }, [playing, cast.currentDevice]);
   const [playerSource, setPlayerSource] = useState(
     () => storage.get("playerSource") || NON_ANIME_DEFAULT_SOURCE,
   );

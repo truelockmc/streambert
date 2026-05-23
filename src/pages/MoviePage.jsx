@@ -120,6 +120,14 @@ export default function MoviePage({
   // AllManga sets this from res.isDirectMp4 so cast knows mp4 vs hls
   const [allmangaIsDirectMp4, setAllmangaIsDirectMp4] = useState(null);
 
+  // Keep the display awake while playing in-app; release while casting (the
+  // receiver plays, the laptop may sleep) or when the player closes.
+  useEffect(() => {
+    const active = playing && !cast.currentDevice;
+    window.electron?.setPlaybackKeepAwake?.(active);
+    return () => window.electron?.setPlaybackKeepAwake?.(false);
+  }, [playing, cast.currentDevice]);
+
   // Derived: detect anime before any effects so effects can use it
   const isAnime = useMemo(
     () => isAnimeContent(item, details),
