@@ -105,7 +105,7 @@ export default function DownloadsPage({
     () => storage.get("localFiles") || [],
   );
   // Casting
-  const cast = useCast();
+  const cast = useCast({ autoDiscover: true });
   const [castDl, setCastDl] = useState(null);
   const castLoadArgs = useMemo(() => {
     if (!castDl || !castDl.filePath) return null;

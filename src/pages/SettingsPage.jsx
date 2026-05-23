@@ -2025,8 +2025,6 @@ function CastSettingsSection() {
     return () => {
       mounted = false;
       if (h) window.electron.offCastDevicesUpdated?.(h);
-      // Stop scanning when leaving Settings so SSDP/mDNS don't run in background.
-      window.electron.castStopDiscovery?.();
     };
   }, []);
 

@@ -42,6 +42,24 @@ export function useCast({ autoDiscover = false } = {}) {
   const mountedRef = useRef(true);
   const devicesRef = useRef([]);
   devicesRef.current = devices;
+  const discoverTimerRef = useRef(null);
+
+  // Discovery is fire-and-forget in the main process: cast:start-discovery
+  // resolves immediately while mDNS/SSDP responses trickle in over the next few
+  // seconds. Keep `isDiscovering` true for that window so the UI shows
+  // "Scanning…" instead of flashing "No devices found".
+  const DISCOVER_WINDOW_MS = 5000;
+  const runDiscovery = () => {
+    if (!window.electron?.castStartDiscovery) return;
+    setIsDiscovering(true);
+    if (discoverTimerRef.current) clearTimeout(discoverTimerRef.current);
+    Promise.resolve(window.electron.castStartDiscovery(discoveryOpts())).catch(
+      () => {},
+    );
+    discoverTimerRef.current = setTimeout(() => {
+      if (mountedRef.current) setIsDiscovering(false);
+    }, DISCOVER_WINDOW_MS);
+  };
 
   // Subscribe to push events from main
   useEffect(() => {
@@ -72,15 +90,11 @@ export function useCast({ autoDiscover = false } = {}) {
       setLastError(e?.message || "Cast error");
     });
 
-    if (autoDiscover) {
-      setIsDiscovering(true);
-      window.electron.castStartDiscovery?.(discoveryOpts()).finally(() => {
-        if (mountedRef.current) setIsDiscovering(false);
-      });
-    }
+    if (autoDiscover) runDiscovery();
 
     return () => {
       mountedRef.current = false;
+      if (discoverTimerRef.current) clearTimeout(discoverTimerRef.current);
       if (devH) window.electron.offCastDevicesUpdated?.(devH);
       if (statusH) window.electron.offCastStatus?.(statusH);
       if (endedH) window.electron.offCastSessionEnded?.(endedH);
@@ -104,13 +118,8 @@ export function useCast({ autoDiscover = false } = {}) {
 
   const currentDevice = connectedDevice;
 
-  const startDiscovery = useCallback(async () => {
-    setIsDiscovering(true);
-    try {
-      await window.electron?.castStartDiscovery?.(discoveryOpts());
-    } finally {
-      setIsDiscovering(false);
-    }
+  const startDiscovery = useCallback(() => {
+    runDiscovery();
   }, []);
 
   const stopDiscovery = useCallback(async () => {

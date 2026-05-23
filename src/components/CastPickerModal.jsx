@@ -116,12 +116,9 @@ export default function CastPickerModal({
   useEffect(() => {
     if (!open) return;
     setError(null);
+    // Re-query on open. The mDNS browser stays alive for the session (passive,
+    // no polling), so devices already found remain listed; this just refreshes.
     cast.startDiscovery();
-    // Stop scanning when the picker closes so SSDP/mDNS don't run in the
-    // background. The active session (if any) is unaffected by stopping discovery.
-    return () => {
-      cast.stopDiscovery();
-    };
   }, [open]);
 
   if (!open) return null;

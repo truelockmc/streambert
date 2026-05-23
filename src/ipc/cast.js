@@ -28,6 +28,7 @@ const _devices = new Map();
 
 let _bonjourBrowser = null;
 let _bonjourInstance = null;
+let _bonjourBindIp = null;
 let _dlnaList = null;
 let _discoveryRunning = false;
 let _lastDlnaUpdate = 0;
@@ -39,6 +40,12 @@ let _castServer = null;
 
 /** token -> { kind:"file"|"sub"|"proxy", filePath?, target?, referer?, headers?, contentType?, expiresAt } */
 const _serveTokens = new Map();
+
+/** Dedup index for proxy tokens: `${target}\n${referer}\n${isHls}` -> token.
+ * Prevents the HLS rewriter minting a fresh token every time a receiver
+ * re-fetches a playlist (seek / variant switch), which would grow _serveTokens
+ * without bound over a long session. */
+const _proxyTokenIndex = new Map();
 
 const SERVE_TOKEN_TTL_MS = 12 * 60 * 60 * 1000; // 12h
 
@@ -88,10 +95,34 @@ function listDevices() {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function getLocalIPv4() {
+function _ipv4ToInt(ip) {
+  const p = ip.split(".");
+  if (p.length !== 4) return null;
+  let n = 0;
+  for (const part of p) {
+    const o = Number(part);
+    if (!Number.isInteger(o) || o < 0 || o > 255) return null;
+    n = (n << 8) | o;
+  }
+  return n >>> 0;
+}
+
+function _sameSubnet(ip, netmask, target) {
+  const a = _ipv4ToInt(ip);
+  const m = _ipv4ToInt(netmask);
+  const t = _ipv4ToInt(target);
+  if (a == null || m == null || t == null) return false;
+  return ((a & m) >>> 0) === ((t & m) >>> 0);
+}
+
+// Pick the LAN IPv4 the cast receiver can actually reach. When the receiver's
+// address is known, prefer the local interface on the SAME subnet (critical on
+// machines with a VPN/secondary NIC, where the first "preferred"-named adapter
+// may be on an unreachable network). Falls back to a preferred adapter, then any
+// non-internal IPv4, then loopback.
+function getLocalIPv4(targetAddr) {
   const ifaces = os.networkInterfaces();
-  const preferred = [];
-  const fallback = [];
+  const candidates = [];
   for (const [name, addrs] of Object.entries(ifaces)) {
     if (!addrs) continue;
     const lname = name.toLowerCase();
@@ -113,11 +144,21 @@ function getLocalIPv4() {
     for (const addr of addrs) {
       if (addr.family !== "IPv4" || addr.internal) continue;
       if (isVirtual) continue;
-      if (isPreferred) preferred.push(addr.address);
-      else fallback.push(addr.address);
+      candidates.push({
+        address: addr.address,
+        netmask: addr.netmask,
+        preferred: isPreferred,
+      });
     }
   }
-  return preferred[0] || fallback[0] || "127.0.0.1";
+  if (targetAddr) {
+    const match = candidates.find((c) =>
+      _sameSubnet(c.address, c.netmask, targetAddr),
+    );
+    if (match) return match.address;
+  }
+  const pref = candidates.find((c) => c.preferred);
+  return (pref || candidates[0])?.address || "127.0.0.1";
 }
 
 function makeToken(entry, ttlMs = SERVE_TOKEN_TTL_MS) {
@@ -126,9 +167,33 @@ function makeToken(entry, ttlMs = SERVE_TOKEN_TTL_MS) {
   return token;
 }
 
+// Reuse a proxy token for an identical upstream so repeated playlist fetches
+// don't accumulate tokens. Refreshes the TTL on reuse.
+function makeProxyToken({ target, referer, headers, isHls }) {
+  const key = `${target}\n${referer || ""}\n${isHls ? 1 : 0}`;
+  const existing = _proxyTokenIndex.get(key);
+  if (existing) {
+    const e = _serveTokens.get(existing);
+    if (e && e.expiresAt > Date.now()) {
+      e.expiresAt = Date.now() + SERVE_TOKEN_TTL_MS;
+      return existing;
+    }
+    _proxyTokenIndex.delete(key);
+  }
+  const token = makeToken({
+    kind: "proxy",
+    target,
+    referer: referer || null,
+    headers: headers || {},
+    isHls: !!isHls,
+  });
+  _proxyTokenIndex.set(key, token);
+  return token;
+}
+
 function castUrlFor(token, kind = "file") {
   if (!_castServer) return null;
-  const ip = getLocalIPv4();
+  const ip = getLocalIPv4(_session?.device?.address);
   const port = _castServer.address().port;
   return `http://${ip}:${port}/${kind}/${token}`;
 }
@@ -137,6 +202,9 @@ function gcServeTokens() {
   const now = Date.now();
   for (const [tok, entry] of _serveTokens) {
     if (entry.expiresAt < now) _serveTokens.delete(tok);
+  }
+  for (const [key, tok] of _proxyTokenIndex) {
+    if (!_serveTokens.has(tok)) _proxyTokenIndex.delete(key);
   }
 }
 setInterval(gcServeTokens, 5 * 60 * 1000).unref();
@@ -227,6 +295,8 @@ function _isHlsContentType(ct) {
 /** Rewrite an HLS playlist so every segment URL flows through /proxy/<childToken>. */
 function _rewriteHlsPlaylist(body, baseUrl, parentEntry) {
   const baseHeadersJson = JSON.stringify(parentEntry.headers || {});
+  const ip = getLocalIPv4(_session?.device?.address);
+  const port = _castServer.address().port;
   const rewriteUrl = (raw) => {
     let abs;
     try {
@@ -234,8 +304,7 @@ function _rewriteHlsPlaylist(body, baseUrl, parentEntry) {
     } catch {
       return raw;
     }
-    const tok = makeToken({
-      kind: "proxy",
+    const tok = makeProxyToken({
       target: abs,
       referer: parentEntry.referer,
       headers: JSON.parse(baseHeadersJson),
@@ -243,8 +312,6 @@ function _rewriteHlsPlaylist(body, baseUrl, parentEntry) {
       // upstream mislabels their content-type.
       isHls: /\.m3u8(\?|$)/i.test(abs),
     });
-    const ip = getLocalIPv4();
-    const port = _castServer.address().port;
     return `http://${ip}:${port}/proxy/${tok}`;
   };
   return body
@@ -579,23 +646,47 @@ function _quietDlnaSearch(fn) {
 const DLNA_SSDP_THROTTLE_MS = 8000;
 
 async function startDiscovery({ enableDlna = true } = {}) {
-  // Re-entrant: if already scanning, just (throttled) re-query DLNA so newly
-  // powered-on renderers surface, without restarting the mDNS browser.
-  const firstStart = !_discoveryRunning;
   _discoveryRunning = true;
 
   // ── Chromecast via mDNS ───────────────────────────────────────────────────
-  if (firstStart) {
-    try {
-      if (!Bonjour) Bonjour = require("bonjour-service").Bonjour;
-      if (!_bonjourInstance) _bonjourInstance = new Bonjour();
+  // Bind the mDNS socket to the LAN interface. On multi-homed machines (active
+  // VPN or a second adapter) the default bind lands on the wrong interface and
+  // receives zero responses — the cause of "no devices found". Rebuild if the
+  // routable IP changed (e.g. VPN toggled) so discovery recovers without a
+  // restart. The browser is otherwise kept alive for the session (passive
+  // listener, no polling, no log noise); subsequent calls issue a fresh query.
+  try {
+    if (!Bonjour) Bonjour = require("bonjour-service").Bonjour;
+    const bindIp = getLocalIPv4();
+    if (_bonjourInstance && _bonjourBindIp && _bonjourBindIp !== bindIp) {
+      try {
+        if (_bonjourBrowser) _bonjourBrowser.stop();
+      } catch {}
+      try {
+        _bonjourInstance.destroy();
+      } catch {}
+      _bonjourBrowser = null;
+      _bonjourInstance = null;
+    }
+    if (!_bonjourInstance) {
+      _bonjourInstance =
+        bindIp && bindIp !== "127.0.0.1"
+          ? new Bonjour({ interface: bindIp })
+          : new Bonjour();
+      _bonjourBindIp = bindIp;
+    }
+    if (!_bonjourBrowser) {
       _bonjourBrowser = _bonjourInstance.find({ type: "googlecast" }, (svc) => {
         _addCastDevice(svc);
       });
       _bonjourBrowser.on("down", (svc) => _removeCastDevice(svc));
-    } catch (e) {
-      pushError(`Chromecast discovery failed: ${e.message}`);
+    } else {
+      try {
+        _bonjourBrowser.update();
+      } catch {}
     }
+  } catch (e) {
+    pushError(`Chromecast discovery failed: ${e.message}`);
   }
 
   // ── DLNA via SSDP (dlnacasts3), gated by setting + throttled ───────────────
@@ -620,14 +711,19 @@ async function startDiscovery({ enableDlna = true } = {}) {
   return { ok: true };
 }
 
+// Fully tear down discovery sockets. Not called on every picker close (that
+// caused devices to disappear); reserved for app shutdown.
 async function stopDiscovery() {
-  if (!_discoveryRunning) return { ok: true };
   _discoveryRunning = false;
   try {
     if (_bonjourBrowser) _bonjourBrowser.stop();
   } catch {}
   _bonjourBrowser = null;
-  // dlnacasts3 stops its SSDP socket once the last "update" listener is removed.
+  try {
+    if (_bonjourInstance) _bonjourInstance.destroy();
+  } catch {}
+  _bonjourInstance = null;
+  _bonjourBindIp = null;
   try {
     if (_dlnaList) {
       _dlnaList.removeAllListeners("update");
@@ -667,8 +763,7 @@ function _resolveLoadArgs(args) {
     out.contentUrl = castUrlFor(token, "file");
     out.contentType = args.contentType || _contentTypeForExt(args.filePath || "");
   } else if (args.mode === "mp4Remote") {
-    const token = makeToken({
-      kind: "proxy",
+    const token = makeProxyToken({
       target: args.url,
       referer: args.referer || null,
       headers: args.extraHeaders || {},
@@ -676,8 +771,7 @@ function _resolveLoadArgs(args) {
     out.contentUrl = castUrlFor(token, "proxy");
     out.contentType = args.contentType || "video/mp4";
   } else if (args.mode === "hlsRemote") {
-    const token = makeToken({
-      kind: "proxy",
+    const token = makeProxyToken({
       target: args.url,
       referer: args.referer || null,
       headers: args.extraHeaders || {},

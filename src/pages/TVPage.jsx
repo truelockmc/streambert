@@ -385,7 +385,7 @@ export default function TVPage({
   const [m3u8Url, setM3u8Url] = useState(null);
   const [interceptedSubs, setInterceptedSubs] = useState([]);
   // Casting
-  const cast = useCast();
+  const cast = useCast({ autoDiscover: true });
   const [showCastPicker, setShowCastPicker] = useState(false);
   const [allmangaIsDirectMp4, setAllmangaIsDirectMp4] = useState(null);
   const [playerSource, setPlayerSource] = useState(

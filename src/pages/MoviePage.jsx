@@ -115,7 +115,7 @@ export default function MoviePage({
   const pipUrlRef = useRef(null); // URL to restore when pop-out closes
   const pipWebContentsIdRef = useRef(null); // cached WebContents ID of the pop-out window
   // Casting
-  const cast = useCast();
+  const cast = useCast({ autoDiscover: true });
   const [showCastPicker, setShowCastPicker] = useState(false);
   // AllManga sets this from res.isDirectMp4 so cast knows mp4 vs hls
   const [allmangaIsDirectMp4, setAllmangaIsDirectMp4] = useState(null);
