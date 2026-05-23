@@ -30,6 +30,7 @@ let _bonjourBrowser = null;
 let _bonjourInstance = null;
 let _dlnaList = null;
 let _discoveryRunning = false;
+let _lastDlnaUpdate = 0;
 
 /** { device, type:"cast"|"dlna", client?, player?, contentUrl, mediaInfo, lastStatus, tearDown } */
 let _session = null;
@@ -238,6 +239,9 @@ function _rewriteHlsPlaylist(body, baseUrl, parentEntry) {
       target: abs,
       referer: parentEntry.referer,
       headers: JSON.parse(baseHeadersJson),
+      // Variant playlists (master → media) must also be rewritten even if the
+      // upstream mislabels their content-type.
+      isHls: /\.m3u8(\?|$)/i.test(abs),
     });
     const ip = getLocalIPv4();
     const port = _castServer.address().port;
@@ -306,6 +310,7 @@ function _serveProxy(entry, req, res) {
 
       const upstreamContentType = upRes.headers["content-type"];
       const looksHls =
+        entry.isHls ||
         _isHlsContentType(upstreamContentType) ||
         /\.m3u8(\?|$)/i.test(upstreamUrl.pathname + upstreamUrl.search);
 
@@ -556,38 +561,61 @@ function _addDlnaPlayer(player) {
   pushDevicesUpdate();
 }
 
-async function startDiscovery() {
-  if (_discoveryRunning) return { ok: true, alreadyRunning: true };
+// dlnacasts3 logs `[DLNACASTS] querying ssdp` via console.debug on every search.
+// Suppress just that one line while still surfacing real errors/warnings.
+function _quietDlnaSearch(fn) {
+  const orig = console.debug;
+  console.debug = (...args) => {
+    if (typeof args[0] === "string" && args[0].includes("[DLNACASTS]")) return;
+    orig.apply(console, args);
+  };
+  try {
+    fn();
+  } finally {
+    console.debug = orig;
+  }
+}
+
+const DLNA_SSDP_THROTTLE_MS = 8000;
+
+async function startDiscovery({ enableDlna = true } = {}) {
+  // Re-entrant: if already scanning, just (throttled) re-query DLNA so newly
+  // powered-on renderers surface, without restarting the mDNS browser.
+  const firstStart = !_discoveryRunning;
   _discoveryRunning = true;
 
   // ── Chromecast via mDNS ───────────────────────────────────────────────────
-  try {
-    if (!Bonjour) Bonjour = require("bonjour-service").Bonjour;
-    if (!_bonjourInstance) _bonjourInstance = new Bonjour();
-    _bonjourBrowser = _bonjourInstance.find({ type: "googlecast" }, (svc) => {
-      _addCastDevice(svc);
-    });
-    _bonjourBrowser.on("down", (svc) => _removeCastDevice(svc));
-  } catch (e) {
-    pushError(`Chromecast discovery failed: ${e.message}`);
-  }
-
-  // ── DLNA via SSDP (dlnacasts3) ────────────────────────────────────────────
-  try {
-    if (!dlnacasts) dlnacasts = require("dlnacasts3");
-    if (!_dlnaList) {
-      _dlnaList = dlnacasts();
-      _dlnaList.on("update", (player) => _addDlnaPlayer(player));
-    }
-    // dlnacasts3 1.x: must explicitly trigger an SSDP search
+  if (firstStart) {
     try {
-      _dlnaList.update();
-    } catch {}
-  } catch (e) {
-    pushError(`DLNA discovery failed: ${e.message}`);
+      if (!Bonjour) Bonjour = require("bonjour-service").Bonjour;
+      if (!_bonjourInstance) _bonjourInstance = new Bonjour();
+      _bonjourBrowser = _bonjourInstance.find({ type: "googlecast" }, (svc) => {
+        _addCastDevice(svc);
+      });
+      _bonjourBrowser.on("down", (svc) => _removeCastDevice(svc));
+    } catch (e) {
+      pushError(`Chromecast discovery failed: ${e.message}`);
+    }
   }
 
-  // Initial push (may already be empty; subsequent finds will push again)
+  // ── DLNA via SSDP (dlnacasts3), gated by setting + throttled ───────────────
+  if (enableDlna) {
+    try {
+      if (!dlnacasts) dlnacasts = require("dlnacasts3");
+      if (!_dlnaList) {
+        _dlnaList = dlnacasts();
+        _dlnaList.on("update", (player) => _addDlnaPlayer(player));
+      }
+      const now = Date.now();
+      if (now - _lastDlnaUpdate >= DLNA_SSDP_THROTTLE_MS) {
+        _lastDlnaUpdate = now;
+        _quietDlnaSearch(() => _dlnaList.update());
+      }
+    } catch (e) {
+      pushError(`DLNA discovery failed: ${e.message}`);
+    }
+  }
+
   pushDevicesUpdate();
   return { ok: true };
 }
@@ -599,7 +627,13 @@ async function stopDiscovery() {
     if (_bonjourBrowser) _bonjourBrowser.stop();
   } catch {}
   _bonjourBrowser = null;
-  // dlnacasts3 has no stop() — leave the list instance for reuse on next start.
+  // dlnacasts3 stops its SSDP socket once the last "update" listener is removed.
+  try {
+    if (_dlnaList) {
+      _dlnaList.removeAllListeners("update");
+      _dlnaList = null;
+    }
+  } catch {}
   return { ok: true };
 }
 
@@ -647,6 +681,7 @@ function _resolveLoadArgs(args) {
       target: args.url,
       referer: args.referer || null,
       headers: args.extraHeaders || {},
+      isHls: true,
     });
     out.contentUrl = castUrlFor(token, "proxy");
     out.contentType = "application/vnd.apple.mpegurl";
@@ -714,12 +749,23 @@ function _connectChromecast(device) {
           try {
             client.removeAllListeners();
           } catch {}
+          // Quit the DefaultMediaReceiver app entirely so the device returns to
+          // its home screen. Closing the TCP socket alone leaves the receiver
+          // running on the cast splash. Fall back to close() if stop() never acks.
+          let closed = false;
+          const closeOnce = () => {
+            if (closed) return;
+            closed = true;
+            try {
+              client.close();
+            } catch {}
+          };
           try {
-            player.stop();
-          } catch {}
-          try {
-            client.close();
-          } catch {}
+            client.stop(player, closeOnce);
+            setTimeout(closeOnce, 1500);
+          } catch {
+            closeOnce();
+          }
         };
 
         player.on("status", (status) => {
@@ -933,7 +979,16 @@ async function loadMedia(args) {
 
     return new Promise((resolve) => {
       _session.player.load(media, options, (err) => {
-        if (err) return resolve({ ok: false, error: err.message });
+        if (err) {
+          // Load failed — quit the receiver app so the TV doesn't sit on the
+          // cast splash, and reset session state so the UI returns to idle.
+          try {
+            _session.tearDown && _session.tearDown();
+          } catch {}
+          _session = null;
+          pushSessionEnded("load-failed");
+          return resolve({ ok: false, error: err.message });
+        }
         resolve({ ok: true, contentUrl: resolved.contentUrl });
       });
     });
@@ -1074,9 +1129,9 @@ function getStatus() {
 function register(getMainWindow) {
   _getMainWindow = getMainWindow || (() => null);
 
-  ipcMain.handle("cast:start-discovery", async () => {
+  ipcMain.handle("cast:start-discovery", async (_, opts) => {
     try {
-      return await startDiscovery();
+      return await startDiscovery(opts || {});
     } catch (e) {
       return { ok: false, error: e.message };
     }

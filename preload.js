@@ -171,7 +171,8 @@ contextBridge.exposeInMainWorld("electron", {
   },
   offUpdateProgress: (h) => ipcRenderer.removeListener("update-progress", h),
   // ── Casting (Chromecast + DLNA) ─────────────────────────────────────────
-  castStartDiscovery: () => ipcRenderer.invoke("cast:start-discovery"),
+  castStartDiscovery: (opts) =>
+    ipcRenderer.invoke("cast:start-discovery", opts),
   castStopDiscovery: () => ipcRenderer.invoke("cast:stop-discovery"),
   castListDevices: () => ipcRenderer.invoke("cast:list-devices"),
   castConnect: (deviceId) => ipcRenderer.invoke("cast:connect", { deviceId }),

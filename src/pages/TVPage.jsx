@@ -385,7 +385,7 @@ export default function TVPage({
   const [m3u8Url, setM3u8Url] = useState(null);
   const [interceptedSubs, setInterceptedSubs] = useState([]);
   // Casting
-  const cast = useCast({ autoDiscover: true });
+  const cast = useCast();
   const [showCastPicker, setShowCastPicker] = useState(false);
   const [allmangaIsDirectMp4, setAllmangaIsDirectMp4] = useState(null);
   const [playerSource, setPlayerSource] = useState(
@@ -1675,10 +1675,43 @@ export default function TVPage({
                     </button>
                   </div>
                 )}
+                {/* Casting active: stop the in-app player; playback is on the device */}
+                {cast.currentDevice && !pipOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      zIndex: 20,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "rgba(0,0,0,0.92)",
+                      gap: 18,
+                      padding: 20,
+                      borderRadius: "inherit",
+                    }}
+                  >
+                    <CastingIcon size={40} />
+                    <span
+                      style={{
+                        fontSize: 15,
+                        color: "var(--text1)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Playing on{" "}
+                      {cast.currentDevice.friendlyName || cast.currentDevice.name}
+                    </span>
+                    <div style={{ width: 480, maxWidth: "90%" }}>
+                      <CastMiniController cast={cast} variant="modal" />
+                    </div>
+                  </div>
+                )}
                 <webview
                   ref={webviewRef}
                   src={
-                    pipOpen
+                    pipOpen || cast.currentDevice
                       ? "about:blank"
                       : isAsync
                         ? resolvedPlayerUrl || "about:blank"
@@ -1770,7 +1803,7 @@ export default function TVPage({
                     }}
                     title={
                       cast.currentDevice
-                        ? `Casting to ${cast.currentDevice.friendlyName || cast.currentDevice.name}`
+                        ? `Casting to ${cast.currentDevice.friendlyName || cast.currentDevice.name} — open controls`
                         : m3u8Url || (isAsync && resolvedPlayerUrl)
                           ? "Cast to a device"
                           : "Start the video first to enable casting"
@@ -2258,7 +2291,6 @@ export default function TVPage({
           return null;
         })()}
       />
-      {cast.currentDevice && <CastMiniController cast={cast} variant="player" />}
     </div>
   );
 }

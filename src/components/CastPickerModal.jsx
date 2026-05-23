@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CastIcon } from "./Icons";
+import CastMiniController from "./CastMiniController";
 import { storage, STORAGE_KEYS } from "../utils/storage";
 
 const MAX_RECENT = 5;
@@ -116,6 +117,11 @@ export default function CastPickerModal({
     if (!open) return;
     setError(null);
     cast.startDiscovery();
+    // Stop scanning when the picker closes so SSDP/mDNS don't run in the
+    // background. The active session (if any) is unaffected by stopping discovery.
+    return () => {
+      cast.stopDiscovery();
+    };
   }, [open]);
 
   if (!open) return null;
@@ -200,7 +206,7 @@ export default function CastPickerModal({
             }}
           >
             <CastIcon size={14} />
-            Cast to a device
+            {cast.currentDevice ? "Casting" : "Cast to a device"}
           </span>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <button
@@ -228,6 +234,24 @@ export default function CastPickerModal({
             flex: 1,
           }}
         >
+          {cast.currentDevice && (
+            <CastMiniController cast={cast} variant="modal" />
+          )}
+
+          {cast.currentDevice && otherDevices.length + recentDevices.length > 1 && (
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "var(--text3)",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            >
+              Switch device
+            </div>
+          )}
+
           {recentDevices.length > 0 && (
             <div>
               <div

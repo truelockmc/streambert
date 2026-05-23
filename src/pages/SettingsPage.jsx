@@ -2014,7 +2014,7 @@ function CastSettingsSection() {
     let mounted = true;
     setScanning(true);
     window.electron
-      .castStartDiscovery?.()
+      .castStartDiscovery?.({ enableDlna })
       .finally(() => mounted && setScanning(false));
     window.electron.castListDevices?.().then((list) => {
       if (mounted && Array.isArray(list)) setDevices(list);
@@ -2025,6 +2025,8 @@ function CastSettingsSection() {
     return () => {
       mounted = false;
       if (h) window.electron.offCastDevicesUpdated?.(h);
+      // Stop scanning when leaving Settings so SSDP/mDNS don't run in background.
+      window.electron.castStopDiscovery?.();
     };
   }, []);
 
@@ -2182,7 +2184,7 @@ function CastSettingsSection() {
             onClick={() => {
               setScanning(true);
               window.electron
-                ?.castStartDiscovery?.()
+                ?.castStartDiscovery?.({ enableDlna })
                 .finally(() => setScanning(false));
             }}
             disabled={scanning}

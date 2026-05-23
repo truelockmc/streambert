@@ -1,24 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { storage, STORAGE_KEYS } from "./storage";
+
+// Discovery options derived from user settings (gate DLNA SSDP if disabled).
+const discoveryOpts = () => ({
+  enableDlna: storage.get(STORAGE_KEYS.CAST_ENABLE_DLNA) ?? true,
+});
 
 /**
  * Casting state + control hook. Subscribes to main-process cast IPC.
  *
+ * Discovery is on-demand: nothing scans the network until `startDiscovery()`
+ * is called (the picker / settings do this when opened). The active session's
+ * device is tracked independently of the live discovery list, so the overlay
+ * and controls keep working even while discovery is stopped.
+ *
  * Returns:
  *   devices              Device[]
  *   isDiscovering        bool
- *   currentDevice        Device | null
+ *   currentDevice        Device | null  (the connected device; survives discovery off)
  *   sessionState         "idle"|"connecting"|"buffering"|"playing"|"paused"|"ended"|"error"
  *   position, duration   seconds
  *   volume, muted        0..1, bool
  *   lastError            string | null
  *
  * Actions: startDiscovery, stopDiscovery, connect, disconnect,
- *          load, play, pause, stop, seek, setVolume, setMute
+ *          load, play, pause, stop, seek, setVolume, setMute, setSubtitleTrack
  */
-export function useCast({ autoDiscover = true } = {}) {
+export function useCast({ autoDiscover = false } = {}) {
   const [devices, setDevices] = useState([]);
   const [isDiscovering, setIsDiscovering] = useState(false);
-  const [currentDeviceId, setCurrentDeviceId] = useState(null);
+  // The connected device object — set on connect, cleared on session end.
+  // Independent of `devices` so it survives discovery being stopped.
+  const [connectedDevice, setConnectedDevice] = useState(null);
   const [sessionState, setSessionState] = useState("idle");
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -27,6 +40,8 @@ export function useCast({ autoDiscover = true } = {}) {
   const [lastError, setLastError] = useState(null);
 
   const mountedRef = useRef(true);
+  const devicesRef = useRef([]);
+  devicesRef.current = devices;
 
   // Subscribe to push events from main
   useEffect(() => {
@@ -44,12 +59,11 @@ export function useCast({ autoDiscover = true } = {}) {
       if (Number.isFinite(s.duration) && s.duration > 0) setDuration(s.duration);
       if (Number.isFinite(s.volume)) setVolume(s.volume);
       if (typeof s.muted === "boolean") setMuted(s.muted);
-      if (s.deviceId) setCurrentDeviceId(s.deviceId);
     });
     const endedH = window.electron.onCastSessionEnded?.(() => {
       if (!mountedRef.current) return;
       setSessionState("idle");
-      setCurrentDeviceId(null);
+      setConnectedDevice(null);
       setPosition(0);
       setDuration(0);
     });
@@ -58,14 +72,9 @@ export function useCast({ autoDiscover = true } = {}) {
       setLastError(e?.message || "Cast error");
     });
 
-    // Prime device list
-    window.electron.castListDevices?.().then((list) => {
-      if (mountedRef.current && Array.isArray(list)) setDevices(list);
-    });
-
     if (autoDiscover) {
       setIsDiscovering(true);
-      window.electron.castStartDiscovery?.().finally(() => {
+      window.electron.castStartDiscovery?.(discoveryOpts()).finally(() => {
         if (mountedRef.current) setIsDiscovering(false);
       });
     }
@@ -93,13 +102,12 @@ export function useCast({ autoDiscover = true } = {}) {
     return () => clearInterval(t);
   }, [sessionState]);
 
-  const currentDevice =
-    devices.find((d) => d.id === currentDeviceId) || null;
+  const currentDevice = connectedDevice;
 
   const startDiscovery = useCallback(async () => {
     setIsDiscovering(true);
     try {
-      await window.electron?.castStartDiscovery?.();
+      await window.electron?.castStartDiscovery?.(discoveryOpts());
     } finally {
       setIsDiscovering(false);
     }
@@ -112,10 +120,14 @@ export function useCast({ autoDiscover = true } = {}) {
   const connect = useCallback(async (deviceId) => {
     setLastError(null);
     setSessionState("connecting");
+    const device =
+      devicesRef.current.find((d) => d.id === deviceId) ||
+      { id: deviceId, name: deviceId, type: "cast" };
+    setConnectedDevice(device);
     const r = await window.electron?.castConnect?.(deviceId);
-    if (r?.ok) setCurrentDeviceId(deviceId);
-    else {
+    if (!r?.ok) {
       setSessionState("idle");
+      setConnectedDevice(null);
       setLastError(r?.error || "Connect failed");
     }
     return r;
@@ -124,7 +136,7 @@ export function useCast({ autoDiscover = true } = {}) {
   const disconnect = useCallback(async () => {
     const r = await window.electron?.castDisconnect?.();
     setSessionState("idle");
-    setCurrentDeviceId(null);
+    setConnectedDevice(null);
     setPosition(0);
     setDuration(0);
     return r;
