@@ -19,3 +19,119 @@ export function applyAccentColor(presetId) {
   root.style.setProperty("--red-dim",  preset.dim);
   root.style.setProperty("--red-glow", preset.glow);
 }
+
+// ── Theme presets ─────────────────────────────────────────────────────────────
+
+/**
+ * Each theme defines the background/surface/text CSS variables.
+ * The accent colour (--red / --red2 / ...) is applied via applyAccentColor.
+ */
+export const THEME_PRESETS = [
+  {
+    id: "dark",
+    label: "Dark",
+    description: "Default dark theme",
+    vars: {
+      "--bg":       "#0a0a0a",
+      "--surface":  "#111111",
+      "--surface2": "#1a1a1a",
+      "--surface3": "#222222",
+      "--border":   "#2a2a2a",
+      "--text":     "#f0f0f0",
+      "--text2":    "#c0c0c0",
+      "--text3":    "#909090",
+    },
+  },
+  {
+    id: "amoled",
+    label: "AMOLED",
+    description: "Very black :) (for OLED displays)",
+    vars: {
+      "--bg":       "#000000",
+      "--surface":  "#080808",
+      "--surface2": "#111111",
+      "--surface3": "#181818",
+      "--border":   "#1f1f1f",
+      "--text":     "#ffffff",
+      "--text2":    "#cccccc",
+      "--text3":    "#888888",
+    },
+  },
+  {
+    id: "mocha",
+    label: "Mocha",
+    description: "Warm dark brown tones",
+    vars: {
+      "--bg":       "#0e0b09",
+      "--surface":  "#1a1410",
+      "--surface2": "#231c16",
+      "--surface3": "#2e251d",
+      "--border":   "#3a2e24",
+      "--text":     "#f0e8df",
+      "--text2":    "#c4b09a",
+      "--text3":    "#8a7060",
+    },
+  },
+  {
+    id: "slate",
+    label: "Slate",
+    description: "Cool blue-grey tones",
+    vars: {
+      "--bg":       "#0d1117",
+      "--surface":  "#161b22",
+      "--surface2": "#1f2937",
+      "--surface3": "#273344",
+      "--border":   "#30363d",
+      "--text":     "#e6edf3",
+      "--text2":    "#8b949e",
+      "--text3":    "#6e7681",
+    },
+  },
+  {
+    id: "light",
+    label: "Light",
+    description: "Very white :) (basic light theme)",
+    vars: {
+      "--bg":       "#f4f4f5",
+      "--surface":  "#ffffff",
+      "--surface2": "#f1f1f2",
+      "--surface3": "#e4e4e7",
+      "--border":   "#d4d4d8",
+      "--text":     "#18181b",
+      "--text2":    "#3f3f46",
+      "--text3":    "#71717a",
+    },
+  },
+  {
+    id: "custom",
+    label: "Custom",
+    description: "Your own colours",
+    vars: null,
+  },
+];
+
+/** Default custom theme vars (used when user first opens the custom editor). */
+export const DEFAULT_CUSTOM_VARS = {
+  "--bg":       "#0a0a0a",
+  "--surface":  "#111111",
+  "--surface2": "#1a1a1a",
+  "--surface3": "#222222",
+  "--border":   "#2a2a2a",
+  "--text":     "#f0f0f0",
+  "--text2":    "#c0c0c0",
+  "--text3":    "#909090",
+};
+
+/**
+ * Apply a theme by id.
+ * @param {string} themeId  - id from THEME_PRESETS
+ * @param {object|null} customVars - only used when themeId === "custom"
+ */
+export function applyTheme(themeId, customVars = null) {
+  const preset = THEME_PRESETS.find((t) => t.id === themeId) ?? THEME_PRESETS[0];
+  const vars = themeId === "custom" ? (customVars ?? DEFAULT_CUSTOM_VARS) : preset.vars;
+  const root = document.documentElement;
+  for (const [prop, value] of Object.entries(vars)) {
+    root.style.setProperty(prop, value);
+  }
+}

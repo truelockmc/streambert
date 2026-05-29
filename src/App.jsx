@@ -11,7 +11,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
 import WindowTitlebar from "./components/WindowTitlebar";
 import { storage, secureStorage, STORAGE_KEYS } from "./utils/storage";
-import { applyAccentColor } from "./utils/appearance";
+import { applyAccentColor, applyTheme } from "./utils/appearance";
 import { collectBackupData } from "./utils/backup";
 import { tmdbFetch, setApiErrorHandlers } from "./utils/api";
 import { clearAppCaches } from "./utils/storage";
@@ -524,6 +524,10 @@ export default function App() {
     // Accent colour
     const accent = storage.get(STORAGE_KEYS.ACCENT_COLOR) || "red";
     applyAccentColor(accent);
+    // Theme
+    const theme = storage.get(STORAGE_KEYS.THEME) || "dark";
+    const customVars = storage.get(STORAGE_KEYS.CUSTOM_THEME_VARS) || null;
+    applyTheme(theme, customVars);
     // Font size
     const font = storage.get(STORAGE_KEYS.FONT_SIZE) || "normal";
     const zoomMap = { sm: 0.85, normal: 1, lg: 1.15 };
