@@ -421,7 +421,59 @@ export default function MoviePage({
     if (!playing) return;
     const wv = webviewRef.current;
     if (!wv) return;
-    const done = () => setWebviewLoading(false);
+    const done = () => {
+      setWebviewLoading(false);
+      // Inject stall watchdog for Videasy: if video stays at t=0 with
+      // networkState=NETWORK_LOADING and nothing buffered for 20s, auto-switch
+      // to the next server in the Videasy settings panel.
+      if (playerSource === "videasy") {
+        try {
+          wv.executeJavaScript(`
+            (() => {
+              if (window.__stallWatchdog) return;
+              window.__stallWatchdog = true;
+              let stallStart = null;
+              const STALL_MS = 20000;
+              const tid = setInterval(() => {
+                const v = document.querySelector('video');
+                if (!v) return;
+                const buffered = v.buffered.length ? v.buffered.end(v.buffered.length - 1) : 0;
+                const stalling = v.networkState === 2 && buffered === 0 && v.currentTime === 0;
+                if (stalling) {
+                  if (!stallStart) stallStart = Date.now();
+                  else if (Date.now() - stallStart >= STALL_MS) {
+                    stallStart = null;
+                    // Open settings panel -> Servers tab -> click next server
+                    const settingsBtn = Array.from(document.querySelectorAll('button'))
+                      .find(b => b.querySelector('svg') && !b.innerText.trim());
+                    // Click the gear/settings icon (last icon button in controls)
+                    const iconBtns = document.querySelectorAll('button.tabbable');
+                    if (iconBtns.length) iconBtns[iconBtns.length - 1].click();
+                    setTimeout(() => {
+                      const serversTab = Array.from(document.querySelectorAll('button'))
+                        .find(b => b.innerText.trim() === 'Servers');
+                      if (serversTab) serversTab.click();
+                      setTimeout(() => {
+                        const serverBtns = Array.from(document.querySelectorAll('button'))
+                          .filter(b => b.className.includes('w-full') && b.className.includes('flex'));
+                        const activeIdx = serverBtns.findIndex(b =>
+                          b.closest('[class*=bg-]') || b.style.background || b.querySelector('[class*=active]')
+                        );
+                        const next = serverBtns[(activeIdx + 1) % serverBtns.length] || serverBtns[1] || serverBtns[0];
+                        if (next) next.click();
+                      }, 300);
+                    }, 300);
+                    clearInterval(tid);
+                  }
+                } else {
+                  stallStart = null;
+                }
+              }, 2000);
+            })()
+          `).catch(() => {});
+        } catch {}
+      }
+    };
     wv.addEventListener("did-finish-load", done);
     wv.addEventListener("did-fail-load", done);
     return () => {
