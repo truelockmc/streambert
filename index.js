@@ -277,6 +277,7 @@ function createWindow() {
   // Trigger scheduled backup after load
   mainWindow.webContents.once("did-finish-load", () => {
     _bench("renderer loaded");
+    mainWindow.focus();
     const sbSettings = storageIpc.loadScheduledBackupSettings();
     if (storageIpc.shouldRunScheduledBackup(sbSettings)) {
       mainWindow.webContents.send("scheduled-backup-requested");
