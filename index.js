@@ -7,6 +7,7 @@ const {
   BrowserWindow,
   ipcMain,
   session,
+  screen,
   webContents,
   Notification,
 } = require("electron");
@@ -29,6 +30,9 @@ app.commandLine.appendSwitch("enable-features", "NetworkServiceInProcess2");
 // Cap disk cache and limit renderer processes (prevents RAM growth on multi-page navigation)
 app.commandLine.appendSwitch("disk-cache-size", String(80 * 1024 * 1024));
 app.commandLine.appendSwitch("renderer-process-limit", "3");
+
+// Disable GPU compositing — fixes black window on secondary display (Metal compositor bug on macOS)
+app.disableHardwareAcceleration();
 
 // -- Startup benchmark ---------------------------------------------------------
 const _t0 = Date.now();
@@ -212,6 +216,7 @@ function createWindow() {
     height: 900,
     minWidth: 900,
     minHeight: 600,
+    show: false,
     backgroundColor: "#0a0a0a",
     icon: process.platform === "linux"
       ? path.join(__dirname, "public/sized/256x256.png")
@@ -277,7 +282,21 @@ function createWindow() {
   // Trigger scheduled backup after load
   mainWindow.webContents.once("did-finish-load", () => {
     _bench("renderer loaded");
+    // Position on primary display (left monitor, has menu bar) then show
+    const { bounds } = screen.getPrimaryDisplay();
+    const [w, h] = mainWindow.getSize();
+    mainWindow.setPosition(
+      Math.round(bounds.x + (bounds.width - w) / 2),
+      Math.round(bounds.y + (bounds.height - h) / 2)
+    );
+    mainWindow.show();
     mainWindow.focus();
+    // Force repaint by resizing by 1px then back
+    setTimeout(() => {
+      const [cw, ch] = mainWindow.getSize();
+      mainWindow.setSize(cw + 1, ch);
+      setTimeout(() => mainWindow.setSize(cw, ch), 50);
+    }, 300);
     const sbSettings = storageIpc.loadScheduledBackupSettings();
     if (storageIpc.shouldRunScheduledBackup(sbSettings)) {
       mainWindow.webContents.send("scheduled-backup-requested");
