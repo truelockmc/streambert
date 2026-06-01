@@ -160,6 +160,17 @@ export const PLAYER_SOURCES = [
     movieUrl: (_id) => "https://allmanga.to",
     tvUrl: (_id, _season, _ep) => "https://allmanga.to",
   },
+  {
+    id: "frembed",
+    label: "Frembed",
+    tag: "VF",
+    note: null,
+    supportsProgress: false,
+    frenchOnly: true,
+    movieUrl: (id) => `https://frembed.fun/api/film.php?id=${id}`,
+    tvUrl: (id, season, ep) =>
+      `https://frembed.fun/api/serie.php?id=${id}&sa=${season}&epi=${ep}`,
+  },
 ];
 
 export const getSourceUrl = (sourceId, type, id, season, ep) => {
@@ -176,6 +187,9 @@ export const sourceProgressViaFrames = (sourceId) =>
 
 export const sourceIsAsync = (sourceId) =>
   PLAYER_SOURCES.find((s) => s.id === sourceId)?.async ?? false;
+
+export const sourceIsFrenchOnly = (sourceId) =>
+  PLAYER_SOURCES.find((s) => s.id === sourceId)?.frenchOnly ?? false;
 
 // Sources that require a transparent webRequest intercept to load properly
 export const NEEDS_INTERCEPT = ["vidsrc", "2embed"];
@@ -390,7 +404,7 @@ export const isAnimeContent = (item, details) => {
 
 // Default sources
 export const ANIME_DEFAULT_SOURCE = "allmanga";
-export const NON_ANIME_DEFAULT_SOURCE = "vidsrc";
+export const NON_ANIME_DEFAULT_SOURCE = "videasy";
 
 // ── Episode Group fetch (localStorage + in-memory cache, 7-day TTL) ─────────
 // Episode groups almost never change -> cache aggressively across sessions.
