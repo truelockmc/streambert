@@ -29,6 +29,7 @@ const TVPage = lazy(() => import("./pages/TVPage"));
 const LibraryPage = lazy(() => import("./pages/LibraryPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const DownloadsPage = lazy(() => import("./pages/DownloadsPage"));
+const LiveTVPage = lazy(() => import("./pages/LiveTVPage"));
 import { checkForUpdates } from "./utils/updates";
 
 export default function App() {
@@ -1001,6 +1002,7 @@ export default function App() {
                 }
               />
             )}
+            {page === "livetv" && <LiveTVPage />}
           </Suspense>
         </div>
 

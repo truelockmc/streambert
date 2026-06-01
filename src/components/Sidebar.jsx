@@ -11,6 +11,7 @@ import {
   QuitIcon,
   BackIcon,
   HelpIcon,
+  LiveTVIcon,
 } from "./Icons";
 
 export default function Sidebar({
@@ -131,6 +132,12 @@ export default function Sidebar({
         icon={<DownloadsQueueIcon />}
         label="Downloads"
         badge={activeDownloads > 0 ? activeDownloads : null}
+      />
+      <SideBtn
+        active={page === "livetv"}
+        onClick={() => onNavigate("livetv")}
+        icon={<LiveTVIcon />}
+        label="Live TV"
       />
 
       <div className="sidebar-sep" />
