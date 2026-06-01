@@ -3833,3 +3833,208 @@ html[data-win-titlebar][data-maximized] .main {
 .episode-check-item:hover {
     color: var(--text) !important;
 }
+
+/* ── Live TV Page ─────────────────────────────────────────────────────────── */
+.livetv-page {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    padding: 16px 20px 0;
+    gap: 12px;
+}
+
+.livetv-filters {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.livetv-search {
+    flex: 1;
+    min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-radius: 8px;
+    color: var(--text);
+    padding: 7px 12px;
+    font-size: 13px;
+    outline: none;
+}
+.livetv-search:focus { border-color: var(--red); }
+
+.livetv-select {
+    background: var(--surface);
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-radius: 8px;
+    color: var(--text);
+    padding: 7px 10px;
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+}
+
+.livetv-count {
+    font-size: 12px;
+    color: var(--text-muted, rgba(255,255,255,0.4));
+    white-space: nowrap;
+}
+
+.livetv-grid {
+    flex: 1;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+    padding-bottom: 20px;
+    align-content: start;
+}
+
+.livetv-loading, .livetv-error, .livetv-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted, rgba(255,255,255,0.4));
+    font-size: 14px;
+}
+.livetv-error { color: var(--red); }
+
+/* Channel card */
+.iptv-card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border, rgba(255,255,255,0.06));
+    border-radius: 10px;
+    padding: 12px 10px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    text-align: center;
+    min-height: 100px;
+}
+.iptv-card:hover { background: var(--surface-hover, rgba(255,255,255,0.06)); border-color: rgba(255,255,255,0.14); }
+.iptv-card--active { border-color: var(--red) !important; background: rgba(229,9,20,0.08) !important; }
+
+.iptv-card__logo {
+    width: 56px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.iptv-card__logo img {
+    max-width: 56px;
+    max-height: 36px;
+    object-fit: contain;
+    border-radius: 4px;
+}
+.iptv-card__logo-fallback {
+    width: 44px;
+    height: 34px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-muted, rgba(255,255,255,0.4));
+}
+
+.iptv-card__info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    width: 100%;
+}
+.iptv-card__name {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.3;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+.iptv-card__quality {
+    font-size: 10px;
+    color: var(--text-muted, rgba(255,255,255,0.35));
+}
+
+.iptv-card__badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 4px;
+    letter-spacing: 0.03em;
+}
+.iptv-card__badge--geo { background: rgba(229,9,20,0.25); color: #ff6b6b; }
+.iptv-card__badge--info { background: rgba(255,193,7,0.2); color: #ffc107; }
+
+/* Player overlay */
+.livetv-player {
+    flex-shrink: 0;
+    height: 420px;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+}
+.livetv-player__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: rgba(0,0,0,0.6);
+    flex-shrink: 0;
+    gap: 10px;
+}
+.livetv-player__title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.livetv-player__logo {
+    height: 20px;
+    width: auto;
+    max-width: 50px;
+    object-fit: contain;
+}
+.livetv-player__quality {
+    font-size: 11px;
+    color: var(--text-muted, rgba(255,255,255,0.4));
+}
+.livetv-player__close {
+    background: none;
+    border: none;
+    color: var(--text-muted, rgba(255,255,255,0.4));
+    font-size: 16px;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+.livetv-player__close:hover { color: var(--text); background: rgba(255,255,255,0.08); }
+.livetv-player__webview {
+    flex: 1;
+    width: 100%;
+    border: none;
+}

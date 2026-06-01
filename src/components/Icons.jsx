@@ -345,6 +345,15 @@ export const SubtitlesIcon = ({ size = 16, ...props }) => (
   </svg>
 );
 
+export const LiveTVIcon = ({ size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="7" width="20" height="14" rx="2" />
+    <path d="M8 7L12 3l4 4" />
+    <circle cx="12" cy="14" r="2" fill="currentColor" stroke="none" />
+    <path d="M9 14h.01M15 14h.01" />
+  </svg>
+);
+
 export const PopOutIcon = ({ size = 16 }) => (
   <svg
     width={size}
