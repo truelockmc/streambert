@@ -29,6 +29,7 @@ const TVPage = lazy(() => import("./pages/TVPage"));
 const LibraryPage = lazy(() => import("./pages/LibraryPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const DownloadsPage = lazy(() => import("./pages/DownloadsPage"));
+const DiscoverPage = lazy(() => import("./discover/DiscoverPage"));
 import { checkForUpdates } from "./utils/updates";
 
 export default function App() {
@@ -999,6 +1000,12 @@ export default function App() {
                     prev.map((d) => (d.id === id ? { ...d, ...updates } : d)),
                   )
                 }
+              />
+            )}
+            {page === "discover" && (
+              <DiscoverPage
+                apiKey={apiKey}
+                onSelect={handleSelectResult}
               />
             )}
           </Suspense>
