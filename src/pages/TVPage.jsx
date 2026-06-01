@@ -20,6 +20,7 @@ import {
   sourceSupportsProgress,
   sourceProgressViaFrames,
   sourceIsAsync,
+  sourceIsFrenchOnly,
   fetchAnilistData,
   fetchEpisodeGroup,
   buildAnilistSeasons,
@@ -1778,6 +1779,34 @@ export default function TVPage({
                       title="Toggle Sub/Dub"
                     >
                       {dubMode === "sub" ? "SUB" : "DUB"}
+                    </button>
+                  )}
+                  {/* French VF toggle — switches to/from Frembed */}
+                  {playerSource !== "allmanga" && (
+                    <button
+                      className={
+                        "player-overlay-btn" +
+                        (sourceIsFrenchOnly(playerSource) ? " player-overlay-btn--active" : "")
+                      }
+                      onClick={() => {
+                        const next = sourceIsFrenchOnly(playerSource)
+                          ? storage.get("playerSourceBeforeFr") || NON_ANIME_DEFAULT_SOURCE
+                          : "frembed";
+                        if (!sourceIsFrenchOnly(playerSource)) {
+                          storage.set("playerSourceBeforeFr", playerSource);
+                        }
+                        setPlayerSource(next);
+                        storage.set("playerSource", next);
+                        setM3u8Url(null);
+                        setInterceptedSubs([]);
+                        setResolvedPlayerUrl(null);
+                        setResolvingUrl(false);
+                        setResolveError(null);
+                      }}
+                      title={sourceIsFrenchOnly(playerSource) ? "Switch back to original source" : "Switch to French dubbed (VF)"}
+                      style={sourceIsFrenchOnly(playerSource) ? { color: "var(--red)" } : undefined}
+                    >
+                      🇫🇷 VF
                     </button>
                   )}
                   {/* Blocked ads & trackers button */}
