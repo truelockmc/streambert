@@ -1871,8 +1871,6 @@ function SubtitleSettingsSection() {
   const [wyzieApiKey, setWyzieApiKey] = useState("");
   const [showWyzieKey, setShowWyzieKey] = useState(false);
   const [wyzieCopied, setWyzieCopied] = useState(false);
-  const [wyzieRedeeming, setWyzieRedeeming] = useState(false);
-  const [wyzieError, setWyzieError] = useState("");
   const [wyzieClearConfirm, setWyzieClearConfirm] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -1888,39 +1886,6 @@ function SubtitleSettingsSection() {
 
   const hasSubdlKey = subdlApiKey.trim().length > 0;
   const hasWyzieKey = wyzieApiKey.trim().length > 0;
-
-  const handleWyzieRedeem = async () => {
-    if (!window.electron) return;
-    setWyzieRedeeming(true);
-    setWyzieError("");
-    try {
-      const res = await window.electron.wyzieOpenRedeem();
-      if (res.cancelled) {
-        setWyzieRedeeming(false);
-        return;
-      }
-      if (res.timeout) {
-        setWyzieError(
-          "No key received within 10 seconds. Try again or enter it manually.",
-        );
-        setWyzieRedeeming(false);
-        return;
-      }
-      if (res.ok && res.key) {
-        // Key came from redirect URL — save directly, no extra validation
-        setWyzieApiKey(res.key);
-        await secureStorage.set(STORAGE_KEYS.WYZIE_API_KEY, res.key);
-        setWyzieError("");
-      } else {
-        setWyzieError(
-          "Could not extract key automatically. Try entering it manually.",
-        );
-      }
-    } catch (e) {
-      setWyzieError(e.message);
-    }
-    setWyzieRedeeming(false);
-  };
 
   const handleWyzieCopy = () => {
     navigator.clipboard.writeText(wyzieApiKey.trim()).then(() => {
@@ -2062,7 +2027,26 @@ function SubtitleSettingsSection() {
                 lineHeight: 1.5,
               }}
             >
-              Required for Wyzie Subs. Claim a free key, no account needed.
+              Required for Wyzie Subs. Get a free key by following the tutorial.{" "}
+              <button
+                className="btn btn-ghost"
+                style={{
+                  display: "inline",
+                  padding: 0,
+                  fontSize: 12,
+                  color: "var(--accent)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+                onClick={() =>
+                  window.electron?.openExternal(
+                    "https://github.com/truelockmc/streambert/wyzie-tutorial.md",
+                  )
+                }
+              >
+                How to get a key ↗
+              </button>
             </div>
             <div
               style={{
@@ -2103,47 +2087,15 @@ function SubtitleSettingsSection() {
                   style={{ padding: "6px 12px", fontSize: 12 }}
                   onClick={() =>
                     window.electron?.openExternal(
-                      `https://sub.wyzie.io/notice?key=${wyzieApiKey.trim()}`,
+                      `https://store.wyzie.io/dashboard?key=${wyzieApiKey.trim()}`,
                     )
                   }
-                  title="Open notice page for this key"
+                  title="Open your wyzie dashboard"
                 >
-                  Notice ↗
+                  Dashboard ↗
                 </button>
               )}
-              {wyzieRedeeming ? (
-                <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                  Opening redeem page…
-                </span>
-              ) : !hasWyzieKey ? (
-                <button
-                  className="btn btn-ghost"
-                  style={{
-                    padding: "6px 12px",
-                    fontSize: 12,
-                    color: "var(--accent)",
-                  }}
-                  onClick={handleWyzieRedeem}
-                >
-                  Get free key ↗
-                </button>
-              ) : null}
             </div>
-            {wyzieError && (
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 12,
-                  color: "#ff6060",
-                  padding: "6px 10px",
-                  borderRadius: 6,
-                  background: "rgba(255,80,80,0.08)",
-                  border: "1px solid rgba(255,80,80,0.2)",
-                }}
-              >
-                {wyzieError}
-              </div>
-            )}
           </div>
 
           {/* SubDL API key */}
