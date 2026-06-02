@@ -79,6 +79,18 @@ chmod +x Streambert-x64.AppImage && ./Streambert-x64.AppImage
 
 Download the latest `Streambert Setup *.exe` from the [Releases](https://github.com/truelockmc/streambert/releases/latest) page and run it.
 
+### macOS
+Download the latest `Streambert-*-universal.dmg` from the [Releases](https://github.com/truelockmc/streambert/releases/latest) page, open it and drag Streambert to your Applications folder.
+
+Alternatively, you can build from source:
+```bash
+git clone https://github.com/truelockmc/streambert.git
+cd streambert
+npm install
+npm run dist:mac
+```
+The built `.app` will appear in the `dist/` folder.
+
 ---
 
 
