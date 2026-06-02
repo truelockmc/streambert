@@ -8,7 +8,13 @@ import {
   clearAppCaches,
 } from "../utils/storage";
 import { clearTmdbCache } from "../utils/api";
-import { ACCENT_PRESETS, applyAccentColor, THEME_PRESETS, applyTheme, DEFAULT_CUSTOM_VARS } from "../utils/appearance";
+import {
+  ACCENT_PRESETS,
+  applyAccentColor,
+  THEME_PRESETS,
+  applyTheme,
+  DEFAULT_CUSTOM_VARS,
+} from "../utils/appearance";
 import { SUBTITLE_LANGUAGES } from "../utils/subtitles";
 import { DEFAULT_INVIDIOUS_BASE } from "../components/TrailerModal";
 import { RATING_COUNTRIES } from "../utils/ageRating";
@@ -1204,11 +1210,15 @@ function AppearanceSection() {
   const [noAnim, setNoAnim] = useState(
     () => !!storage.get(STORAGE_KEYS.REDUCE_ANIMATIONS),
   );
+  const [accentInPlayer, setAccentInPlayer] = useState(
+    () => storage.get(STORAGE_KEYS.ACCENT_IN_PLAYER) !== false,
+  );
   const [theme, setTheme] = useState(
     () => storage.get(STORAGE_KEYS.THEME) || "dark",
   );
   const [customVars, setCustomVars] = useState(
-    () => storage.get(STORAGE_KEYS.CUSTOM_THEME_VARS) || { ...DEFAULT_CUSTOM_VARS },
+    () =>
+      storage.get(STORAGE_KEYS.CUSTOM_THEME_VARS) || { ...DEFAULT_CUSTOM_VARS },
   );
   const [showCustomEditor, setShowCustomEditor] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -1216,8 +1226,10 @@ function AppearanceSection() {
   // Remember the committed (saved) values to revert on unmount if unsaved
   const committedRef = useRef({
     accent: storage.get(STORAGE_KEYS.ACCENT_COLOR) || "red",
-    theme:  storage.get(STORAGE_KEYS.THEME) || "dark",
-    customVars: storage.get(STORAGE_KEYS.CUSTOM_THEME_VARS) || { ...DEFAULT_CUSTOM_VARS },
+    theme: storage.get(STORAGE_KEYS.THEME) || "dark",
+    customVars: storage.get(STORAGE_KEYS.CUSTOM_THEME_VARS) || {
+      ...DEFAULT_CUSTOM_VARS,
+    },
   });
   const savedRef = useRef(false);
 
@@ -1250,6 +1262,7 @@ function AppearanceSection() {
 
   const handleSave = () => {
     storage.set(STORAGE_KEYS.ACCENT_COLOR, accent);
+    storage.set(STORAGE_KEYS.ACCENT_IN_PLAYER, accentInPlayer);
     storage.set(STORAGE_KEYS.FONT_SIZE, fontSize);
     storage.set(STORAGE_KEYS.COMPACT_MODE, compact ? 1 : 0);
     storage.set(STORAGE_KEYS.REDUCE_ANIMATIONS, noAnim ? 1 : 0);
@@ -1268,19 +1281,21 @@ function AppearanceSection() {
     // Mark as saved so the cleanup effect doesn't revert
     savedRef.current = true;
     committedRef.current = { accent, theme, customVars };
+    // Notify App.jsx so playerSettings prop (accent + lang) is refreshed
+    window.dispatchEvent(new CustomEvent("streambert:player-settings-changed"));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
   const CUSTOM_VAR_LABELS = {
-    "--bg":       "Background",
-    "--surface":  "Surface",
+    "--bg": "Background",
+    "--surface": "Surface",
     "--surface2": "Surface 2",
     "--surface3": "Surface 3",
-    "--border":   "Border",
-    "--text":     "Text",
-    "--text2":    "Text 2",
-    "--text3":    "Text 3",
+    "--border": "Border",
+    "--text": "Text",
+    "--text2": "Text 2",
+    "--text3": "Text 3",
   };
 
   return (
@@ -1335,8 +1350,8 @@ function AppearanceSection() {
                     t.id === "custom"
                       ? `linear-gradient(135deg, ${customVars["--bg"]} 50%, ${customVars["--surface2"]} 50%)`
                       : t.vars
-                      ? `linear-gradient(135deg, ${t.vars["--bg"]} 50%, ${t.vars["--surface2"]} 50%)`
-                      : "var(--surface3)",
+                        ? `linear-gradient(135deg, ${t.vars["--bg"]} 50%, ${t.vars["--surface2"]} 50%)`
+                        : "var(--surface3)",
                   border: "1px solid rgba(255,255,255,0.08)",
                   flexShrink: 0,
                 }}
@@ -1389,7 +1404,9 @@ function AppearanceSection() {
                   <input
                     type="color"
                     value={customVars[prop] || "#000000"}
-                    onChange={(e) => handleCustomVarChange(prop, e.target.value)}
+                    onChange={(e) =>
+                      handleCustomVarChange(prop, e.target.value)
+                    }
                     style={{
                       width: 32,
                       height: 32,
@@ -1402,10 +1419,22 @@ function AppearanceSection() {
                     }}
                   />
                   <div>
-                    <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: "var(--text)",
+                        fontWeight: 500,
+                      }}
+                    >
                       {label}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--text3)", fontFamily: "monospace" }}>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text3)",
+                        fontFamily: "monospace",
+                      }}
+                    >
                       {customVars[prop]}
                     </div>
                   </div>
@@ -1451,7 +1480,10 @@ function AppearanceSection() {
           {ACCENT_PRESETS.map((p) => (
             <button
               key={p.id}
-              onClick={() => { setAccent(p.id); applyAccentColor(p.id); }}
+              onClick={() => {
+                setAccent(p.id);
+                applyAccentColor(p.id);
+              }}
               title={p.label}
               style={{
                 width: 32,
@@ -1475,6 +1507,28 @@ function AppearanceSection() {
         <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>
           {ACCENT_PRESETS.find((p) => p.id === accent)?.label}, applied to
           buttons, highlights, and indicators.
+        </div>
+        {/* Accent in streaming player */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginTop: 14,
+          }}
+        >
+          <Toggle value={accentInPlayer} onChange={setAccentInPlayer} />
+          <div>
+            <div
+              style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}
+            >
+              Apply accent colour to streaming player
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
+              Passes the selected accent colour to the player source (Videasy,
+              Vidking). VidSrc does not support colour theming.
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1776,7 +1830,14 @@ function TmdbLanguageSection() {
         from TMDB. Changing this clears the metadata cache so updated content
         loads immediately.
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
         <SettingsSelect
           value={lang}
           onChange={(v) => setLang(v)}
@@ -1786,7 +1847,9 @@ function TmdbLanguageSection() {
           Save
         </button>
         {saved && (
-          <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved, cache cleared</span>
+          <span style={{ fontSize: 13, color: "#48c774" }}>
+            ✓ Saved, cache cleared
+          </span>
         )}
       </div>
     </div>
@@ -1871,6 +1934,8 @@ function SubtitleSettingsSection() {
     storage.set(STORAGE_KEYS.SUBTITLE_LANG, lang);
     secureStorage.set(STORAGE_KEYS.SUBDL_API_KEY, subdlApiKey.trim());
     secureStorage.set(STORAGE_KEYS.WYZIE_API_KEY, wyzieApiKey.trim());
+    // refresh playerSettings prop (subtitle lang)
+    window.dispatchEvent(new CustomEvent("streambert:player-settings-changed"));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };

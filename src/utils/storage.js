@@ -61,6 +61,7 @@ export const STORAGE_KEYS = {
   WYZIE_API_KEY: "wyzieApiKey",
   // Appearance & behaviour
   ACCENT_COLOR: "accentColor",
+  ACCENT_IN_PLAYER: "accentInPlayer",
   THEME: "theme",
   CUSTOM_THEME_VARS: "customThemeVars",
   FONT_SIZE: "fontSize",

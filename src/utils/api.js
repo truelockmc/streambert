@@ -115,6 +115,11 @@ export const tmdbFetch = async (path, apiKey) => {
   return data;
 };
 
+// Documentation:
+// https://www.videasy.net/docs
+// https://vsembed.su/api/
+// https://www.vidking.net/#documentation
+
 // ── Player Sources ────────────────────────────────────────────────────────────
 // supportsProgress: true = executeJavaScript tracking works for this source
 export const PLAYER_SOURCES = [
@@ -124,6 +129,8 @@ export const PLAYER_SOURCES = [
     tag: null,
     note: null,
     supportsProgress: true,
+    colorParam: "color", // hex without # → e.g. "e50914"
+    langParam: null, // no subtitle lang param
     params: {
       overlay: "true",
     },
@@ -138,6 +145,8 @@ export const PLAYER_SOURCES = [
     note: null,
     supportsProgress: true,
     progressViaFrames: true, // video is in a nested iframe, needs main-process frame query
+    colorParam: null, // vidsrc doesn't support color param
+    langParam: "ds_lang", // ISO 639-1 language code
     params: {},
     movieUrl: (id) => `https://vsembed.su/embed/movie/${id}`,
     tvUrl: (id, season, ep) =>
@@ -149,7 +158,11 @@ export const PLAYER_SOURCES = [
     tag: null,
     note: null,
     supportsProgress: true,
-    params: {},
+    colorParam: "color", // hex without # → e.g. "e50914"
+    langParam: null,
+    params: {
+      autoPlay: "true",
+    },
     movieUrl: (id) => `https://www.vidking.net/embed/movie/${id}`,
     tvUrl: (id, season, ep) =>
       `https://www.vidking.net/embed/tv/${id}/${season}/${ep}`,
@@ -173,6 +186,9 @@ export const getSourceUrl = (
   season,
   ep,
   extraParams = {},
+  // Optional: accent hex (with or without #) and subtitle ISO lang code
+  accentColor = null,
+  subtitleLang = null,
 ) => {
   const src =
     PLAYER_SOURCES.find((s) => s.id === sourceId) ?? PLAYER_SOURCES[0];
@@ -183,6 +199,16 @@ export const getSourceUrl = (
   Object.entries(src.params || {}).forEach(([key, value]) => {
     url.searchParams.set(key, value);
   });
+
+  // Inject accent color into the player if the source supports it
+  if (accentColor && src.colorParam) {
+    url.searchParams.set(src.colorParam, accentColor.replace(/^#/, ""));
+  }
+
+  if (subtitleLang && src.langParam) {
+    url.searchParams.set(src.langParam, subtitleLang);
+  }
+
   Object.entries(extraParams).forEach(([key, value]) => {
     if (value != null) {
       url.searchParams.set(key, value);

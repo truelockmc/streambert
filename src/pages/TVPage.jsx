@@ -350,6 +350,7 @@ const INJECT_SKIP_CONTROLS = `
 export default function TVPage({
   item,
   apiKey,
+  playerSettings,
   onSave,
   isSaved,
   onHistory,
@@ -382,6 +383,10 @@ export default function TVPage({
   const [playerSource, setPlayerSource] = useState(
     () => storage.get("playerSource") || NON_ANIME_DEFAULT_SOURCE,
   );
+  // Accent colour + subtitle lang come from App-level state (via props),
+  // so they are always fresh after Settings save without any extra storage reads.
+  const playerAccentColor = playerSettings?.accentColor ?? null;
+  const playerSubLang = playerSettings?.subtitleLang ?? null;
   const [showSourceMenu, setShowSourceMenu] = useState(false);
   // Derived from playerSource, computed once per render instead of 5-6× inline
   const isAsync = useMemo(() => sourceIsAsync(playerSource), [playerSource]);
@@ -1678,6 +1683,9 @@ export default function TVPage({
                             item.id,
                             playerEp.season,
                             playerEp.episode,
+                            {},
+                            playerAccentColor,
+                            playerSubLang,
                           )
                   }
                   partition="persist:player"
@@ -1767,6 +1775,9 @@ export default function TVPage({
                             item.id,
                             playerEp.season,
                             playerEp.episode,
+                            {},
+                            playerAccentColor,
+                            playerSubLang,
                           );
                       if (!url) return;
                       pipUrlRef.current = url;

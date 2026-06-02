@@ -54,6 +54,7 @@ import {
 export default function MoviePage({
   item,
   apiKey,
+  playerSettings,
   onSave,
   isSaved,
   onHistory,
@@ -79,6 +80,11 @@ export default function MoviePage({
   const [playerSource, setPlayerSource] = useState(
     () => storage.get("playerSource") || NON_ANIME_DEFAULT_SOURCE,
   );
+
+  // Accent colour + subtitle lang come from App-level state (via props),
+  // so they are always fresh after Settings save without any extra storage reads.
+  const playerAccentColor = playerSettings?.accentColor ?? null;
+  const playerSubLang = playerSettings?.subtitleLang ?? null;
   const progressViaFrames = useMemo(
     () => sourceProgressViaFrames(playerSource),
     [playerSource],
@@ -902,7 +908,16 @@ export default function MoviePage({
                   ? "about:blank"
                   : sourceIsAsync(playerSource)
                     ? resolvedPlayerUrl || "about:blank"
-                    : getSourceUrl(playerSource, "movie", item.id, null, null)
+                    : getSourceUrl(
+                        playerSource,
+                        "movie",
+                        item.id,
+                        null,
+                        null,
+                        {},
+                        playerAccentColor,
+                        playerSubLang,
+                      )
               }
               partition="persist:player"
               allowpopups="false"
@@ -980,7 +995,16 @@ export default function MoviePage({
                   }
                   const url = sourceIsAsync(playerSource)
                     ? resolvedPlayerUrl
-                    : getSourceUrl(playerSource, "movie", item.id, null, null);
+                    : getSourceUrl(
+                        playerSource,
+                        "movie",
+                        item.id,
+                        null,
+                        null,
+                        {},
+                        playerAccentColor,
+                        playerSubLang,
+                      );
                   if (!url) return;
                   pipUrlRef.current = url;
                   window.electron?.openPipWindow?.(url, item.title);
