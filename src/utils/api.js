@@ -124,6 +124,9 @@ export const PLAYER_SOURCES = [
     tag: null,
     note: null,
     supportsProgress: true,
+    params: {
+      overlay: "true",
+    },
     movieUrl: (id) => `https://player.videasy.net/movie/${id}`,
     tvUrl: (id, season, ep) =>
       `https://player.videasy.net/tv/${id}/${season}/${ep}`,
@@ -135,6 +138,7 @@ export const PLAYER_SOURCES = [
     note: null,
     supportsProgress: true,
     progressViaFrames: true, // video is in a nested iframe, needs main-process frame query
+    params: {},
     movieUrl: (id) => `https://vsembed.su/embed/movie/${id}`,
     tvUrl: (id, season, ep) =>
       `https://vsembed.su/embed/tv/${id}/${season}/${ep}`,
@@ -145,6 +149,7 @@ export const PLAYER_SOURCES = [
     tag: null,
     note: null,
     supportsProgress: true,
+    params: {},
     movieUrl: (id) => `https://www.vidking.net/embed/movie/${id}`,
     tvUrl: (id, season, ep) =>
       `https://www.vidking.net/embed/tv/${id}/${season}/${ep}`,
@@ -156,15 +161,35 @@ export const PLAYER_SOURCES = [
     note: null,
     supportsProgress: true,
     async: true,
+    params: {},
     movieUrl: (_id) => "https://allmanga.to",
     tvUrl: (_id, _season, _ep) => "https://allmanga.to",
   },
 ];
-
-export const getSourceUrl = (sourceId, type, id, season, ep) => {
+export const getSourceUrl = (
+  sourceId,
+  type,
+  id,
+  season,
+  ep,
+  extraParams = {},
+) => {
   const src =
     PLAYER_SOURCES.find((s) => s.id === sourceId) ?? PLAYER_SOURCES[0];
-  return type === "movie" ? src.movieUrl(id) : src.tvUrl(id, season, ep);
+  const baseUrl =
+    type === "movie" ? src.movieUrl(id) : src.tvUrl(id, season, ep);
+  const url = new URL(baseUrl);
+
+  Object.entries(src.params || {}).forEach(([key, value]) => {
+    url.searchParams.set(key, value);
+  });
+  Object.entries(extraParams).forEach(([key, value]) => {
+    if (value != null) {
+      url.searchParams.set(key, value);
+    }
+  });
+
+  return url.toString();
 };
 
 export const sourceSupportsProgress = (sourceId) =>
