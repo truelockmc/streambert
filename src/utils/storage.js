@@ -72,6 +72,10 @@ export const STORAGE_KEYS = {
   // Intro skip (anime only, allmanga source)
   // Values: "off" | "auto" | "manual"
   INTRO_SKIP_MODE: "introSkipMode",
+  // Autoplay next preferences
+  AUTOPLAY_NEXT_ENABLED: "autoplayNextEnabled",
+  AUTOPLAY_NEXT_DURATION: "autoplayNextDuration",
+  AUTOPLAY_NEXT_LAYOUT: "autoplayNextLayout",
   // Download page UI preferences
   DL_SORT_BY: "dlSortBy",
   DL_SORT_DIR: "dlSortDir",

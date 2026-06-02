@@ -2830,6 +2830,15 @@ export default function SettingsPage({
   const [introSkipMode, setIntroSkipMode] = useState(
     () => storage.get(STORAGE_KEYS.INTRO_SKIP_MODE) || "off",
   );
+  const [autoplayNextEnabled, setAutoplayNextEnabled] = useState(
+    () => storage.get(STORAGE_KEYS.AUTOPLAY_NEXT_ENABLED) ?? true,
+  );
+  const [autoplayNextDuration, setAutoplayNextDuration] = useState(
+    () => storage.get(STORAGE_KEYS.AUTOPLAY_NEXT_DURATION) ?? 5,
+  );
+  const [autoplayNextLayout, setAutoplayNextLayout] = useState(
+    () => storage.get(STORAGE_KEYS.AUTOPLAY_NEXT_LAYOUT) || "right",
+  );
   const [saved, setSaved] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetHovered, setResetHovered] = useState(false);
@@ -3399,6 +3408,103 @@ export default function SettingsPage({
               </div>
             )}
           </div>
+
+          <Divider />
+
+          {/* Autoplay Next Episode */}
+          <div style={{ marginBottom: 40 }}>
+            <div className="settings-section-title">Autoplay Next Episode</div>
+            <div
+              style={{
+                fontSize: 13,
+                color: "var(--text3)",
+                marginBottom: 16,
+                lineHeight: 1.6,
+              }}
+            >
+              Configure how the player behaves when an episode finishes.
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Enable/Disable Toggle */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Toggle
+                  value={autoplayNextEnabled}
+                  onChange={(val) => {
+                    setAutoplayNextEnabled(val);
+                    storage.set(STORAGE_KEYS.AUTOPLAY_NEXT_ENABLED, val);
+                    flash();
+                  }}
+                />
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>
+                    Enable Autoplay Next
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
+                    Automatically play the next episode when the current one ends.
+                  </div>
+                </div>
+              </div>
+
+              {autoplayNextEnabled && (
+                <>
+                  {/* Duration input */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)" }}>
+                      Countdown Duration
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>
+                      Number of seconds to display the countdown. Set to 0 to only show the buttons and not autoplay automatically.
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <input
+                        type="number"
+                        min={0}
+                        max={60}
+                        className="apikey-input"
+                        style={{ width: 90, marginBottom: 0 }}
+                        value={autoplayNextDuration}
+                        onChange={(e) => setAutoplayNextDuration(e.target.value)}
+                        onBlur={() => {
+                          const num = Math.max(0, Math.min(60, parseInt(autoplayNextDuration, 10) || 0));
+                          setAutoplayNextDuration(num);
+                          storage.set(STORAGE_KEYS.AUTOPLAY_NEXT_DURATION, num);
+                          flash();
+                        }}
+                      />
+                      <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                        seconds
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Overlay Layout selection */}
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)", marginBottom: 8 }}>
+                      Overlay Position
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>
+                      Choose which side of the player the next episode thumbnail and details are shown.
+                    </div>
+                    <SettingsSelect
+                      value={autoplayNextLayout}
+                      onChange={(val) => {
+                        setAutoplayNextLayout(val);
+                        storage.set(STORAGE_KEYS.AUTOPLAY_NEXT_LAYOUT, val);
+                        flash();
+                      }}
+                      options={[
+                        { value: "left", label: "Left Side" },
+                        { value: "right", label: "Right Side" },
+                      ]}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <Divider />
 
           {/* Intro Skip */}
           <div style={{ marginBottom: 40 }}>
