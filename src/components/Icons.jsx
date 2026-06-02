@@ -345,6 +345,13 @@ export const SubtitlesIcon = ({ size = 16, ...props }) => (
   </svg>
 );
 
+export const DiscoverIcon = ({ size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88 16.24,7.76" fill="currentColor" stroke="none" />
+  </svg>
+);
+
 export const PopOutIcon = ({ size = 16 }) => (
   <svg
     width={size}

@@ -1,0 +1,71 @@
+name: build-discover-page
+description: Build a WebGL Voronoi movie discovery page in Streambert (nothing-to-watch style)
+
+nodes:
+  - id: plan
+    prompt: |
+      You are building a new "Discover" page for Streambert — an Electron + Vite + React desktop app at /Volumes/SanDisk/dev/projects/streambert.
+
+      The feature: a WebGL force-directed Voronoi diagram showing movie poster thumbnails (inspired by https://github.com/gnovotny/nothing-to-watch, MIT licensed). User pans/zooms, hovers to preview, clicks to open MoviePage.
+
+      Read the following files to understand the codebase:
+      - src/App.jsx (routing, how pages are wired)
+      - src/components/Sidebar.jsx (nav structure)
+      - src/components/Icons.jsx (icon pattern)
+      - src/utils/api.js (TMDB fetch, imgUrl, PLAYER_SOURCES)
+      - src/styles/global.css (CSS variables, patterns)
+      - package.json (existing deps)
+
+      Then produce a detailed implementation plan covering:
+      1. New npm dependencies needed (ogl for WebGL2, zustand already used?)
+      2. File structure: which files to create, which to modify
+      3. Data pipeline: how to fetch TMDB popular/top-rated movies and build the film dataset (paginate to get ~2000 movies, cache to localStorage)
+      4. Texture atlas approach: since we can't pre-bake atlases, use individual poster JPGs loaded as textures per cell (the "uncompressed single" approach from nothing-to-watch)
+      5. WebGL engine: custom OGL-based renderer — cells as quads, each textured with a poster, force-directed simulation for layout, pan/zoom controls
+      6. Hover preview card: floating div showing title, year, rating, genres — follows cursor
+      7. Click handler: calls onSelect(item) to navigate to existing MoviePage
+      8. Sidebar integration: new "Discover" nav icon
+      9. Performance targets: handle 500-2000 cells at 60fps in Electron WebGL2
+      10. Replacement GLSL shaders (no CC BY-NC-SA dependency)
+
+      Output the plan as structured markdown. Be specific about file paths and API shapes.
+
+  - id: implement
+    depends_on: [plan]
+    loop:
+      prompt: |
+        You are implementing the Discover page for Streambert based on this plan:
+
+        $plan.output
+
+        The repo is at /Volumes/SanDisk/dev/projects/streambert on the main branch.
+
+        Work through the implementation in order:
+        1. Install dependencies (ogl via npm if not present, check package.json first)
+        2. Create src/utils/discover.js — TMDB film fetcher + localStorage cache (fetch popular + top_rated movies, paginate 10 pages each, dedupe by id, store {id, title, release_date, poster_path, vote_average, genre_ids, overview})
+        3. Create src/discover/ directory with:
+           - engine.js — OGL WebGL2 engine: force simulation, camera pan/zoom, cell quads with poster textures, hover detection via raycasting
+           - shaders.js — GLSL vertex + fragment shaders (MIT, no CC) for cell rendering
+           - DiscoverPage.jsx — React component mounting the canvas, hover preview card, click → onSelect
+        4. Add DiscoverIcon to src/components/Icons.jsx
+        5. Add Discover nav item to src/components/Sidebar.jsx
+        6. Add lazy import + route for DiscoverPage in src/App.jsx
+        7. Add CSS for DiscoverPage in src/styles/global.css
+        8. Run: cd /Volumes/SanDisk/dev/projects/streambert && npm install && node_modules/.bin/vite build
+        9. Fix any build errors
+
+        After each file is written, continue to the next. Don't stop until the build succeeds.
+
+        When the build passes with no errors, output: <promise>COMPLETE</promise>
+      until: COMPLETE
+      max_iterations: 15
+      fresh_context: false
+
+  - id: verify
+    depends_on: [implement]
+    bash: |
+      cd /Volumes/SanDisk/dev/projects/streambert
+      node_modules/.bin/vite build 2>&1 | tail -5
+      echo "---"
+      grep -l "DiscoverPage\|discover" src/App.jsx src/components/Sidebar.jsx 2>/dev/null && echo "wired up"
+      ls src/discover/ 2>/dev/null && echo "discover dir exists"
