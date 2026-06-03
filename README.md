@@ -82,15 +82,6 @@ Download the latest `Streambert Setup *.exe` from the [Releases](https://github.
 ### macOS
 Download the latest `Streambert-*-universal.dmg` from the [Releases](https://github.com/truelockmc/streambert/releases/latest) page, open it and drag Streambert to your Applications folder.
 
-Alternatively, you can build from source:
-```bash
-git clone https://github.com/truelockmc/streambert.git
-cd streambert
-npm install
-npm run dist:mac
-```
-The built `.app` will appear in the `dist/` folder.
-
 ---
 
 
@@ -101,11 +92,11 @@ npm install
 ```
 2. Build
 ```bash
-npm run dist:win
+npm run dist:win   
 ```
 or
 ```bash
-npm run dist:linux
+npm run dist:linux 
 ```
 or (for Arch Linux)
 ```bash
@@ -114,6 +105,22 @@ npm run dist:arch
 or (for an AppImage only)
 ```bash
 npm run dist:appimage
+```
+or (for a .deb only)
+```bash
+npm run dist:deb
+```
+or (for a .rpm only)
+```bash
+npm run dist:rpm
+```
+or (for macOS)
+```bash
+npm run dist:mac
+```
+or (build all platforms at once)
+```bash
+npm run dist
 ```
 
 > [!IMPORTANT]
