@@ -1,6 +1,25 @@
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const IMG_BASE = "https://image.tmdb.org/t/p";
 
+// ── TMDB metadata language ────────────────────────────────────────────────────
+// Read lazily from localStorage so it always reflects the current setting.
+// Falls back to "en-US".
+function getTmdbLanguage() {
+  try {
+    const raw = localStorage.getItem("streambert_tmdbLang");
+    return raw ? JSON.parse(raw) : "en-US";
+  } catch {
+    return "en-US";
+  }
+}
+
+// Append the language query param to a TMDB path.
+function withLanguage(path) {
+  const lang = getTmdbLanguage();
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}language=${lang}`;
+}
+
 export const imgUrl = (path, size = "w500") =>
   path ? `${IMG_BASE}/${size}${path}` : null;
 
@@ -17,6 +36,15 @@ export const setApiErrorHandlers = (onAuth, onUnreachable) => {
 // TTL: 5 minutes
 const _tmdbCache = new Map(); // key → { data, expiresAt }
 const TMDB_CACHE_TTL = 5 * 60 * 1000;
+
+/** Clears the in-memory TMDB cache and the persisted trending cache.
+ * Calling this when the metadata language changes. */
+export function clearTmdbCache() {
+  _tmdbCache.clear();
+  try {
+    localStorage.removeItem("streambert_trendingCache");
+  } catch {}
+}
 
 // ── Request queue (max 4 concurrent TMDB fetches) ────────────────────────────
 // Prevents bursts of 10-20 parallel requests from carousel/similar-rows rapid
@@ -42,7 +70,8 @@ function _releaseSlot() {
 }
 
 export const tmdbFetch = async (path, apiKey) => {
-  const cacheKey = `${apiKey}|${path}`;
+  const localizedPath = withLanguage(path);
+  const cacheKey = `${apiKey}|${localizedPath}`;
   const cached = _tmdbCache.get(cacheKey);
   if (cached && Date.now() < cached.expiresAt) return cached.data;
 
@@ -50,7 +79,7 @@ export const tmdbFetch = async (path, apiKey) => {
 
   let res;
   try {
-    res = await fetch(`${TMDB_BASE}${path}`, {
+    res = await fetch(`${TMDB_BASE}${localizedPath}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
   } catch {
@@ -86,6 +115,11 @@ export const tmdbFetch = async (path, apiKey) => {
   return data;
 };
 
+// Documentation:
+// https://www.videasy.net/docs
+// https://vsembed.su/api/
+// https://www.vidking.net/#documentation
+
 // ── Player Sources ────────────────────────────────────────────────────────────
 // supportsProgress: true = executeJavaScript tracking works for this source
 export const PLAYER_SOURCES = [
@@ -95,6 +129,11 @@ export const PLAYER_SOURCES = [
     tag: null,
     note: null,
     supportsProgress: true,
+    colorParam: "color", // hex without # → e.g. "e50914"
+    langParam: null, // no subtitle lang param
+    params: {
+      overlay: "true",
+    },
     movieUrl: (id) => `https://player.videasy.net/movie/${id}`,
     tvUrl: (id, season, ep) =>
       `https://player.videasy.net/tv/${id}/${season}/${ep}`,
@@ -106,20 +145,27 @@ export const PLAYER_SOURCES = [
     note: null,
     supportsProgress: true,
     progressViaFrames: true, // video is in a nested iframe, needs main-process frame query
-    movieUrl: (id) => `https://vidsrc.to/embed/movie/${id}`,
+    colorParam: null, // vidsrc doesn't support color param
+    langParam: "ds_lang", // ISO 639-1 language code
+    params: {},
+    movieUrl: (id) => `https://vsembed.su/embed/movie/${id}`,
     tvUrl: (id, season, ep) =>
-      `https://vidsrc.to/embed/tv/${id}/${season}/${ep}`,
+      `https://vsembed.su/embed/tv/${id}/${season}/${ep}`,
   },
   {
-    id: "2embed",
-    label: "2Embed",
+    id: "vidking",
+    label: "Vidking",
     tag: null,
-    note: "unstable",
+    note: null,
     supportsProgress: true,
-    progressViaFrames: true,
-    movieUrl: (id) => `https://www.2embed.online/embed/movie/${id}`,
+    colorParam: "color", // hex without # → e.g. "e50914"
+    langParam: null,
+    params: {
+      autoPlay: "true",
+    },
+    movieUrl: (id) => `https://www.vidking.net/embed/movie/${id}`,
     tvUrl: (id, season, ep) =>
-      `https://www.2embed.online/embed/tv/${id}/${season}/${ep}`,
+      `https://www.vidking.net/embed/tv/${id}/${season}/${ep}`,
   },
   {
     id: "allmanga",
@@ -128,15 +174,48 @@ export const PLAYER_SOURCES = [
     note: null,
     supportsProgress: true,
     async: true,
+    params: {},
     movieUrl: (_id) => "https://allmanga.to",
     tvUrl: (_id, _season, _ep) => "https://allmanga.to",
   },
 ];
-
-export const getSourceUrl = (sourceId, type, id, season, ep) => {
+export const getSourceUrl = (
+  sourceId,
+  type,
+  id,
+  season,
+  ep,
+  extraParams = {},
+  // Optional: accent hex (with or without #) and subtitle ISO lang code
+  accentColor = null,
+  subtitleLang = null,
+) => {
   const src =
     PLAYER_SOURCES.find((s) => s.id === sourceId) ?? PLAYER_SOURCES[0];
-  return type === "movie" ? src.movieUrl(id) : src.tvUrl(id, season, ep);
+  const baseUrl =
+    type === "movie" ? src.movieUrl(id) : src.tvUrl(id, season, ep);
+  const url = new URL(baseUrl);
+
+  Object.entries(src.params || {}).forEach(([key, value]) => {
+    url.searchParams.set(key, value);
+  });
+
+  // Inject accent color into the player if the source supports it
+  if (accentColor && src.colorParam) {
+    url.searchParams.set(src.colorParam, accentColor.replace(/^#/, ""));
+  }
+
+  if (subtitleLang && src.langParam) {
+    url.searchParams.set(src.langParam, subtitleLang);
+  }
+
+  Object.entries(extraParams).forEach(([key, value]) => {
+    if (value != null) {
+      url.searchParams.set(key, value);
+    }
+  });
+
+  return url.toString();
 };
 
 export const sourceSupportsProgress = (sourceId) =>
@@ -148,8 +227,19 @@ export const sourceProgressViaFrames = (sourceId) =>
 export const sourceIsAsync = (sourceId) =>
   PLAYER_SOURCES.find((s) => s.id === sourceId)?.async ?? false;
 
+// Return the next non-async source after `currentId` in PLAYER_SOURCES order
+export const getNextNonAsyncSource = (currentId) => {
+  const nonAsync = PLAYER_SOURCES.filter((s) => !s.async);
+  if (nonAsync.length === 0) return null;
+  const idx = nonAsync.findIndex((s) => s.id === currentId);
+  // If currentId is itself non-async, return the next one (wrap around).
+  // If currentId is async (e.g. AllManga), just return the first non-async.
+  if (idx < 0) return nonAsync[0].id;
+  return nonAsync[(idx + 1) % nonAsync.length].id;
+};
+
 // Sources that require a transparent webRequest intercept to load properly
-export const NEEDS_INTERCEPT = ["vidsrc", "2embed"];
+export const NEEDS_INTERCEPT = ["vidsrc"];
 
 // ── AniList API (anime metadata) ──────────────────────────────────────────────
 const ANILIST_API = "https://graphql.anilist.co";
@@ -349,7 +439,7 @@ export const buildAnilistSeasons = (anilistData) => {
   return all.map((s, i) => ({ seasonNum: i + 1, ...s }));
 };
 
-// TMDB genre ID 16 = Animation. We treat it as anime when origin_country includes JP or language is jp
+// TMDB genre ID 16 = Animation. Treat it as anime when origin_country includes JP or language is jp
 export const isAnimeContent = (item, details) => {
   const d = details || item;
   const lang = d.original_language;
@@ -361,10 +451,10 @@ export const isAnimeContent = (item, details) => {
 
 // Default sources
 export const ANIME_DEFAULT_SOURCE = "allmanga";
-export const NON_ANIME_DEFAULT_SOURCE = "vidsrc";
+export const NON_ANIME_DEFAULT_SOURCE = "vidking";
 
 // ── Episode Group fetch (localStorage + in-memory cache, 7-day TTL) ─────────
-// Episode groups almost never change, so we cache aggressively across sessions.
+// Episode groups almost never change -> cache aggressively across sessions.
 const EG_CACHE_KEY = "streambert_episodeGroupCache";
 const EG_CACHE_TTL = 1000 * 60 * 60 * 24 * 7; // 7 days
 

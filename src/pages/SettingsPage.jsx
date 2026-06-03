@@ -7,7 +7,14 @@ import {
   isElectron,
   clearAppCaches,
 } from "../utils/storage";
-import { ACCENT_PRESETS, applyAccentColor } from "../utils/appearance";
+import { clearTmdbCache } from "../utils/api";
+import {
+  ACCENT_PRESETS,
+  applyAccentColor,
+  THEME_PRESETS,
+  applyTheme,
+  DEFAULT_CUSTOM_VARS,
+} from "../utils/appearance";
 import { SUBTITLE_LANGUAGES } from "../utils/subtitles";
 import { DEFAULT_INVIDIOUS_BASE } from "../components/TrailerModal";
 import { RATING_COUNTRIES } from "../utils/ageRating";
@@ -1203,27 +1210,259 @@ function AppearanceSection() {
   const [noAnim, setNoAnim] = useState(
     () => !!storage.get(STORAGE_KEYS.REDUCE_ANIMATIONS),
   );
+  const [accentInPlayer, setAccentInPlayer] = useState(
+    () => storage.get(STORAGE_KEYS.ACCENT_IN_PLAYER) !== false,
+  );
+  const [theme, setTheme] = useState(
+    () => storage.get(STORAGE_KEYS.THEME) || "dark",
+  );
+  const [customVars, setCustomVars] = useState(
+    () =>
+      storage.get(STORAGE_KEYS.CUSTOM_THEME_VARS) || { ...DEFAULT_CUSTOM_VARS },
+  );
+  const [showCustomEditor, setShowCustomEditor] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Remember the committed (saved) values to revert on unmount if unsaved
+  const committedRef = useRef({
+    accent: storage.get(STORAGE_KEYS.ACCENT_COLOR) || "red",
+    theme: storage.get(STORAGE_KEYS.THEME) || "dark",
+    customVars: storage.get(STORAGE_KEYS.CUSTOM_THEME_VARS) || {
+      ...DEFAULT_CUSTOM_VARS,
+    },
+  });
+  const savedRef = useRef(false);
+
+  // Revert live preview when leaving without saving
+  useEffect(() => {
+    return () => {
+      if (!savedRef.current) {
+        const { accent, theme, customVars } = committedRef.current;
+        applyAccentColor(accent);
+        applyTheme(theme, theme === "custom" ? customVars : null);
+      }
+    };
+  }, []);
+
+  const handleThemeSelect = (id) => {
+    setTheme(id);
+    if (id !== "custom") {
+      applyTheme(id);
+    } else {
+      applyTheme("custom", customVars);
+      setShowCustomEditor(true);
+    }
+  };
+
+  const handleCustomVarChange = (prop, value) => {
+    const next = { ...customVars, [prop]: value };
+    setCustomVars(next);
+    applyTheme("custom", next);
+  };
 
   const handleSave = () => {
     storage.set(STORAGE_KEYS.ACCENT_COLOR, accent);
+    storage.set(STORAGE_KEYS.ACCENT_IN_PLAYER, accentInPlayer);
     storage.set(STORAGE_KEYS.FONT_SIZE, fontSize);
     storage.set(STORAGE_KEYS.COMPACT_MODE, compact ? 1 : 0);
     storage.set(STORAGE_KEYS.REDUCE_ANIMATIONS, noAnim ? 1 : 0);
+    storage.set(STORAGE_KEYS.THEME, theme);
+    if (theme === "custom") {
+      storage.set(STORAGE_KEYS.CUSTOM_THEME_VARS, customVars);
+    }
     // Apply immediately
     applyAccentColor(accent);
+    applyTheme(theme, theme === "custom" ? customVars : null);
     const zoomMap = { sm: 0.85, normal: 1, lg: 1.15 };
     if (window.electron?.setZoomFactor)
       window.electron.setZoomFactor(zoomMap[fontSize] ?? 1);
     document.body.classList.toggle("compact-mode", compact);
     document.body.classList.toggle("no-anim", noAnim);
+    // Mark as saved so the cleanup effect doesn't revert
+    savedRef.current = true;
+    committedRef.current = { accent, theme, customVars };
+    // Notify App.jsx so playerSettings prop (accent + lang) is refreshed
+    window.dispatchEvent(new CustomEvent("streambert:player-settings-changed"));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const CUSTOM_VAR_LABELS = {
+    "--bg": "Background",
+    "--surface": "Surface",
+    "--surface2": "Surface 2",
+    "--surface3": "Surface 3",
+    "--border": "Border",
+    "--text": "Text",
+    "--text2": "Text 2",
+    "--text3": "Text 3",
   };
 
   return (
     <div style={{ marginBottom: 40 }}>
       <div className="settings-section-title">Appearance</div>
+
+      {/* Theme */}
+      <div style={{ marginBottom: 24 }}>
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: "var(--text2)",
+            marginBottom: 10,
+          }}
+        >
+          Theme
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {THEME_PRESETS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => handleThemeSelect(t.id)}
+              title={t.description}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 6,
+                padding: "10px 14px",
+                borderRadius: "var(--radius)",
+                background:
+                  theme === t.id
+                    ? "color-mix(in srgb, var(--red) 15%, var(--surface2))"
+                    : "var(--surface2)",
+                border:
+                  theme === t.id
+                    ? "1.5px solid var(--red)"
+                    : "1.5px solid var(--border)",
+                cursor: "pointer",
+                transition: "border-color 0.15s, background 0.15s",
+                minWidth: 70,
+              }}
+            >
+              {/* Mini preview swatch */}
+              <div
+                style={{
+                  width: 40,
+                  height: 28,
+                  borderRadius: 4,
+                  background:
+                    t.id === "custom"
+                      ? `linear-gradient(135deg, ${customVars["--bg"]} 50%, ${customVars["--surface2"]} 50%)`
+                      : t.vars
+                        ? `linear-gradient(135deg, ${t.vars["--bg"]} 50%, ${t.vars["--surface2"]} 50%)`
+                        : "var(--surface3)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: theme === t.id ? 600 : 400,
+                  color: theme === t.id ? "var(--text)" : "var(--text2)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {t.label}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>
+          {THEME_PRESETS.find((t) => t.id === theme)?.description}
+        </div>
+      </div>
+
+      {/* Custom theme editor */}
+      {theme === "custom" && (
+        <div style={{ marginBottom: 24 }}>
+          <button
+            onClick={() => setShowCustomEditor((v) => !v)}
+            className="btn btn-ghost"
+            style={{ fontSize: 12, padding: "5px 12px", marginBottom: 12 }}
+          >
+            {showCustomEditor ? "▲ Hide" : "▼ Edit"} custom colours
+          </button>
+          {showCustomEditor && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                gap: 12,
+                padding: 16,
+                background: "var(--surface2)",
+                borderRadius: "var(--radius)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              {Object.entries(CUSTOM_VAR_LABELS).map(([prop, label]) => (
+                <div
+                  key={prop}
+                  style={{ display: "flex", alignItems: "center", gap: 8 }}
+                >
+                  <input
+                    type="color"
+                    value={customVars[prop] || "#000000"}
+                    onChange={(e) =>
+                      handleCustomVarChange(prop, e.target.value)
+                    }
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 4,
+                      border: "1px solid var(--border)",
+                      cursor: "pointer",
+                      background: "none",
+                      padding: 2,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: "var(--text)",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {label}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text3)",
+                        fontFamily: "monospace",
+                      }}
+                    >
+                      {customVars[prop]}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  display: "flex",
+                  gap: 8,
+                  marginTop: 4,
+                }}
+              >
+                <button
+                  className="btn btn-ghost"
+                  style={{ fontSize: 12, padding: "5px 12px" }}
+                  onClick={() => {
+                    setCustomVars({ ...DEFAULT_CUSTOM_VARS });
+                    applyTheme("custom", DEFAULT_CUSTOM_VARS);
+                  }}
+                >
+                  Reset to defaults
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Accent Colour */}
       <div style={{ marginBottom: 24 }}>
@@ -1241,7 +1480,10 @@ function AppearanceSection() {
           {ACCENT_PRESETS.map((p) => (
             <button
               key={p.id}
-              onClick={() => setAccent(p.id)}
+              onClick={() => {
+                setAccent(p.id);
+                applyAccentColor(p.id);
+              }}
               title={p.label}
               style={{
                 width: 32,
@@ -1265,6 +1507,28 @@ function AppearanceSection() {
         <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>
           {ACCENT_PRESETS.find((p) => p.id === accent)?.label}, applied to
           buttons, highlights, and indicators.
+        </div>
+        {/* Accent in streaming player */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginTop: 14,
+          }}
+        >
+          <Toggle value={accentInPlayer} onChange={setAccentInPlayer} />
+          <div>
+            <div
+              style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}
+            >
+              Apply accent colour to streaming player
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
+              Passes the selected accent colour to the player source (Videasy,
+              Vidking). VidSrc does not support colour theming.
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1513,6 +1777,85 @@ function StartPageSection() {
   );
 }
 
+// ── TMDB Metadata Language ────────────────────────────────────────────────────
+const TMDB_LANGUAGES = [
+  { value: "en-US", label: "English (en-US)" },
+  { value: "de-DE", label: "Deutsch (de-DE)" },
+  { value: "fr-FR", label: "Français (fr-FR)" },
+  { value: "es-ES", label: "Español (es-ES)" },
+  { value: "it-IT", label: "Italiano (it-IT)" },
+  { value: "pt-BR", label: "Português (Brasil) (pt-BR)" },
+  { value: "nl-NL", label: "Nederlands (nl-NL)" },
+  { value: "pl-PL", label: "Polski (pl-PL)" },
+  { value: "sv-SE", label: "Svenska (sv-SE)" },
+  { value: "nb-NO", label: "Norsk (nb-NO)" },
+  { value: "da-DK", label: "Dansk (da-DK)" },
+  { value: "fi-FI", label: "Suomi (fi-FI)" },
+  { value: "tr-TR", label: "Türkçe (tr-TR)" },
+  { value: "ru-RU", label: "Русский (ru-RU)" },
+  { value: "ja-JP", label: "日本語 (ja-JP)" },
+  { value: "ko-KR", label: "한국어 (ko-KR)" },
+  { value: "zh-CN", label: "中文 (简体) (zh-CN)" },
+  { value: "ar-SA", label: "العربية (ar-SA)" },
+];
+
+function TmdbLanguageSection() {
+  const [lang, setLang] = useState(
+    () => storage.get(STORAGE_KEYS.TMDB_LANG) || "en-US",
+  );
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    storage.set(STORAGE_KEYS.TMDB_LANG, lang);
+    // Clear in-memory cache
+    clearTmdbCache();
+    // Notify App.jsx to re-fetch trending data immediately.
+    window.dispatchEvent(new CustomEvent("streambert:tmdb-lang-changed"));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">Metadata Language</div>
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--text3)",
+          marginBottom: 16,
+          lineHeight: 1.6,
+        }}
+      >
+        Language used when fetching titles, descriptions, and other metadata
+        from TMDB. Changing this clears the metadata cache so updated content
+        loads immediately.
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <SettingsSelect
+          value={lang}
+          onChange={(v) => setLang(v)}
+          options={TMDB_LANGUAGES}
+        />
+        <button className="btn btn-primary" onClick={handleSave}>
+          Save
+        </button>
+        {saved && (
+          <span style={{ fontSize: 13, color: "#48c774" }}>
+            ✓ Saved, cache cleared
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Subtitle Settings ─────────────────────────────────────────────────────────
 function SubtitleSettingsSection() {
   const [enabled, setEnabled] = useState(
@@ -1528,8 +1871,6 @@ function SubtitleSettingsSection() {
   const [wyzieApiKey, setWyzieApiKey] = useState("");
   const [showWyzieKey, setShowWyzieKey] = useState(false);
   const [wyzieCopied, setWyzieCopied] = useState(false);
-  const [wyzieRedeeming, setWyzieRedeeming] = useState(false);
-  const [wyzieError, setWyzieError] = useState("");
   const [wyzieClearConfirm, setWyzieClearConfirm] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -1546,39 +1887,6 @@ function SubtitleSettingsSection() {
   const hasSubdlKey = subdlApiKey.trim().length > 0;
   const hasWyzieKey = wyzieApiKey.trim().length > 0;
 
-  const handleWyzieRedeem = async () => {
-    if (!window.electron) return;
-    setWyzieRedeeming(true);
-    setWyzieError("");
-    try {
-      const res = await window.electron.wyzieOpenRedeem();
-      if (res.cancelled) {
-        setWyzieRedeeming(false);
-        return;
-      }
-      if (res.timeout) {
-        setWyzieError(
-          "No key received within 10 seconds. Try again or enter it manually.",
-        );
-        setWyzieRedeeming(false);
-        return;
-      }
-      if (res.ok && res.key) {
-        // Key came from redirect URL — save directly, no extra validation
-        setWyzieApiKey(res.key);
-        await secureStorage.set(STORAGE_KEYS.WYZIE_API_KEY, res.key);
-        setWyzieError("");
-      } else {
-        setWyzieError(
-          "Could not extract key automatically. Try entering it manually.",
-        );
-      }
-    } catch (e) {
-      setWyzieError(e.message);
-    }
-    setWyzieRedeeming(false);
-  };
-
   const handleWyzieCopy = () => {
     navigator.clipboard.writeText(wyzieApiKey.trim()).then(() => {
       setWyzieCopied(true);
@@ -1591,6 +1899,8 @@ function SubtitleSettingsSection() {
     storage.set(STORAGE_KEYS.SUBTITLE_LANG, lang);
     secureStorage.set(STORAGE_KEYS.SUBDL_API_KEY, subdlApiKey.trim());
     secureStorage.set(STORAGE_KEYS.WYZIE_API_KEY, wyzieApiKey.trim());
+    // refresh playerSettings prop (subtitle lang)
+    window.dispatchEvent(new CustomEvent("streambert:player-settings-changed"));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -1717,7 +2027,26 @@ function SubtitleSettingsSection() {
                 lineHeight: 1.5,
               }}
             >
-              Required for Wyzie Subs. Claim a free key, no account needed.
+              Required for Wyzie Subs. Get a free key by following the tutorial.{" "}
+              <button
+                className="btn btn-ghost"
+                style={{
+                  display: "inline",
+                  padding: 0,
+                  fontSize: 12,
+                  color: "var(--accent)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+                onClick={() =>
+                  window.electron?.openExternal(
+                    "https://github.com/truelockmc/streambert/wyzie-tutorial.md",
+                  )
+                }
+              >
+                How to get a key ↗
+              </button>
             </div>
             <div
               style={{
@@ -1758,47 +2087,15 @@ function SubtitleSettingsSection() {
                   style={{ padding: "6px 12px", fontSize: 12 }}
                   onClick={() =>
                     window.electron?.openExternal(
-                      `https://sub.wyzie.io/notice?key=${wyzieApiKey.trim()}`,
+                      `https://store.wyzie.io/dashboard?key=${wyzieApiKey.trim()}`,
                     )
                   }
-                  title="Open notice page for this key"
+                  title="Open your wyzie dashboard"
                 >
-                  Notice ↗
+                  Dashboard ↗
                 </button>
               )}
-              {wyzieRedeeming ? (
-                <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                  Opening redeem page…
-                </span>
-              ) : !hasWyzieKey ? (
-                <button
-                  className="btn btn-ghost"
-                  style={{
-                    padding: "6px 12px",
-                    fontSize: 12,
-                    color: "var(--accent)",
-                  }}
-                  onClick={handleWyzieRedeem}
-                >
-                  Get free key ↗
-                </button>
-              ) : null}
             </div>
-            {wyzieError && (
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 12,
-                  color: "#ff6060",
-                  padding: "6px 10px",
-                  borderRadius: 6,
-                  background: "rgba(255,80,80,0.08)",
-                  border: "1px solid rgba(255,80,80,0.2)",
-                }}
-              >
-                {wyzieError}
-              </div>
-            )}
           </div>
 
           {/* SubDL API key */}
@@ -2056,6 +2353,12 @@ const SECTION_NAV = [
       "startup",
       "auto",
       "app",
+      "language",
+      "metadata",
+      "locale",
+      "german",
+      "french",
+      "spanish",
     ],
   },
   {
@@ -3122,7 +3425,7 @@ export default function SettingsPage({
         <div ref={secUpdates} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
             title="General"
-            subtitle="App version, updates, and API credentials"
+            subtitle="App version, updates, API credentials and Languages"
           />
 
           {/* Version & Updates */}
@@ -3169,6 +3472,10 @@ export default function SettingsPage({
               </button>
             </div>
           </div>
+
+          <Divider />
+
+          <TmdbLanguageSection />
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
@@ -3692,7 +3999,7 @@ export default function SettingsPage({
             )}
             {!downloadPath && (
               <div style={{ marginTop: 10, fontSize: 13, color: "var(--red)" }}>
-                ⚠ No download folder set — videos cannot be downloaded until you
+                ⚠ No download folder set - videos cannot be downloaded until you
                 set one.
               </div>
             )}

@@ -3,6 +3,9 @@
 [![Issues Badge](https://img.shields.io/github/issues/truelockmc/streambert?style=for-the-badge)](https://github.com/truelockmc/streambert/issues)
 [![Closed Issues Badge](https://img.shields.io/github/issues-closed/truelockmc/streambert?color=%238256d0&style=for-the-badge)](https://github.com/truelockmc/streambert/issues?q=is%3Aissue+is%3Aclosed)<br>
 
+[![GitHub](https://img.shields.io/badge/GitHub-truelockmc%2Fstreambert-181717?style=for-the-badge&logo=github)](https://github.com/truelockmc/streambert)
+[![Codeberg](https://img.shields.io/badge/Codeberg-truelockmc%2Fstreambert-2185D0?style=for-the-badge&logo=codeberg)](https://codeberg.org/truelockmc/streambert)
+[![AUR Version](https://img.shields.io/aur/version/streambert-bin?style=for-the-badge&logo=archlinux)](https://aur.archlinux.org/packages/streambert-bin)
 # Streambert
 A cross-platform Electron Desktop App to stream and download any Movie, TV Series or Anime in the World. Zero Ads and Tracking <br></br>
 ![Logo](public/logo.svg)
@@ -106,6 +109,15 @@ npm run dist:appimage
 > - **libcrypt.so.1 error:** `sudo pacman -S libxcrypt-compat`
 > - **http-parser dependency error:** `yay -S http-parser` (from AUR)
 
+## License
+This project is open-source software licensed under the GNU General Public License v3.0 [(GPL-3.0)](LICENSE).
+
+Forks may be created but they MUST stay open-sourced.
+
+## Contributing
+Everyone is welcome to contribute to this project.
+Before contributing please make sure to read the [Contributing Guidelines](CONTRIBUTING.md) and act accordingly.
+
 ## Legal Disclaimer
 
 **IMPORTANT: This application is for educational and personal use only.**
@@ -127,8 +139,11 @@ This application is provided "as is" for educational purposes. The developer:
 - Does not control third-party content providers
 - Encourages users to support content creators through legal means
 
----
-## Project Structure
+[![RepoStars](https://repostars.dev/api/embed?repo=truelockmc%2Fstreambert&theme=dark)](https://repostars.dev/?repos=truelockmc%2Fstreambert&theme=dark)
+
+<details>
+    <summary>Project Structure</summary>
+    
 ```
 Project Root
 ├── index.html
@@ -212,3 +227,4 @@ Project Root
         ├── useBlockedStats.js
         └── useRatings.js
 ```
+</details>

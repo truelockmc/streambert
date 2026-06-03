@@ -300,15 +300,15 @@ body,
     content: "";
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
+    background: color-mix(in srgb, var(--bg) 35%, transparent);
 }
 
 .hero-gradient {
     position: absolute;
     inset: 0;
     background:
-        linear-gradient(to right, rgba(10, 10, 10, 0.95) 30%, transparent 70%),
-        linear-gradient(to top, var(--bg) 0%, transparent 40%);
+        linear-gradient(to right, var(--bg) 0%, color-mix(in srgb, var(--bg) 90%, transparent) 25%, transparent 65%),
+        linear-gradient(to top, var(--bg) 0%, transparent 45%);
 }
 
 .hero-content {
@@ -406,13 +406,13 @@ body,
 }
 
 .btn-secondary {
-    background: rgba(255, 255, 255, 0.1);
+    background: color-mix(in srgb, var(--text) 8%, transparent);
     color: var(--text);
     border: 1px solid var(--border);
 }
 
 .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: color-mix(in srgb, var(--text) 13%, transparent);
 }
 
 .btn-ghost {
@@ -535,7 +535,7 @@ body.no-anim *::after {
 .card-overlay {
     position: absolute;
     inset: 0;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, transparent 50%);
+    background: linear-gradient(to top, color-mix(in srgb, var(--bg) 88%, transparent) 0%, transparent 55%);
     opacity: 0;
     transition: opacity 0.25s;
     display: flex;
@@ -603,7 +603,7 @@ body.no-anim *::after {
     left: 0;
     right: 0;
     height: 3px;
-    background: rgba(255, 255, 255, 0.1);
+    background: color-mix(in srgb, var(--text) 10%, transparent);
 }
 
 .card-progress-fill {
@@ -629,7 +629,7 @@ body.no-anim *::after {
     position: fixed;
     inset: 0;
     z-index: 200;
-    background: rgba(0, 0, 0, 0.8);
+    background: color-mix(in srgb, var(--bg) 75%, transparent);
     backdrop-filter: blur(8px);
     display: flex;
     flex-direction: column;
@@ -644,7 +644,7 @@ body.no-anim *::after {
     border: 1px solid var(--border);
     border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.8);
+    box-shadow: 0 24px 60px color-mix(in srgb, var(--bg) 70%, transparent);
 }
 
 .search-input-wrap {
@@ -873,7 +873,7 @@ body.no-anim *::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.55);
+    background: color-mix(in srgb, var(--bg) 45%, transparent);
 }
 
 .detail-gradient {
@@ -904,7 +904,7 @@ body.no-anim *::after {
     flex-shrink: 0;
     border-radius: var(--radius);
     overflow: hidden;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 8px 32px color-mix(in srgb, var(--bg) 55%, transparent);
     border: 1px solid var(--border);
     background: var(--surface3);
     aspect-ratio: 2/3;
@@ -1135,14 +1135,14 @@ body.no-anim *::after {
 .episode-playing-badge {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.55);
+    background: color-mix(in srgb, var(--bg) 55%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
     font-size: 11px;
     font-weight: 700;
-    color: #fff;
+    color: var(--text);
     letter-spacing: 0.06em;
     text-transform: uppercase;
     border-radius: 5px;
@@ -1222,7 +1222,7 @@ body.no-anim *::after {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.5);
+    background: color-mix(in srgb, var(--bg) 50%, transparent);
     opacity: 0;
     transition: opacity 0.2s;
 }
@@ -1296,7 +1296,7 @@ body.no-anim *::after {
 .ep-desc-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.65);
+    background: color-mix(in srgb, var(--bg) 62%, transparent);
     z-index: 1200;
     display: flex;
     align-items: center;
@@ -1313,7 +1313,7 @@ body.no-anim *::after {
     display: flex;
     flex-direction: column;
     gap: 14px;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 16px 40px color-mix(in srgb, var(--bg) 55%, transparent);
 }
 
 .ep-desc-popup-title {
@@ -1434,7 +1434,7 @@ body.no-anim *::after {
     position: fixed;
     inset: 0;
     z-index: 300;
-    background: rgba(0, 0, 0, 0.95);
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1521,8 +1521,8 @@ body.no-anim *::after {
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-top-color: #fff;
+    border: 2px solid color-mix(in srgb, var(--text) 30%, transparent);
+    border-top-color: var(--text);
     animation: spin 0.65s linear infinite;
     flex-shrink: 0;
 }
@@ -1623,7 +1623,7 @@ body.no-anim *::after {
     padding: 12px 20px;
     border-radius: var(--radius);
     font-size: 14px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--bg) 45%, transparent);
     animation: slideUp 0.3s ease;
 }
 
@@ -1734,9 +1734,9 @@ kbd {
     top: 12px;
     right: 12px;
     z-index: 10;
-    background: rgba(0, 0, 0, 0.72);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    color: white;
+    background: color-mix(in srgb, var(--bg) 80%, transparent);
+    border: 1px solid var(--border);
+    color: var(--text);
     border-radius: 8px;
     padding: 7px 12px;
     cursor: pointer;
@@ -1810,7 +1810,7 @@ kbd {
     position: fixed;
     inset: 0;
     z-index: 99999;
-    background: rgba(0, 0, 0, 0.75);
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
     backdrop-filter: blur(6px);
     display: flex;
     align-items: center;
@@ -1824,7 +1824,7 @@ kbd {
     border-radius: 14px;
     width: 560px;
     max-width: 100%;
-    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.8);
+    box-shadow: 0 32px 60px color-mix(in srgb, var(--bg) 70%, transparent);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -2057,7 +2057,7 @@ kbd {
     z-index: 4;
     line-height: 0;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.55);
+    background: color-mix(in srgb, var(--bg) 52%, transparent);
     padding: 3px;
     box-shadow: 0 0 8px rgba(72, 199, 116, 0.5);
     animation: watchedPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
@@ -2070,7 +2070,7 @@ kbd {
     z-index: 4;
     line-height: 0;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.6);
+    background: color-mix(in srgb, var(--bg) 58%, transparent);
     padding: 5px;
     box-shadow: 0 0 12px rgba(72, 199, 116, 0.6);
     animation: watchedPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
@@ -2137,11 +2137,11 @@ kbd {
     position: fixed;
     z-index: 9999;
     background: var(--surface2, #1e1e2e);
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 4px;
     min-width: 180px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+    box-shadow: 0 8px 28px color-mix(in srgb, var(--bg) 50%, transparent);
     animation: ctxFadeIn 0.1s ease both;
 }
 
@@ -2174,7 +2174,7 @@ kbd {
 }
 
 .context-menu-item:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
 .saved-thumb.drag-over {
@@ -2191,7 +2191,7 @@ kbd {
     position: fixed;
     inset: 0;
     z-index: 9999;
-    background: rgba(0, 0, 0, 0.85);
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2206,7 +2206,7 @@ kbd {
     border-radius: 12px;
     border: 1px solid var(--border);
     overflow: hidden;
-    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.8);
+    box-shadow: 0 24px 60px color-mix(in srgb, var(--bg) 70%, transparent);
     animation: slideUp 0.25s ease;
 }
 
@@ -2251,7 +2251,7 @@ kbd {
 }
 
 .trailer-close-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: color-mix(in srgb, var(--text) 10%, transparent);
     color: var(--text);
 }
 
@@ -2278,7 +2278,7 @@ kbd {
     position: fixed;
     inset: 0;
     z-index: 99999;
-    background: rgba(0, 0, 0, 0.75);
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2298,7 +2298,7 @@ kbd {
     gap: 16px;
     box-shadow:
         0 0 0 1px rgba(229, 9, 20, 0.15),
-        0 32px 80px rgba(0, 0, 0, 0.8),
+        0 32px 60px color-mix(in srgb, var(--bg) 70%, transparent),
         0 0 60px rgba(229, 9, 20, 0.08);
     animation: slideUp 0.2s ease;
 }
@@ -2399,8 +2399,8 @@ kbd {
     font-weight: 700;
     letter-spacing: 0.5px;
     text-transform: uppercase;
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: color-mix(in srgb, var(--text) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--text) 20%, transparent);
     color: var(--text);
 }
 
@@ -2436,7 +2436,7 @@ kbd {
 .episode-restricted-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.65);
+    background: color-mix(in srgb, var(--bg) 62%, transparent);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -2449,7 +2449,7 @@ kbd {
 .episode-restricted-overlay span {
     font-size: 10px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--text2);
     text-align: center;
     letter-spacing: 0.3px;
     padding: 0 6px;
@@ -2459,9 +2459,9 @@ kbd {
     position: absolute;
     top: 7px;
     left: 7px;
-    background: rgba(0, 0, 0, 0.78);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    color: #fff;
+    background: color-mix(in srgb, var(--bg) 80%, transparent);
+    border: 1px solid var(--border);
+    color: var(--text);
     font-size: 9px;
     font-weight: 700;
     letter-spacing: 0.5px;
@@ -2487,8 +2487,8 @@ kbd {
     gap: 8px;
     padding: 6px 14px;
     border-radius: 20px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
     margin-bottom: 16px;
     font-size: 13px;
     font-weight: 600;
@@ -2528,7 +2528,7 @@ kbd {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.55);
+    background: color-mix(in srgb, var(--bg) 52%, transparent);
     gap: 6px;
 }
 
@@ -2538,7 +2538,7 @@ kbd {
     color: #ffd700;
     letter-spacing: 0.5px;
     text-transform: uppercase;
-    background: rgba(0, 0, 0, 0.6);
+    background: color-mix(in srgb, var(--bg) 58%, transparent);
     padding: 4px 10px;
     border-radius: 6px;
 }
@@ -2682,7 +2682,7 @@ kbd {
 
 .dl-search-bar__close:hover {
     color: var(--text);
-    background: rgba(255, 255, 255, 0.08);
+    background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
 /* ── Downloads toolbar ────────────────────────────────────────────────────── */
@@ -2737,7 +2737,7 @@ kbd {
 }
 
 .dl-toolbar__sort-btn:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: color-mix(in srgb, var(--text) 6%, transparent);
     color: var(--text2);
 }
 
@@ -2768,7 +2768,7 @@ kbd {
 }
 
 .dl-toolbar__dir-btn:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: color-mix(in srgb, var(--text) 6%, transparent);
     color: var(--text);
     border-color: var(--text3);
 }
@@ -2787,12 +2787,12 @@ kbd {
 }
 
 .dl-toolbar__toggle:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: color-mix(in srgb, var(--text) 5%, transparent);
     color: var(--text2);
 }
 
 .dl-toolbar__toggle--on {
-    background: rgba(255, 255, 255, 0.05);
+    background: color-mix(in srgb, var(--text) 5%, transparent);
     border-color: var(--border);
     color: var(--text2);
 }
@@ -2814,7 +2814,7 @@ kbd {
 
 .dl-toolbar__search-hint:hover {
     color: var(--text2);
-    background: rgba(255, 255, 255, 0.05);
+    background: color-mix(in srgb, var(--text) 5%, transparent);
 }
 
 .dl-toolbar__search-hint-key {
@@ -3091,7 +3091,7 @@ kbd {
     border-radius: 10px;
     padding: 6px;
     min-width: 180px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 12px 32px color-mix(in srgb, var(--bg) 60%, transparent);
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -3117,7 +3117,7 @@ kbd {
 }
 
 .source-dropdown__item:hover {
-    background: rgba(255, 255, 255, 0.07);
+    background: color-mix(in srgb, var(--text) 7%, transparent);
     color: var(--text);
 }
 
@@ -3181,7 +3181,7 @@ kbd {
     bottom: 10px;
     left: 12px;
     font-size: 10px;
-    color: rgba(255, 255, 255, 0.45);
+    color: var(--text3);
     pointer-events: none;
     letter-spacing: 0.3px;
 }
@@ -3307,12 +3307,12 @@ kbd {
 }
 
 .carousel-item--active {
-    filter: drop-shadow(0 8px 36px rgba(0, 0, 0, 0.8));
+    filter: drop-shadow(0 8px 36px color-mix(in srgb, var(--bg) 75%, transparent));
 }
 .carousel-item--active .carousel-poster-wrap {
     box-shadow:
-        0 0 0 2px rgba(255, 255, 255, 0.12),
-        0 12px 40px rgba(0, 0, 0, 0.6);
+        0 0 0 2px color-mix(in srgb, var(--text) 12%, transparent),
+        0 12px 36px color-mix(in srgb, var(--bg) 55%, transparent);
 }
 
 .carousel-poster-wrap {
@@ -3350,7 +3350,7 @@ kbd {
 .carousel-unreleased-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: color-mix(in srgb, var(--bg) 68%, transparent);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -3375,7 +3375,7 @@ kbd {
 
 .carousel-unreleased-date {
     font-size: 10px;
-    color: rgba(255, 255, 255, 0.6);
+    color: color-mix(in srgb, var(--text) 60%, transparent);
     letter-spacing: 0.2px;
     text-align: center;
     line-height: 1.3;
@@ -3389,7 +3389,7 @@ kbd {
     display: flex;
     align-items: center;
     gap: 3px;
-    background: rgba(0, 0, 0, 0.75);
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
     color: #f5c518;
     font-size: 11px;
     font-weight: 600;
@@ -3431,9 +3431,9 @@ kbd {
     letter-spacing: 0.4px;
     padding: 1px 5px;
     border-radius: 3px;
-    border: 1.5px solid rgba(255, 255, 255, 0.55);
-    background: rgba(0, 0, 0, 0.65);
-    color: rgba(255, 255, 255, 0.9);
+    border: 1.5px solid color-mix(in srgb, var(--text) 50%, transparent);
+    background: color-mix(in srgb, var(--bg) 62%, transparent);
+    color: var(--text);
     backdrop-filter: blur(3px);
     line-height: 1.5;
 }
@@ -3487,7 +3487,7 @@ kbd {
     top: 40%;
     transform: translateY(-50%);
     z-index: 20;
-    background: rgba(18, 18, 18, 0.8);
+    background: color-mix(in srgb, var(--bg) 80%, transparent);
     border: 1px solid var(--border);
     color: var(--text);
     width: 34px;
@@ -3561,7 +3561,7 @@ kbd {
     border-radius: 6px;
     padding: 4px 0;
     min-width: 180px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--bg) 38%, transparent);
     user-select: none;
 }
 
@@ -3627,7 +3627,7 @@ kbd {
     position: fixed;
     inset: 0;
     z-index: 9000;
-    background: rgba(0, 0, 0, 0.78);
+    background: color-mix(in srgb, var(--bg) 75%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3641,7 +3641,7 @@ kbd {
     max-height: 520px;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.85);
+    box-shadow: 0 24px 60px color-mix(in srgb, var(--bg) 75%, transparent);
     overflow: hidden;
     animation: modal-pop 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -3697,7 +3697,7 @@ kbd {
 
 .blocked-modal-close:hover {
     color: var(--text1);
-    background: rgba(255, 255, 255, 0.08);
+    background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
 .blocked-modal-close svg {
@@ -3726,7 +3726,7 @@ kbd {
     background: transparent;
 }
 .blocked-modal-list::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.12);
+    background: color-mix(in srgb, var(--text) 12%, transparent);
     border-radius: 2px;
 }
 
@@ -3747,7 +3747,7 @@ kbd {
 }
 
 .blocked-modal-row:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: color-mix(in srgb, var(--text) 4%, transparent);
 }
 
 .blocked-modal-domain {

@@ -11,7 +11,11 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
 import WindowTitlebar from "./components/WindowTitlebar";
 import { storage, secureStorage, STORAGE_KEYS } from "./utils/storage";
-import { applyAccentColor } from "./utils/appearance";
+import {
+  applyAccentColor,
+  applyTheme,
+  ACCENT_PRESETS,
+} from "./utils/appearance";
 import { collectBackupData } from "./utils/backup";
 import { tmdbFetch, setApiErrorHandlers } from "./utils/api";
 import { clearAppCaches } from "./utils/storage";
@@ -70,6 +74,20 @@ export default function App() {
   const [loadingHome, setLoadingHome] = useState(false);
   const [offline, setOffline] = useState(() => !navigator.onLine);
 
+  // ── Player accent + subtitle lang ─────────────────────────────────────────
+  // Computed once here and passed as a prop to MoviePage / TVPage so neither
+  // page needs to touch storage.  Refreshed via "streambert:player-settings-changed".
+  const readPlayerSettings = () => {
+    const accentId = storage.get(STORAGE_KEYS.ACCENT_COLOR) || "red";
+    const inPlayer = storage.get(STORAGE_KEYS.ACCENT_IN_PLAYER) !== false; // default true
+    const accentHex = inPlayer
+      ? (ACCENT_PRESETS.find((p) => p.id === accentId)?.color ?? null)
+      : null;
+    const subtitleLang = storage.get(STORAGE_KEYS.SUBTITLE_LANG) || null;
+    return { accentColor: accentHex, subtitleLang };
+  };
+  const [playerSettings, setPlayerSettings] = useState(readPlayerSettings);
+
   // ── Scheduled backup: run on startup if due ─────────────────────────────────
   useEffect(() => {
     if (!window.electron?.onScheduledBackupRequested) return;
@@ -123,7 +141,7 @@ export default function App() {
     let cancelled = false;
 
     async function checkNewEpisodes() {
-      // Small grace period so the UI has fully painted before we start
+      // Small grace period so the UI has fully painted before start
       await new Promise((r) => setTimeout(r, 1200));
       if (cancelled) return;
 
@@ -199,7 +217,7 @@ export default function App() {
                 }
               } else {
                 // Subsequent checks: notify when last_episode_to_air changed
-                // (new episode aired) compared to what we cached.
+                // (new episode aired) compared to what got cached.
                 // Migration: old cache entries only have nextEpDate, not lastEpDate.
                 // In that case treat as first check to avoid false positives.
                 const prevLastDate = prev.lastEpDate ?? null;
@@ -463,11 +481,19 @@ export default function App() {
   // ── Trending, single shared fetch fn avoids code duplication ────────────
   // Results are cached in localStorage for 30 min to avoid redundant API calls
   // and to keep trending data out of RAM between restarts.
+  // The cache stores the active metadata language; if it differs from the
+  // current setting the cache is treated as stale and data is re-fetched.
   const fetchTrending = useCallback(() => {
     if (!apiKey) return;
     const cached = storage.get("trendingCache");
     const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-    if (cached && cached.ts && Date.now() - cached.ts < CACHE_TTL) {
+    const currentLang = storage.get(STORAGE_KEYS.TMDB_LANG) || "en-US";
+    if (
+      cached &&
+      cached.ts &&
+      cached.lang === currentLang &&
+      Date.now() - cached.ts < CACHE_TTL
+    ) {
       setTrending(cached.movies || []);
       setTrendingTV(cached.tv || []);
       return;
@@ -482,7 +508,12 @@ export default function App() {
         const tv = t.results || [];
         setTrending(movies);
         setTrendingTV(tv);
-        storage.set("trendingCache", { movies, tv, ts: Date.now() });
+        storage.set("trendingCache", {
+          movies,
+          tv,
+          ts: Date.now(),
+          lang: currentLang,
+        });
       })
       .catch(() => {})
       .finally(() => setLoadingHome(false));
@@ -504,10 +535,30 @@ export default function App() {
     return () =>
       window.removeEventListener("streambert:library-sort-changed", handler);
   }, []);
+
+  // ── Re-fetch trending immediately when metadata language changes ──────────
+  useEffect(() => {
+    const handler = () => fetchTrending();
+    window.addEventListener("streambert:tmdb-lang-changed", handler);
+    return () =>
+      window.removeEventListener("streambert:tmdb-lang-changed", handler);
+  }, [fetchTrending]);
+
+  // ── Refresh player settings (accent + subtitle lang) after save ───────────
+  useEffect(() => {
+    const handler = () => setPlayerSettings(readPlayerSettings());
+    window.addEventListener("streambert:player-settings-changed", handler);
+    return () =>
+      window.removeEventListener("streambert:player-settings-changed", handler);
+  }, []);
   useEffect(() => {
     // Accent colour
     const accent = storage.get(STORAGE_KEYS.ACCENT_COLOR) || "red";
     applyAccentColor(accent);
+    // Theme
+    const theme = storage.get(STORAGE_KEYS.THEME) || "dark";
+    const customVars = storage.get(STORAGE_KEYS.CUSTOM_THEME_VARS) || null;
+    applyTheme(theme, customVars);
     // Font size
     const font = storage.get(STORAGE_KEYS.FONT_SIZE) || "normal";
     const zoomMap = { sm: 0.85, normal: 1, lg: 1.15 };
@@ -902,6 +953,7 @@ export default function App() {
               <MoviePage
                 item={selected}
                 apiKey={apiKey}
+                playerSettings={playerSettings}
                 onSave={() => toggleSave(selected)}
                 isSaved={isSaved(selected)}
                 onHistory={addHistory}
@@ -924,6 +976,7 @@ export default function App() {
               <TVPage
                 item={selected}
                 apiKey={apiKey}
+                playerSettings={playerSettings}
                 onSave={() => toggleSave(selected)}
                 isSaved={isSaved(selected)}
                 onHistory={addHistory}

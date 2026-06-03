@@ -198,24 +198,78 @@ function register(getMainWindow, { writeSecretMigration }) {
   // ── Auto-updater ──────────────────────────────────────────────────────────
   ipcMain.handle("detect-update-format", () => {
     if (process.platform === "win32") return "exe";
-    if (process.platform === "linux")
-      return process.env.APPIMAGE ? "appimage" : "deb";
+    if (process.platform === "darwin") return "dmg";
+    if (process.platform === "linux") {
+      if (process.env.APPIMAGE) return "appimage";
+      const isArch =
+        spawnSync("which", ["pacman"], { encoding: "utf8" }).status === 0;
+      return isArch ? "pacman" : "deb";
+    }
     return null;
   });
 
   ipcMain.handle("download-and-install-update", async (_, { url, format }) => {
     try {
+
+      const ALLOWED_FORMATS = ["exe", "deb", "pacman", "dmg", "dmg_arm64", "appimage"];
+      if (!ALLOWED_FORMATS.includes(format)) {
+        return { ok: false, error: "Invalid format" };
+      }
+
+      const TRUSTED_ORIGIN   = "https://github.com";
+      const TRUSTED_PATH     = "/truelockmc/streambert/releases/download/";
+      // Domains that are allowed as redirect targets (GitHub CDN).
+      const ALLOWED_REDIRECT_HOSTS = [
+        "github.com",
+        "objects.githubusercontent.com",
+        "release-assets.githubusercontent.com",
+      ];
+
+      let parsed;
+      try {
+        parsed = new URL(url);
+      } catch {
+        return { ok: false, error: "Invalid URL" };
+      }
+
+      if (
+        parsed.origin !== TRUSTED_ORIGIN ||
+        !parsed.pathname.startsWith(TRUSTED_PATH)
+      ) {
+        return { ok: false, error: "Unauthorized update source" };
+      }
+
       _updateAbortController = new AbortController();
       const { signal } = _updateAbortController;
 
       const ext =
-        format === "exe" ? ".exe" : format === "deb" ? ".deb" : ".AppImage";
+        format === "exe" ? ".exe"
+        : format === "deb" ? ".deb"
+        : format === "pacman" ? ".pacman"
+        : format === "dmg" ? ".dmg"
+        : ".AppImage";
       const destPath = path.join(os.tmpdir(), `streambert-update${ext}`);
 
       await new Promise((resolve, reject) => {
         if (signal.aborted) return reject(new Error("Cancelled"));
 
-        const doRequest = (reqUrl) => {
+        const doRequest = (reqUrl, redirectDepth = 0) => {
+          // Guard against infinite redirect loops.
+          if (redirectDepth > 5) {
+            return reject(new Error("Too many redirects"));
+          }
+          let reqParsed;
+          try {
+            reqParsed = new URL(reqUrl);
+          } catch {
+            return reject(new Error("Invalid redirect URL"));
+          }
+          if (!ALLOWED_REDIRECT_HOSTS.includes(reqParsed.hostname)) {
+            return reject(
+              new Error(`Untrusted redirect host: ${reqParsed.hostname}`)
+            );
+          }
+
           const lib = reqUrl.startsWith("https") ? https : http;
           const req = lib.get(
             reqUrl,
@@ -232,11 +286,10 @@ function register(getMainWindow, { writeSecretMigration }) {
                 res.headers.location
               ) {
                 res.resume();
-                doRequest(
-                  res.headers.location.startsWith("http")
-                    ? res.headers.location
-                    : new URL(res.headers.location, reqUrl).toString(),
-                );
+                const next = res.headers.location.startsWith("http")
+                  ? res.headers.location
+                  : new URL(res.headers.location, reqUrl).toString();
+                doRequest(next, redirectDepth + 1);
                 return;
               }
               if (res.statusCode !== 200) {
@@ -287,7 +340,19 @@ function register(getMainWindow, { writeSecretMigration }) {
 
       if (signal.aborted) return { ok: false, error: "Cancelled" };
 
+      // ── Helper: send "Installing…" to renderer ──────────────────────────────
+      const sendInstalling = () => {
+        const mw = getMainWindow();
+        if (mw && !mw.isDestroyed()) {
+          mw.webContents.send("update-progress", {
+            percent: 100,
+            label: "Installing…",
+          });
+        }
+      };
+
       if (format === "appimage") {
+        sendInstalling();
         fs.chmodSync(destPath, 0o755);
         const currentAppImage = process.env.APPIMAGE;
         if (currentAppImage) {
@@ -312,7 +377,41 @@ function register(getMainWindow, { writeSecretMigration }) {
         }
         writeSecretMigration();
         app.exit(0);
+      } else if (format === "pacman") {
+        sendInstalling();
+        // Give the renderer a moment to process the IPC message and show
+        // "Installing…" before spawnSync blocks the main thread
+        await new Promise((r) => setTimeout(r, 150));
+        fs.chmodSync(destPath, 0o644);
+        const pacmanLaunchers = [
+          { bin: "pkexec", args: ["pacman", "-U", "--noconfirm", destPath] },
+          { bin: "pamac-installer", args: [destPath] },
+        ];
+        let launched = false;
+        for (const { bin, args } of pacmanLaunchers) {
+          try {
+            const which = spawnSync("which", [bin], { encoding: "utf8" });
+            if (which.status !== 0) continue;
+            // spawnSync, to wait for pacman to finish before relaunching
+            const result = spawnSync(bin, args, { stdio: "inherit" });
+            if (result.status === 0) {
+              launched = true;
+              break;
+            }
+          } catch {
+            continue;
+          }
+        }
+        if (launched) {
+          writeSecretMigration();
+          app.relaunch();
+          app.exit(0);
+        } else {
+          shell.openPath(destPath);
+        }
       } else if (format === "deb") {
+        sendInstalling();
+        await new Promise((r) => setTimeout(r, 150));
         fs.chmodSync(destPath, 0o644);
         const debLaunchers = [
           { bin: "pkexec", args: ["dpkg", "-i", destPath] },
@@ -329,17 +428,33 @@ function register(getMainWindow, { writeSecretMigration }) {
               { encoding: "utf8" },
             );
             if (which.status !== 0) continue;
-            spawn(bin, args, { detached: true, stdio: "ignore" }).unref();
-            launched = true;
-            break;
+            // spawnSync, to wait for dpkg to finish before relaunching
+            const result = spawnSync(bin, args, { stdio: "inherit" });
+            if (result.status === 0) {
+              launched = true;
+              break;
+            }
           } catch {
             continue;
           }
         }
-        if (!launched) shell.openPath(destPath);
+        if (launched) {
+          writeSecretMigration();
+          app.relaunch();
+          app.exit(0);
+        } else {
+          shell.openPath(destPath);
+        }
       } else if (format === "exe") {
+        sendInstalling();
         spawn(destPath, [], { detached: true, stdio: "ignore" }).unref();
         app.exit(0);
+      } else if (format === "dmg") {
+        sendInstalling();
+        spawn("hdiutil", ["attach", destPath], {
+          detached: true,
+          stdio: "ignore",
+        }).unref();
       }
 
       return { ok: true };

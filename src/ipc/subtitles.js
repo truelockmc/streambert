@@ -21,6 +21,12 @@ function fetchWithTimeout(url, options = {}, ms = 15000) {
 
 // ── ZIP subtitle extractor ────────────────────────────────────────────────────
 
+// Max decompressed zip size (10mb) to prevent zip-bombs
+const ZIP_MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
+
+// Only these extensions are accepted as subtitle files.
+const SUBTITLE_EXTS = new Set(["srt", "vtt", "ass", "ssa"]);
+
 function extractFirstSubtitleFromZip(buf) {
   let offset = 0;
   while (offset < buf.length - 30) {
@@ -34,22 +40,33 @@ function extractFirstSubtitleFromZip(buf) {
       const compressedSize = buf.readUInt32LE(offset + 18);
       const fileNameLen = buf.readUInt16LE(offset + 26);
       const extraLen = buf.readUInt16LE(offset + 28);
-      const fileName = buf
+      const rawFileName = buf
         .slice(offset + 30, offset + 30 + fileNameLen)
         .toString("utf8");
       const dataOffset = offset + 30 + fileNameLen + extraLen;
+
+      const fileName = path.basename(rawFileName);
+
       const ext = fileName.toLowerCase().split(".").pop();
-      if (ext === "srt" || ext === "vtt" || ext === "ass" || ext === "ssa") {
+      if (SUBTITLE_EXTS.has(ext)) {
         const compressedData = buf.slice(
           dataOffset,
           dataOffset + compressedSize,
         );
         let data;
         if (compression === 0) {
+          // Stored (no compression)
+          if (compressedData.length > ZIP_MAX_OUTPUT_BYTES) {
+            offset = dataOffset + compressedSize;
+            continue;
+          }
           data = compressedData;
         } else if (compression === 8) {
+          // cap the decompressed output to guard against ZIP-bombs
           try {
-            data = zlib.inflateRawSync(compressedData);
+            data = zlib.inflateRawSync(compressedData, {
+              maxOutputLength: ZIP_MAX_OUTPUT_BYTES,
+            });
           } catch {
             offset = dataOffset + compressedSize;
             continue;
@@ -269,6 +286,8 @@ function register({ getDownloads, saveDownloads }) {
   );
 
   // ── Get subtitle download URL ──────────────────────────────────────────────
+  const TEMP_SUB_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
   ipcMain.handle("get-subtitle-url", async (_, { fileId }) => {
     try {
       if (String(fileId).startsWith("subdl_")) {
@@ -286,11 +305,22 @@ function register({ getDownloads, saveDownloads }) {
         const extracted = extractFirstSubtitleFromZip(zipBuffer);
         if (!extracted)
           return { ok: false, error: "No subtitle file found in SubDL ZIP" };
+
+        // extracted.name is already basename-sanitised by extractFirstSubtitleFromZip.
+        const safeName = path.basename(extracted.name);
         const tmpPath = path.join(
           os.tmpdir(),
-          `streambert_sub_${Date.now()}_${extracted.name}`,
+          `streambert_sub_${Date.now()}_${safeName}`,
         );
         fs.writeFileSync(tmpPath, extracted.data);
+
+        // Schedule automatic cleanup so temp subtitles don't accumulate
+        setTimeout(() => {
+          try {
+            if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+          } catch {}
+        }, TEMP_SUB_TTL_MS);
+
         return {
           ok: true,
           url: `file://${tmpPath}`,
@@ -326,8 +356,44 @@ function register({ getDownloads, saveDownloads }) {
     "download-subtitles-for-file",
     async (_, { filePath, selectedSubs }) => {
       try {
-        const dir = path.dirname(filePath);
-        const baseName = path.basename(filePath, path.extname(filePath));
+        const resolvedFilePath = path.resolve(filePath);
+
+        // The target must be an existing regular file.
+        let targetStat;
+        try {
+          targetStat = fs.statSync(resolvedFilePath);
+        } catch {
+          return { ok: false, error: "Target file does not exist" };
+        }
+        if (!targetStat.isFile()) {
+          return { ok: false, error: "Target path is not a file" };
+        }
+
+        // The file must reside inside a directory that was previously chosen
+        // by the user as a download location (present in the downloads store),
+        // OR it must be a known filePath from the registry.  This prevents a
+        // compromised renderer from writing subtitle files to arbitrary paths.
+        const allDownloads = getDownloads();
+        const resolvedDir = path.dirname(resolvedFilePath);
+        const isKnownFile = allDownloads.some(
+          (d) => d.filePath && path.resolve(d.filePath) === resolvedFilePath,
+        );
+        const isInKnownDownloadDir = allDownloads.some((d) => {
+          if (!d.downloadPath) return false;
+          const dp = path.resolve(d.downloadPath);
+          return (
+            resolvedDir === dp || resolvedDir.startsWith(dp + path.sep)
+          );
+        });
+        if (!isKnownFile && !isInKnownDownloadDir) {
+          return {
+            ok: false,
+            error: "File is not in a known download directory",
+          };
+        }
+
+        const dir = path.dirname(resolvedFilePath);
+        const baseName = path.basename(resolvedFilePath, path.extname(resolvedFilePath));
         const results = [];
         const langCounter = {};
 
@@ -352,7 +418,9 @@ function register({ getDownloads, saveDownloads }) {
               const extracted = extractFirstSubtitleFromZip(zipBuf);
               if (!extracted) continue;
               fileData = extracted.data;
+
               ext = extracted.name.split(".").pop().toLowerCase();
+              if (!SUBTITLE_EXTS.has(ext)) continue;
             } else {
               const url =
                 sub.direct_url ||
@@ -366,9 +434,7 @@ function register({ getDownloads, saveDownloads }) {
               if (!res.ok) continue;
               fileData = Buffer.from(await res.arrayBuffer());
               const urlExt = url.split("?")[0].split(".").pop().toLowerCase();
-              ext = ["srt", "vtt", "ass", "ssa"].includes(urlExt)
-                ? urlExt
-                : "srt";
+              ext = SUBTITLE_EXTS.has(urlExt) ? urlExt : "srt";
             }
 
             const lIdx = langCounter[langCode] ?? 0;
@@ -392,9 +458,9 @@ function register({ getDownloads, saveDownloads }) {
         }
 
         // Merge into download registry
-        if (results.length > 0 && filePath) {
+        if (results.length > 0 && resolvedFilePath) {
           const downloads = getDownloads();
-          const idx = downloads.findIndex((d) => d.filePath === filePath);
+          const idx = downloads.findIndex((d) => d.filePath === resolvedFilePath);
           if (idx >= 0) {
             const existing = downloads[idx].subtitlePaths || [];
             const existingFileIds = new Set(

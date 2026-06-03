@@ -1,6 +1,6 @@
 {
   "name": "streambert",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "Streambert Desktop App",
   "author": {
     "name": "truelockmc",
@@ -13,12 +13,13 @@
     "dev": "vite build --watch",
     "start": "vite build && electron .",
     "dist": "cross-env ELECTRON_DIST=1 vite build && npm run dist:linux && npm run dist:win && npm run dist:mac",
-    "dist:linux": "cross-env ELECTRON_DIST=1 vite build && electron-builder --linux deb AppImage pacman --publish never",
+    "dist:linux": "cross-env ELECTRON_DIST=1 vite build && electron-builder --linux deb rpm AppImage pacman --publish never",
     "dist:deb": "cross-env ELECTRON_DIST=1 vite build && electron-builder --linux deb --publish never",
+    "dist:rpm": "cross-env ELECTRON_DIST=1 vite build && electron-builder --linux rpm --publish never",
     "dist:arch": "cross-env ELECTRON_DIST=1 vite build && electron-builder --linux pacman --publish never",
     "dist:appimage": "cross-env ELECTRON_DIST=1 vite build && electron-builder --linux AppImage --publish never",
     "dist:win": "cross-env ELECTRON_DIST=1 vite build && electron-builder --win --publish never",
-    "dist:mac": "cross-env ELECTRON_DIST=1 vite build && electron-builder --mac --publish never"
+    "dist:mac": "cross-env ELECTRON_DIST=1 vite build && electron-builder --mac --universal --publish never"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -44,11 +45,15 @@
       "dist/**/*",
       "!dist/mac/**",
       "!dist/mac-arm64/**",
+      "!dist/mac-universal/**",
+      "!dist/mac-universal-x64-temp/**",
+      "!dist/mac-universal-arm64-temp/**",
       "!dist/win-unpacked/**",
       "!dist/linux-unpacked/**",
       "!dist/*.dmg",
       "!dist/*.exe",
       "!dist/*.deb",
+      "!dist/*.rpm",
       "!dist/*.AppImage",
       "!dist/*.blockmap",
       "!dist/*.yaml",
@@ -100,8 +105,7 @@
         {
           "target": "dmg",
           "arch": [
-            "x64",
-            "arm64"
+            "universal"
           ]
         }
       ],
@@ -136,6 +140,12 @@
           ]
         },
         {
+          "target": "rpm",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
           "target": "pacman",
           "arch": [
             "x64"
@@ -143,7 +153,25 @@
         }
       ],
       "category": "Utility",
-      "icon": "public/icon.png"
+      "icon": "public/sized",
+      "desktop": {
+        "entry": {
+          "Name": "Streambert",
+          "Comment": "Streambert Desktop App",
+          "Categories": "AudioVideo;Video;Player;Multimedia;Internet;",
+          "Icon": "streambert",
+          "StartupWMClass": "Streambert"
+        }
+      }
+    },
+    "rpm": {
+      "packageCategory": "Applications/Multimedia",
+      "depends": [
+        "gtk3",
+        "libnotify",
+        "libXScrnSaver",
+        "nss"
+      ]
     },
     "electronLanguages": [
       "en-US",
