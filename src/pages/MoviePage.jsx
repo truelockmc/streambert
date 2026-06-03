@@ -46,6 +46,7 @@ import { useBlockedStats } from "../utils/useBlockedStats";
 import MediaCard from "../components/MediaCard";
 import {
   storage,
+  STORAGE_KEYS,
   getFailoverSource,
   setFailoverSource,
   clearFailoverSource,
@@ -97,7 +98,7 @@ export default function MoviePage({
   );
   const [showSourceMenu, setShowSourceMenu] = useState(false);
   const [dubMode, setDubMode] = useState(
-    () => storage.get("allmangaDubMode") || "sub",
+    () => storage.get(STORAGE_KEYS.ALLMANGA_DUB_MODE) || "sub",
   );
   const [anilistData, setAnilistData] = useState(null);
   const [menuPos, setMenuPos] = useState(null);
@@ -113,6 +114,9 @@ export default function MoviePage({
   const [resolvedPlayerUrl, setResolvedPlayerUrl] = useState(null);
   const [resolvingUrl, setResolvingUrl] = useState(false);
   const [resolveError, setResolveError] = useState(null);
+  // Refs mirror the above so the resolve-effect can guard without stale closures
+  const resolvingUrlRef = useRef(false);
+  const resolvedPlayerUrlRef = useRef(null);
   const [collection, setCollection] = useState(null); // { name, parts }
   // Webview loading overlay
   const [webviewLoading, setWebviewLoading] = useState(false);
@@ -266,7 +270,9 @@ export default function MoviePage({
     setInterceptedSubs([]);
     setShowSourceMenu(false);
     setAnilistData(null);
+    resolvedPlayerUrlRef.current = null;
     setResolvedPlayerUrl(null);
+    resolvingUrlRef.current = false;
     setResolvingUrl(false);
     setResolveError(null);
     setWebviewLoading(true); // instantly blank the player on every source/item switch
@@ -314,7 +320,9 @@ export default function MoviePage({
       if (cached && cached !== playerSource) {
         setM3u8Url(null);
         setInterceptedSubs([]);
+        resolvedPlayerUrlRef.current = null;
         setResolvedPlayerUrl(null);
+        resolvingUrlRef.current = false;
         setResolvingUrl(false);
         setResolveError(null);
         setPlayerSource(cached);
@@ -323,7 +331,9 @@ export default function MoviePage({
     }
 
     if (!sourceIsAsync(playerSource)) return;
-    if (resolvedPlayerUrl || resolvingUrl) return;
+    // Use refs as guards
+    if (resolvedPlayerUrlRef.current || resolvingUrlRef.current) return;
+    resolvingUrlRef.current = true;
     setResolvingUrl(true);
     setResolveError(null);
     const startTime = storage.get("dlTime_" + progressKey) || 0;
@@ -349,6 +359,7 @@ export default function MoviePage({
               })
               .then((r) => {
                 if (!mounted) return;
+                resolvedPlayerUrlRef.current = r.playerUrl;
                 setResolvedPlayerUrl(r.playerUrl);
                 setM3u8Url(res.url);
               })
@@ -356,6 +367,7 @@ export default function MoviePage({
                 if (mounted) setResolveError("Failed to start local player");
               });
           } else {
+            resolvedPlayerUrlRef.current = res.url;
             setResolvedPlayerUrl(res.url);
           }
         } else {
@@ -366,6 +378,7 @@ export default function MoviePage({
             setFailoverSource(epKey, next);
             setM3u8Url(null);
             setInterceptedSubs([]);
+            resolvedPlayerUrlRef.current = null;
             setResolvedPlayerUrl(null);
             setResolveError(null);
             setPlayerSource(next);
@@ -378,7 +391,10 @@ export default function MoviePage({
         if (mounted) setResolveError(e.message || "Error");
       })
       .finally(() => {
-        if (mounted) setResolvingUrl(false);
+        if (mounted) {
+          resolvingUrlRef.current = false;
+          setResolvingUrl(false);
+        }
       });
     return () => {
       mounted = false;
@@ -989,17 +1005,19 @@ export default function MoviePage({
                 {PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ??
                   "Source"}
               </button>
-              {/* Sub/Dub toggle, only for AllManga */}
-              {playerSource === "allmanga" && (
+              {/* Sub/Dub toggle, only for async (AllManga) sources */}
+              {sourceIsAsync(playerSource) && (
                 <button
                   className="player-overlay-btn"
                   onClick={() => {
                     const next = dubMode === "sub" ? "dub" : "sub";
                     setDubMode(next);
-                    storage.set("allmangaDubMode", next);
+                    storage.set(STORAGE_KEYS.ALLMANGA_DUB_MODE, next);
                     setM3u8Url(null);
                     setInterceptedSubs([]);
+                    resolvedPlayerUrlRef.current = null;
                     setResolvedPlayerUrl(null);
+                    resolvingUrlRef.current = false;
                     setResolvingUrl(false);
                     setResolveError(null);
                   }}
@@ -1075,15 +1093,15 @@ export default function MoviePage({
                     onClick={() => {
                       setShowSourceMenu(false);
                       if (src.id === playerSource) return;
-                      // Manual selection wins over auto-failover for this
-                      // title — otherwise the resolve effect would switch
-                      // back to the cached fallback immediately.
+                      // Manual selection wins over auto-failover
                       clearFailoverSource(`movie_${item.id}_${dubMode}`);
                       setPlayerSource(src.id);
-                      storage.set("playerSource", src.id);
+                      storage.set(STORAGE_KEYS.PLAYER_SOURCE, src.id);
                       setM3u8Url(null);
                       setInterceptedSubs([]);
+                      resolvedPlayerUrlRef.current = null;
                       setResolvedPlayerUrl(null);
+                      resolvingUrlRef.current = false;
                       setResolvingUrl(false);
                       setResolveError(null);
                     }}

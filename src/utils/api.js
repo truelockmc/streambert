@@ -227,18 +227,15 @@ export const sourceProgressViaFrames = (sourceId) =>
 export const sourceIsAsync = (sourceId) =>
   PLAYER_SOURCES.find((s) => s.id === sourceId)?.async ?? false;
 
-// Return the next non-async source after `currentId` in PLAYER_SOURCES order,
-// used for auto-failover when the current source can't resolve an episode.
-// Async sources (e.g. AllManga) are skipped because they have the same
-// "missing episode" failure mode and we'd just loop.
+// Return the next non-async source after `currentId` in PLAYER_SOURCES order
 export const getNextNonAsyncSource = (currentId) => {
-  const idx = PLAYER_SOURCES.findIndex((s) => s.id === currentId);
-  if (idx < 0) return null;
-  for (let i = 1; i < PLAYER_SOURCES.length; i++) {
-    const candidate = PLAYER_SOURCES[(idx + i) % PLAYER_SOURCES.length];
-    if (!candidate.async) return candidate.id;
-  }
-  return null;
+  const nonAsync = PLAYER_SOURCES.filter((s) => !s.async);
+  if (nonAsync.length === 0) return null;
+  const idx = nonAsync.findIndex((s) => s.id === currentId);
+  // If currentId is itself non-async, return the next one (wrap around).
+  // If currentId is async (e.g. AllManga), just return the first non-async.
+  if (idx < 0) return nonAsync[0].id;
+  return nonAsync[(idx + 1) % nonAsync.length].id;
 };
 
 // Sources that require a transparent webRequest intercept to load properly

@@ -406,12 +406,15 @@ export default function TVPage({
     [playerSource],
   );
   const [dubMode, setDubMode] = useState(
-    () => storage.get("allmangaDubMode") || "sub",
+    () => storage.get(STORAGE_KEYS.ALLMANGA_DUB_MODE) || "sub",
   );
   // async URL resolution
   const [resolvedPlayerUrl, setResolvedPlayerUrl] = useState(null);
   const [resolvingUrl, setResolvingUrl] = useState(false);
   const [resolveError, setResolveError] = useState(null);
+  // Refs mirror the above so the resolve-effect can guard without stale closures
+  const resolvingUrlRef = useRef(false);
+  const resolvedPlayerUrlRef = useRef(null);
   const [anilistData, setAnilistData] = useState(null);
   const [anilistSeasons, setAnilistSeasons] = useState(null); // [{seasonNum, title, episodes, year}]
   const [anilistLoading, setAnilistLoading] = useState(false);
@@ -600,7 +603,9 @@ export default function TVPage({
     setM3u8Url(null);
     setInterceptedSubs([]);
     setShowSourceMenu(false);
+    resolvedPlayerUrlRef.current = null;
     setResolvedPlayerUrl(null);
+    resolvingUrlRef.current = false;
     setResolvingUrl(false);
     setResolveError(null);
     setWebviewLoading(true); // instantly blank the player on every source/episode switch
@@ -667,7 +672,9 @@ export default function TVPage({
       if (cached && cached !== playerSource) {
         setM3u8Url(null);
         setInterceptedSubs([]);
+        resolvedPlayerUrlRef.current = null;
         setResolvedPlayerUrl(null);
+        resolvingUrlRef.current = false;
         setResolvingUrl(false);
         setResolveError(null);
         setPlayerSource(cached);
@@ -676,7 +683,9 @@ export default function TVPage({
     }
 
     if (!isAsync) return;
-    if (resolvedPlayerUrl || resolvingUrl) return;
+    // Use refs as guards
+    if (resolvedPlayerUrlRef.current || resolvingUrlRef.current) return;
+    resolvingUrlRef.current = true;
     setResolvingUrl(true);
     setResolveError(null);
     const progressKey = `tv_${item.id}_s${selectedSeason}e${epNum}`;
@@ -702,6 +711,7 @@ export default function TVPage({
               })
               .then((r) => {
                 if (!mounted) return;
+                resolvedPlayerUrlRef.current = r.playerUrl;
                 setResolvedPlayerUrl(r.playerUrl);
                 // Also expose raw url so download button can use it
                 setM3u8Url(res.url);
@@ -710,6 +720,7 @@ export default function TVPage({
                 if (mounted) setResolveError("Failed to start local player");
               });
           } else {
+            resolvedPlayerUrlRef.current = res.url;
             setResolvedPlayerUrl(res.url);
           }
         } else {
@@ -720,6 +731,7 @@ export default function TVPage({
             setFailoverSource(epKey, next);
             setM3u8Url(null);
             setInterceptedSubs([]);
+            resolvedPlayerUrlRef.current = null;
             setResolvedPlayerUrl(null);
             setResolveError(null);
             setPlayerSource(next);
@@ -732,7 +744,10 @@ export default function TVPage({
         if (mounted) setResolveError(e.message || "Error");
       })
       .finally(() => {
-        if (mounted) setResolvingUrl(false);
+        if (mounted) {
+          resolvingUrlRef.current = false;
+          setResolvingUrl(false);
+        }
       });
     return () => {
       mounted = false;
@@ -1120,8 +1135,7 @@ export default function TVPage({
   useEffect(() => {
     setSkipTimings(null);
     setSkipPrompt(null);
-    if (introSkipMode === "off" || playerSource !== "allmanga" || !isAnime)
-      return;
+    if (introSkipMode === "off" || !isAsync || !isAnime) return;
     const anilistId = anilistData?.idMal;
     const epNum = selectedEp?.episode_number;
     if (!anilistId || !epNum) return;
@@ -1177,10 +1191,7 @@ export default function TVPage({
   // Skip detection runs every tick, progress is saved every 5th tick (5s).
   useEffect(() => {
     const aniSkipActive =
-      introSkipMode !== "off" &&
-      playing &&
-      !!skipTimings &&
-      playerSource === "allmanga";
+      introSkipMode !== "off" && playing && !!skipTimings && isAsync;
 
     if (!aniSkipActive) setSkipPrompt(null);
     if (!playing || !currentProgressKey) return;
@@ -1351,7 +1362,7 @@ export default function TVPage({
 
   useEffect(() => {
     const wv = webviewRef.current;
-    if (!wv || !playing || playerSource !== "allmanga") return;
+    if (!wv || !playing || !isAsync) return;
 
     const inject = () => {
       wv.executeJavaScript(INJECT_SKIP_CONTROLS).catch(() => {});
@@ -1381,7 +1392,9 @@ export default function TVPage({
     (ep) => {
       setM3u8Url(null);
       setInterceptedSubs([]);
+      resolvedPlayerUrlRef.current = null;
       setResolvedPlayerUrl(null);
+      resolvingUrlRef.current = false;
       setResolvingUrl(false);
       setResolveError(null);
       setSelectedEp(ep);
@@ -1763,16 +1776,18 @@ export default function TVPage({
                       "Source"}
                   </button>
                   {/* Sub/Dub toggle, only for AllManga */}
-                  {playerSource === "allmanga" && (
+                  {isAsync && (
                     <button
                       className="player-overlay-btn"
                       onClick={() => {
                         const next = dubMode === "sub" ? "dub" : "sub";
                         setDubMode(next);
-                        storage.set("allmangaDubMode", next);
+                        storage.set(STORAGE_KEYS.ALLMANGA_DUB_MODE, next);
                         setM3u8Url(null);
                         setInterceptedSubs([]);
+                        resolvedPlayerUrlRef.current = null;
                         setResolvedPlayerUrl(null);
+                        resolvingUrlRef.current = false;
                         setResolvingUrl(false);
                         setResolveError(null);
                       }}
@@ -1852,19 +1867,19 @@ export default function TVPage({
                         onClick={() => {
                           setShowSourceMenu(false);
                           if (src.id === playerSource) return;
-                          // Manual selection wins over auto-failover for the
-                          // current episode — otherwise the resolve effect
-                          // would immediately switch back to the cached one.
+                          // Manual selection wins over auto-failover
                           if (selectedEp) {
                             clearFailoverSource(
                               `tv_${item.id}_s${selectedSeason}_e${selectedEp.episode_number}_${dubMode}`,
                             );
                           }
                           setPlayerSource(src.id);
-                          storage.set("playerSource", src.id);
+                          storage.set(STORAGE_KEYS.PLAYER_SOURCE, src.id);
                           setM3u8Url(null);
                           setInterceptedSubs([]);
+                          resolvedPlayerUrlRef.current = null;
                           setResolvedPlayerUrl(null);
+                          resolvingUrlRef.current = false;
                           setResolvingUrl(false);
                           setResolveError(null);
                         }}

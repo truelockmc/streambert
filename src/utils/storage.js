@@ -92,16 +92,24 @@ export const getApiKey = () => storage.get(STORAGE_KEYS.API_KEY);
 
 // ── Source failover cache ────────────────────────────────────────────────────
 // AllManga doesn't always have every episode; rather than nag the user every
-// time, remember the working alternate source per (tmdbId, season, ep, dub)
-// so subsequent visits skip the failed default automatically.
+// time, remember the working alternate source per (tmdbId, season, ep, dub).
+// Max 200 entries
+const FAILOVER_CACHE_MAX = 200;
+
 export const getFailoverSource = (epKey) => {
   const cache = storage.get(STORAGE_KEYS.SOURCE_FAILOVER_CACHE) || {};
-  return cache[epKey] || null;
+  return cache[epKey]?.sourceId || null;
 };
 
 export const setFailoverSource = (epKey, sourceId) => {
   const cache = storage.get(STORAGE_KEYS.SOURCE_FAILOVER_CACHE) || {};
-  cache[epKey] = sourceId;
+  // Evict oldest entries when at capacity (insertion order via Object.keys)
+  const keys = Object.keys(cache);
+  if (keys.length >= FAILOVER_CACHE_MAX) {
+    const evict = keys.slice(0, keys.length - FAILOVER_CACHE_MAX + 1);
+    evict.forEach((k) => delete cache[k]);
+  }
+  cache[epKey] = { sourceId, ts: Date.now() };
   storage.set(STORAGE_KEYS.SOURCE_FAILOVER_CACHE, cache);
 };
 
