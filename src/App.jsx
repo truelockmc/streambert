@@ -84,7 +84,8 @@ export default function App() {
       ? (ACCENT_PRESETS.find((p) => p.id === accentId)?.color ?? null)
       : null;
     const subtitleLang = storage.get(STORAGE_KEYS.SUBTITLE_LANG) || null;
-    return { accentColor: accentHex, subtitleLang };
+    const subtitleDefaultDelay = storage.get(STORAGE_KEYS.SUBTITLE_DEFAULT_DELAY) ?? 0;
+    return { accentColor: accentHex, subtitleLang, subtitleDefaultDelay };
   };
   const [playerSettings, setPlayerSettings] = useState(readPlayerSettings);
 

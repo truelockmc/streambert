@@ -1873,6 +1873,9 @@ function SubtitleSettingsSection() {
   const [wyzieCopied, setWyzieCopied] = useState(false);
   const [wyzieClearConfirm, setWyzieClearConfirm] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [defaultDelay, setDefaultDelay] = useState(
+    () => storage.get(STORAGE_KEYS.SUBTITLE_DEFAULT_DELAY) ?? 0,
+  );
 
   // Load keys from secure storage
   useEffect(() => {
@@ -1897,6 +1900,7 @@ function SubtitleSettingsSection() {
   const handleSave = () => {
     storage.set(STORAGE_KEYS.SUBTITLE_ENABLED, enabled ? 1 : 0);
     storage.set(STORAGE_KEYS.SUBTITLE_LANG, lang);
+    storage.set(STORAGE_KEYS.SUBTITLE_DEFAULT_DELAY, defaultDelay);
     secureStorage.set(STORAGE_KEYS.SUBDL_API_KEY, subdlApiKey.trim());
     secureStorage.set(STORAGE_KEYS.WYZIE_API_KEY, wyzieApiKey.trim());
     // refresh playerSettings prop (subtitle lang)
@@ -2178,6 +2182,30 @@ function SubtitleSettingsSection() {
           </div>
         </>
       )}
+
+      {/* Advanced Settings */}
+      <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--border)", marginBottom: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          Advanced Settings
+        </div>
+        {/* Default subtitle delay */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}>
+            Default subtitle delay (seconds)
+          </div>
+          <input
+            type="number"
+            step="0.05"
+            className="apikey-input"
+            style={{ width: 120, marginBottom: 0 }}
+            value={defaultDelay}
+            onChange={(e) => setDefaultDelay(parseFloat(e.target.value) || 0)}
+          />
+          <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 6 }}>
+            Delay applied to online subtitles on startup (e.g. 0.05, -0.1). Use 0 for no delay.
+          </div>
+        </div>
+      </div>
 
       <div
         style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}

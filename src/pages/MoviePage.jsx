@@ -38,6 +38,7 @@ import {
   SourceIcon,
   ShieldBlockIcon,
   PopOutIcon,
+  SubtitlesIcon,
 } from "../components/Icons";
 import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
@@ -84,6 +85,14 @@ export default function MoviePage({
   const [showTrailer, setShowTrailer] = useState(false);
   const [m3u8Url, setM3u8Url] = useState(null);
   const [interceptedSubs, setInterceptedSubs] = useState([]);
+  const defaultDelay = playerSettings?.subtitleDefaultDelay ?? 0;
+  const [subOffset, setSubOffset] = useState(defaultDelay);
+  const [showSubTimingMenu, setShowSubTimingMenu] = useState(false);
+  const [osdText, setOsdText] = useState("");
+  const [showOsd, setShowOsd] = useState(false);
+  const osdTimeoutRef = useRef(null);
+  const subOffsetRef = useRef(subOffset);
+  subOffsetRef.current = subOffset;
   const [playerSource, setPlayerSource] = useState(
     () => storage.get("playerSource") || NON_ANIME_DEFAULT_SOURCE,
   );
@@ -103,6 +112,7 @@ export default function MoviePage({
   const [anilistData, setAnilistData] = useState(null);
   const [menuPos, setMenuPos] = useState(null);
   const sourceRef = useRef(null);
+  const subTimingRef = useRef(null);
   const playerWrapRef = useRef(null);
   const webviewRef = useRef(null);
   // Always-current refs for interval callbacks, avoids stale closures without restarting the interval
@@ -200,6 +210,67 @@ export default function MoviePage({
   // Timestamp until which we ignore reset detection (post-seekback cooldown)
   const seekBackCooldownRef = useRef(0);
 
+  const applySubtitleOffset = useCallback((offset, showOsd = false) => {
+    const wv = webviewRef.current;
+    if (wv && window.electron?.setSubtitleOffset) {
+      try {
+        window.electron.setSubtitleOffset(wv.getWebContentsId(), offset, showOsd);
+      } catch (e) {
+        console.error("Failed to set subtitle offset:", e);
+      }
+    }
+  }, []);
+
+  // Apply default or current offset on startup and when subOffset/playerSource changes
+  useEffect(() => {
+    if (playing) {
+      const t = setTimeout(() => {
+        applySubtitleOffset(subOffset, false);
+      }, 3000);
+      return () => clearTimeout(t);
+    }
+  }, [playing, subOffset, playerSource, applySubtitleOffset]);
+
+  // Auto-hide OSD after 2 seconds
+  useEffect(() => {
+    if (showOsd) {
+      if (osdTimeoutRef.current) clearTimeout(osdTimeoutRef.current);
+      osdTimeoutRef.current = setTimeout(() => {
+        setShowOsd(false);
+      }, 2000);
+    }
+    return () => {
+      if (osdTimeoutRef.current) clearTimeout(osdTimeoutRef.current);
+    };
+  }, [showOsd]);
+
+  // Shortcut key listener
+  useEffect(() => {
+    if (!playing || !window.electron?.onPlayerShortcutKey) return;
+    
+    const handler = window.electron.onPlayerShortcutKey((key) => {
+      setSubOffset((prev) => {
+        let val;
+        if (key === "g") {
+          val = Math.max(-10, prev - 0.05);
+        } else if (key === "h") {
+          val = Math.min(10, prev + 0.05);
+        } else {
+          return prev;
+        }
+        applySubtitleOffset(val, true);
+        const ms = Math.round(val * 1000);
+        setOsdText(`Subtitle delay: ${ms > 0 ? "+" : ""}${ms} ms`);
+        setShowOsd(true);
+        return val;
+      });
+    });
+
+    return () => {
+      window.electron.offPlayerShortcutKey(handler);
+    };
+  }, [playing, applySubtitleOffset]);
+
   useEffect(() => {
     let mounted = true;
     tmdbFetch(`/movie/${item.id}`, apiKey)
@@ -269,6 +340,8 @@ export default function MoviePage({
     setM3u8Url(null);
     setInterceptedSubs([]);
     setShowSourceMenu(false);
+    setSubOffset(defaultDelay);
+    setShowSubTimingMenu(false);
     setAnilistData(null);
     resolvedPlayerUrlRef.current = null;
     setResolvedPlayerUrl(null);
@@ -409,14 +482,18 @@ export default function MoviePage({
     return () => window.electron.offM3u8Found(handler);
   }, []);
 
-  // Close source dropdown on scroll or click-outside
+  // Close source / sub timing dropdown on scroll or click-outside
   useEffect(() => {
-    if (!showSourceMenu) return;
-    const close = () => setShowSourceMenu(false);
+    if (!showSourceMenu && !showSubTimingMenu) return;
+    const close = () => {
+      setShowSourceMenu(false);
+      setShowSubTimingMenu(false);
+    };
     window.addEventListener("scroll", close, { capture: true, passive: true });
     const handleClick = (e) => {
       if (
         sourceRef.current?.contains(e.target) ||
+        subTimingRef.current?.contains(e.target) ||
         e.target.closest(".source-dropdown")
       )
         return;
@@ -427,7 +504,7 @@ export default function MoviePage({
       window.removeEventListener("scroll", close, { capture: true });
       document.removeEventListener("mousedown", handleClick);
     };
-  }, [showSourceMenu]);
+  }, [showSourceMenu, showSubTimingMenu]);
 
   useEffect(() => {
     if (!window.electron) return;
@@ -489,6 +566,42 @@ export default function MoviePage({
     };
   }, [playing, playerSource, item.id]);
 
+  // Inject player settings subtitle delay block and listen to slider changes
+  useEffect(() => {
+    if (!playing) return;
+    const wv = webviewRef.current;
+    if (!wv) return;
+
+    const inject = () => {
+      if (window.electron?.injectSubtitleMenu) {
+        window.electron.injectSubtitleMenu(wv.getWebContentsId()).catch(() => {});
+      }
+    };
+
+    const handleConsole = (e) => {
+      if (e.message && e.message.startsWith('streambert:log:')) {
+        console.log(e.message.substring('streambert:log:'.length));
+      }
+      if (e.message && e.message.startsWith('streambert:sub-offset-changed:')) {
+        const val = parseFloat(e.message.substring('streambert:sub-offset-changed:'.length));
+        if (!isNaN(val)) {
+          setSubOffset(val);
+        }
+      }
+    };
+
+    wv.addEventListener("dom-ready", inject);
+    wv.addEventListener("console-message", handleConsole);
+    
+    // Also inject immediately if DOM ready
+    try { inject(); } catch {}
+
+    return () => {
+      wv.removeEventListener("dom-ready", inject);
+      wv.removeEventListener("console-message", handleConsole);
+    };
+  }, [playing, playerSource, item.id]);
+
   // ── Auto-track progress + auto-watched every 5s ──────────────────────────
   useEffect(() => {
     if (!playing || !sourceSupportsProgress(playerSource)) return;
@@ -508,10 +621,22 @@ export default function MoviePage({
             result = await window.electron.queryVideoProgress(
               pipWebContentsIdRef.current,
             );
+            if (window.electron?.setSubtitleOffset) {
+              window.electron.setSubtitleOffset(pipWebContentsIdRef.current, subOffsetRef.current);
+            }
+            if (window.electron?.injectSubtitleMenu) {
+              window.electron.injectSubtitleMenu(pipWebContentsIdRef.current).catch(() => {});
+            }
           } else if (progressViaFrames && window.electron?.queryVideoProgress) {
             result = await window.electron.queryVideoProgress(
               wv.getWebContentsId(),
             );
+            if (window.electron?.setSubtitleOffset) {
+              window.electron.setSubtitleOffset(wv.getWebContentsId(), subOffsetRef.current);
+            }
+            if (window.electron?.injectSubtitleMenu) {
+              window.electron.injectSubtitleMenu(wv.getWebContentsId()).catch(() => {});
+            }
           } else {
             result = await wv.executeJavaScript(`
               (() => {
@@ -857,6 +982,25 @@ export default function MoviePage({
             className={`player-wrap${playerFullscreen ? " player-wrap--fullscreen" : ""}`}
             ref={playerWrapRef}
           >
+            {showOsd && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 28,
+                  right: 28,
+                  zIndex: 2147483647,
+                  color: "#ffffff",
+                  fontFamily: "var(--font-display), Arial, sans-serif",
+                  fontSize: 24,
+                  fontWeight: 800,
+                  textShadow: "2px 2px 0px #000000, -1px -1px 0px #000000, 1px -1px 0px #000000, -1px 1px 0px #000000, 1px 1px 0px #000000",
+                  pointerEvents: "none",
+                  letterSpacing: "0.5px",
+                }}
+              >
+                {osdText}
+              </div>
+            )}
             {/* Universal source-loading overlay, shown instantly on every source/item switch */}
             {webviewLoading && !resolveError && (
               <div
@@ -1040,6 +1184,22 @@ export default function MoviePage({
                   <span className="player-blocked-badge">{blockedSession}</span>
                 )}
               </button>
+              {/* Subtitle timing button */}
+              <button
+                ref={subTimingRef}
+                className="player-overlay-btn"
+                onClick={() => {
+                  const rect = subTimingRef.current?.getBoundingClientRect();
+                  if (rect)
+                    setMenuPos({ top: rect.bottom + 6, left: rect.left });
+                  setShowSubTimingMenu((v) => !v);
+                  setShowSourceMenu(false);
+                }}
+                title="Subtitle Timing"
+              >
+                <SubtitlesIcon />
+                {subOffset !== 0 ? `${subOffset > 0 ? "+" : ""}${Math.round(subOffset * 1000)}ms` : "Sync"}
+              </button>
               {/* Pop-out button*/}
               <button
                 className="player-overlay-btn"
@@ -1075,6 +1235,82 @@ export default function MoviePage({
                 <PopOutIcon />
               </button>
             </div>
+            {showSubTimingMenu && menuPos && (
+              <div
+                className="source-dropdown source-dropdown--fixed"
+                style={{ top: menuPos.top, left: menuPos.left, minWidth: 220, padding: 12 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  Subtitle Timing
+                </div>
+                
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, color: "var(--text2)" }}>Offset:</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: subOffset === 0 ? "var(--text3)" : "var(--accent, var(--red))" }}>
+                    {subOffset > 0 ? `+${Math.round(subOffset * 1000)}` : Math.round(subOffset * 1000)} ms
+                  </span>
+                </div>
+                
+                <input
+                  type="range"
+                  min="-10"
+                  max="10"
+                  step="0.05"
+                  value={subOffset}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setSubOffset(val);
+                    applySubtitleOffset(val, true);
+                  }}
+                  style={{
+                    width: "100%",
+                    accentColor: "var(--accent, var(--red))",
+                    background: "var(--border)",
+                    height: 4,
+                    borderRadius: 2,
+                    outline: "none",
+                    cursor: "pointer",
+                    marginBottom: 12
+                  }}
+                />
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                  <button
+                    className="btn btn-ghost btn--sm"
+                    style={{ padding: "4px 0", fontSize: 11, justifyContent: "center" }}
+                    onClick={() => {
+                      const val = Math.max(-10, subOffset - 0.05);
+                      setSubOffset(val);
+                      applySubtitleOffset(val, true);
+                    }}
+                  >
+                    -50ms
+                  </button>
+                  <button
+                    className="btn btn-ghost btn--sm"
+                    style={{ padding: "4px 0", fontSize: 11, justifyContent: "center", fontWeight: 600 }}
+                    onClick={() => {
+                      setSubOffset(0);
+                      applySubtitleOffset(0, true);
+                    }}
+                  >
+                    Reset
+                  </button>
+                  <button
+                    className="btn btn-ghost btn--sm"
+                    style={{ padding: "4px 0", fontSize: 11, justifyContent: "center" }}
+                    onClick={() => {
+                      const val = Math.min(10, subOffset + 0.05);
+                      setSubOffset(val);
+                      applySubtitleOffset(val, true);
+                    }}
+                  >
+                    +50ms
+                  </button>
+                </div>
+              </div>
+            )}
             {showSourceMenu && menuPos && (
               <div
                 className="source-dropdown source-dropdown--fixed"
