@@ -64,6 +64,13 @@ import {
   getAgeLimitSetting,
   getRatingCountry,
 } from "../utils/ageRating";
+import {
+  setMediaSessionMetadata,
+  buildWebviewMetadataScript,
+  registerMediaSessionHandlers,
+  clearMediaSession,
+  syncPlaybackState,
+} from "../utils/mediaSession";
 
 // ── Partial-circle progress icon (cached per pct tier) ───────────────────────
 // Uses a single SVG arc. Three instances (25/50/75)
@@ -1277,6 +1284,9 @@ export default function TVPage({
             durationRef.current = result.duration;
             const ct = result.currentTime;
 
+            // Sync OS playback state on every progress tick
+            syncPlaybackState("playing");
+
             // ── Resolution-change reset detection ──────────────────────────
             // Videasy resets to 0 on quality change. We only seek back if:
             // - ct is near zero (≤5s)
@@ -1410,6 +1420,93 @@ export default function TVPage({
     },
     [d, selectedSeason, onHistory],
   );
+
+  // ── Media Session API integration ─────────────────────────────────────────
+  // The OS reads media metadata from the renderer that OWNS the playing
+  // <video> — which is the webview, not this React renderer. So we must
+  // inject MediaMetadata overrides into the webview via executeJavaScript.
+  // We also keep main-renderer calls as a secondary layer for compatibility.
+  useEffect(() => {
+    if (!playing || !selectedEp) {
+      clearMediaSession();
+      return;
+    }
+
+    // Build episode-aware title: "Show Name — S01E03"
+    const showTitle  = d.name || d.title || "TV Show";
+    const epNum      = String(selectedEp.episode_number).padStart(2, "0");
+    const snNum      = String(selectedSeason).padStart(2, "0");
+    const epLabel    = `S${snNum}E${epNum}`;
+    const epName     = selectedEp.name || epLabel;
+    const mediaTitle = `${showTitle} — ${epLabel}`;
+
+    const metadata = {
+      title:      mediaTitle,
+      artist:     epName,           // episode title shown as "artist" subtitle
+      album:      showTitle,        // show name shown as "album"
+      posterPath: selectedEp.still_path ?? d.poster_path ?? null,
+    };
+
+    // ─ Secondary: set in main renderer (picked up by some Electron builds) ─
+    setMediaSessionMetadata(metadata);
+    syncPlaybackState("playing");
+
+    // ─ Register main-renderer handlers (play/pause delegated to webview) ─
+    registerMediaSessionHandlers(
+      async () => {
+        try {
+          const wv = webviewRef.current;
+          if (wv) await wv.executeJavaScript(`(() => { const v = document.querySelector('video'); if (v) v.play(); })()`);
+          syncPlaybackState("playing");
+        } catch {}
+      },
+      async () => {
+        try {
+          const wv = webviewRef.current;
+          if (wv) await wv.executeJavaScript(`(() => { const v = document.querySelector('video'); if (v) v.pause(); })()`);
+          syncPlaybackState("paused");
+        } catch {}
+      },
+    );
+
+    // ─ Primary: inject directly into the webview renderer ───────────────
+    // The script re-applies itself at +0 ms, +600 ms, and +2 s to reliably
+    // override any async metadata the embed page sets after initial load.
+    const script = buildWebviewMetadataScript(metadata);
+    const injectIntoWebview = () => {
+      const wv = webviewRef.current;
+      if (wv && window.electron?.injectAllFrames) {
+        window.electron.injectAllFrames(wv.getWebContentsId(), script).catch(() => {});
+      } else if (wv) {
+        wv.executeJavaScript(script).catch(() => {});
+      }
+    };
+
+    const wv = webviewRef.current;
+    if (wv) {
+      wv.addEventListener("dom-ready",       injectIntoWebview);
+      wv.addEventListener("did-finish-load", injectIntoWebview);
+      // Try immediately — succeeds if the webview is already loaded,
+      // fails silently if dom-ready hasn't fired yet (dom-ready handles it).
+      try { injectIntoWebview(); } catch {}
+    }
+
+    return () => {
+      clearMediaSession();
+      const wv = webviewRef.current;
+      if (wv) {
+        wv.removeEventListener("dom-ready",       injectIntoWebview);
+        wv.removeEventListener("did-finish-load", injectIntoWebview);
+      }
+    };
+  }, [
+    playing,
+    selectedEp,
+    selectedSeason,
+    d.name,
+    d.title,
+    d.poster_path,
+  ]);
 
   const handleSetDownloaderFolder = useCallback((folder) => {
     setDownloaderFolder(folder);

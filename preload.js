@@ -184,4 +184,8 @@ contextBridge.exposeInMainWorld("electron", {
   },
   offScheduledBackupRequested: (h) =>
     ipcRenderer.removeListener("scheduled-backup-requested", h),
+
+  // Webframe main injection for frames
+  injectAllFrames: (webContentsId, script) =>
+    ipcRenderer.invoke("inject-all-frames", { webContentsId, script }),
 });
