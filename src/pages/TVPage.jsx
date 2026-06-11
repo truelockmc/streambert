@@ -442,6 +442,8 @@ export default function TVPage({
   saveProgressRef.current = saveProgress;
   const onMarkWatchedRef = useRef(onMarkWatched);
   onMarkWatchedRef.current = onMarkWatched;
+  const watchedRef = useRef(watched);
+  watchedRef.current = watched;
 
   // Derived: detect anime before any effects so effects can use it
   const isAnime = useMemo(
@@ -492,11 +494,25 @@ export default function TVPage({
       .then((d) => {
         if (!mounted) return;
         setDetails(d);
-        // Only fall back to first season when no specific season was requested
+        // Only fall back when no specific season was requested
         if (item.season == null) {
-          const first =
-            d.seasons?.find((s) => s.season_number > 0) || d.seasons?.[0];
-          if (first) setSelectedSeason(first.season_number);
+          const validSeasons = (d.seasons || []).filter(
+            (s) => s.season_number > 0,
+          );
+          // Find the lowest season that isn't fully watched
+          const incomplete = validSeasons.find((s) => {
+            const count = s.episode_count || 0;
+            if (!count) return false;
+            for (let i = 1; i <= count; i++) {
+              if (
+                !watchedRef.current?.[`tv_${item.id}_s${s.season_number}e${i}`]
+              )
+                return true;
+            }
+            return false;
+          });
+          const target = incomplete || validSeasons[0] || d.seasons?.[0];
+          if (target) setSelectedSeason(target.season_number);
         }
       })
       .catch(() => {
