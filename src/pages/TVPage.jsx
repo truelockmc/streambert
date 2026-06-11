@@ -925,18 +925,20 @@ export default function TVPage({
     seasonData,
   ]);
 
-  // Auto-select specific episode when navigating from "Continue Watching" / history
-  const autoSelectDoneRef = useRef(false);
+  // Auto-select specific episode when navigating from "Continue Watching" / history.
+  // Key includes item.id + item.episode so the ref resets whenever the target changes.
+  const autoSelectKeyRef = useRef(null);
   useEffect(() => {
-    if (autoSelectDoneRef.current) return;
     if (!item.episode || currentSeasonEpisodes.length === 0) return;
+    const key = `${item.id}_e${item.episode}`;
+    if (autoSelectKeyRef.current === key) return; // already handled this target
     const target = Number(item.episode);
     const ep = currentSeasonEpisodes.find((e) => e.episode_number === target);
     if (ep) {
-      autoSelectDoneRef.current = true;
+      autoSelectKeyRef.current = key;
       setSelectedEp(ep);
     }
-  }, [item.episode, currentSeasonEpisodes]);
+  }, [item.id, item.episode, currentSeasonEpisodes]);
 
   // ── Downloads lookup map: O(1) per episode instead of O(n) ───────────────
   const downloadsByEpisodeKey = useMemo(() => {
