@@ -925,6 +925,19 @@ export default function TVPage({
     seasonData,
   ]);
 
+  // Auto-select specific episode when navigating from "Continue Watching" / history
+  const autoSelectDoneRef = useRef(false);
+  useEffect(() => {
+    if (autoSelectDoneRef.current) return;
+    if (!item.episode || currentSeasonEpisodes.length === 0) return;
+    const target = Number(item.episode);
+    const ep = currentSeasonEpisodes.find((e) => e.episode_number === target);
+    if (ep) {
+      autoSelectDoneRef.current = true;
+      setSelectedEp(ep);
+    }
+  }, [item.episode, currentSeasonEpisodes]);
+
   // ── Downloads lookup map: O(1) per episode instead of O(n) ───────────────
   const downloadsByEpisodeKey = useMemo(() => {
     const map = new Map();

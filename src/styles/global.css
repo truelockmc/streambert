@@ -307,7 +307,12 @@ body,
     position: absolute;
     inset: 0;
     background:
-        linear-gradient(to right, var(--bg) 0%, color-mix(in srgb, var(--bg) 90%, transparent) 25%, transparent 65%),
+        linear-gradient(
+            to right,
+            var(--bg) 0%,
+            color-mix(in srgb, var(--bg) 90%, transparent) 25%,
+            transparent 65%
+        ),
         linear-gradient(to top, var(--bg) 0%, transparent 45%);
 }
 
@@ -535,7 +540,11 @@ body.no-anim *::after {
 .card-overlay {
     position: absolute;
     inset: 0;
-    background: linear-gradient(to top, color-mix(in srgb, var(--bg) 88%, transparent) 0%, transparent 55%);
+    background: linear-gradient(
+        to top,
+        color-mix(in srgb, var(--bg) 88%, transparent) 0%,
+        transparent 55%
+    );
     opacity: 0;
     transition: opacity 0.25s;
     display: flex;
@@ -1427,6 +1436,32 @@ body.no-anim *::after {
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+.history-remove-btn {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    line-height: 1;
+    opacity: 0;
+    transition:
+        opacity 0.15s,
+        color 0.15s,
+        background 0.15s;
+    flex-shrink: 0;
+}
+
+.history-row:hover .history-remove-btn {
+    opacity: 1;
+}
+
+.history-remove-btn:hover {
+    color: var(--red);
+    background: color-mix(in srgb, var(--red) 12%, transparent);
 }
 
 /* ── API Key Setup ───────────────────────────────────────────────────────── */
@@ -3307,7 +3342,9 @@ kbd {
 }
 
 .carousel-item--active {
-    filter: drop-shadow(0 8px 36px color-mix(in srgb, var(--bg) 75%, transparent));
+    filter: drop-shadow(
+        0 8px 36px color-mix(in srgb, var(--bg) 75%, transparent)
+    );
 }
 .carousel-item--active .carousel-poster-wrap {
     box-shadow:

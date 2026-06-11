@@ -761,10 +761,16 @@ export default function App() {
     };
     // Functional update - never reads stale history from closure
     setHistory((prev) => {
-      const filtered = prev.filter(
-        (h) => !(h.id === entry.id && h.media_type === entry.media_type),
-      );
-      const next = [entry, ...filtered].slice(0, 50);
+      // For TV: dedupe per episode (same show+season+episode).
+      // For movies: dedupe by id+media_type as before.
+      const filtered = prev.filter((h) => {
+        if (h.id !== entry.id || h.media_type !== entry.media_type) return true;
+        if (entry.media_type === "tv") {
+          return !(h.season === entry.season && h.episode === entry.episode);
+        }
+        return false;
+      });
+      const next = [entry, ...filtered].slice(0, 100);
       storage.set("history", next);
       return next;
     });
@@ -795,6 +801,20 @@ export default function App() {
       const next = { ...prev };
       delete next[key];
       storage.set("watched", next);
+      return next;
+    });
+  }, []);
+
+  const removeHistory = useCallback((item) => {
+    setHistory((prev) => {
+      const next = prev.filter((h) => {
+        if (h.id !== item.id || h.media_type !== item.media_type) return true;
+        if (item.media_type === "tv") {
+          return !(h.season === item.season && h.episode === item.episode);
+        }
+        return false;
+      });
+      storage.set("history", next);
       return next;
     });
   }, []);
@@ -1004,6 +1024,7 @@ export default function App() {
                 watched={watched}
                 onMarkWatched={markWatched}
                 onMarkUnwatched={markUnwatched}
+                onRemoveHistory={removeHistory}
               />
             )}
             {page === "settings" && (

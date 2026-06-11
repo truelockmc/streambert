@@ -15,6 +15,7 @@ export default function LibraryPage({
   watched,
   onMarkWatched,
   onMarkUnwatched,
+  onRemoveHistory,
 }) {
   const allItems = useMemo(
     () => [...inProgress, ...saved],
@@ -136,7 +137,7 @@ export default function LibraryPage({
               const isWatched = !!watched?.[pk];
               return (
                 <div
-                  key={pk}
+                  key={`${pk}_${item.watchedAt}`}
                   className="history-row"
                   onClick={() => onSelect(item)}
                 >
@@ -160,8 +161,14 @@ export default function LibraryPage({
                     </div>
                     <div style={{ fontSize: 12, color: "var(--text3)" }}>
                       {item.media_type === "tv" &&
-                        item.season &&
-                        `S${item.season}E${item.episode} · `}
+                        item.season != null &&
+                        item.episode != null && (
+                          <>
+                            {`S${item.season}E${item.episode}`}
+                            {item.episodeName ? ` · ${item.episodeName}` : ""}
+                            {" · "}
+                          </>
+                        )}
                       {new Date(item.watchedAt).toLocaleDateString("en-US", {
                         year: "numeric",
                         month: "short",
@@ -174,6 +181,18 @@ export default function LibraryPage({
                   >
                     {item.media_type === "tv" ? "Series" : "Movie"}
                   </span>
+                  {onRemoveHistory && (
+                    <button
+                      className="history-remove-btn"
+                      title="Remove from history"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveHistory(item);
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               );
             })}
