@@ -1025,17 +1025,28 @@ export default function TVPage({
     const map = {};
     for (const s of seasons) {
       const num = s.season_number;
-      const count =
-        num === selectedSeason
-          ? currentSeasonEpisodes.length || s.episode_count || 0
-          : s.episode_count || 0;
+      const isSelected = num === selectedSeason;
+      // For the currently-loaded season use actual episode objects so
+      // remapped / non-sequential episode_numbers match the stored keys exactly.
+      const loadedEps =
+        isSelected && currentSeasonEpisodes.length > 0
+          ? currentSeasonEpisodes
+          : null;
+      const count = loadedEps ? loadedEps.length : s.episode_count || 0;
       if (!count) {
         map[num] = "none";
         continue;
       }
       let watchedCount = 0;
-      for (let i = 1; i <= count; i++) {
-        if (watched?.[`tv_${item.id}_s${num}e${i}`]) watchedCount++;
+      if (loadedEps) {
+        for (const ep of loadedEps) {
+          if (watched?.[`tv_${item.id}_s${num}e${ep.episode_number}`])
+            watchedCount++;
+        }
+      } else {
+        for (let i = 1; i <= count; i++) {
+          if (watched?.[`tv_${item.id}_s${num}e${i}`]) watchedCount++;
+        }
       }
       if (watchedCount === 0) {
         map[num] = "none";
@@ -1059,15 +1070,21 @@ export default function TVPage({
       const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
       const episodes =
         seasonNum === selectedSeason ? currentSeasonEpisodes : null;
-      const count = episodes?.length || seasonInfo?.episode_count || 0;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      for (let i = 1; i <= count; i++) {
-        if (episodes) {
-          const ep = episodes.find((e) => e.episode_number === i);
-          if (ep?.air_date && new Date(ep.air_date) > today) continue;
+
+      if (episodes && episodes.length > 0) {
+        // Use actual loaded episode objects
+        for (const ep of episodes) {
+          if (ep.air_date && new Date(ep.air_date) > today) continue;
+          onMarkWatched?.(`tv_${item.id}_s${seasonNum}e${ep.episode_number}`);
         }
-        onMarkWatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
+      } else {
+        // Episodes not loaded (non-selected season)
+        const count = seasonInfo?.episode_count || 0;
+        for (let i = 1; i <= count; i++) {
+          onMarkWatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
+        }
       }
     },
     [seasons, selectedSeason, currentSeasonEpisodes, item.id, onMarkWatched],
@@ -1078,9 +1095,16 @@ export default function TVPage({
       const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
       const episodes =
         seasonNum === selectedSeason ? currentSeasonEpisodes : null;
-      const count = episodes?.length || seasonInfo?.episode_count || 0;
-      for (let i = 1; i <= count; i++) {
-        onMarkUnwatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
+
+      if (episodes && episodes.length > 0) {
+        for (const ep of episodes) {
+          onMarkUnwatched?.(`tv_${item.id}_s${seasonNum}e${ep.episode_number}`);
+        }
+      } else {
+        const count = seasonInfo?.episode_count || 0;
+        for (let i = 1; i <= count; i++) {
+          onMarkUnwatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
+        }
       }
     },
     [seasons, selectedSeason, currentSeasonEpisodes, item.id, onMarkUnwatched],
