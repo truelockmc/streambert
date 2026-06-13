@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { imgUrl } from "../utils/api";
+import { useSeasonalEvent } from "../components/seasonalEvents.jsx";
 import {
   StreambertLogo,
   HomeIcon,
@@ -28,6 +29,7 @@ export default function Sidebar({
   const [dragOver, setDragOver] = useState(null);
   const dragItem = useRef(null);
   const dragNode = useRef(null);
+  const seasonalEvent = useSeasonalEvent();
 
   const [tooltip, setTooltip] = useState(null); // { title, y }
   const [contextMenu, setContextMenu] = useState(null); // { item, x, y }
@@ -104,8 +106,10 @@ export default function Sidebar({
         className="sidebar-logo"
         onClick={() => onNavigate("home")}
         title="Streambert"
+        style={{ position: "relative" }}
       >
         <StreambertLogo />
+        {seasonalEvent && seasonalEvent.render()}
       </div>
 
       {canGoBack && (
