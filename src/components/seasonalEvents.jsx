@@ -77,9 +77,12 @@ export function useSeasonalEvent() {
  *   const now = new Date("2024-10-28"); // Halloween
  *   const now = new Date("2024-12-25"); // Christmas
  *   const now = new Date("2024-06-15"); // Pride
+ *
+ * To make it normal again:
+ *  const now = new Date();
  */
 function getActiveEvent() {
-  const now = new Date("2024-12-25"); // Christmas
+  const now = new Date();
   return EVENTS.find((e) => e.check(now)) ?? null;
 }
 
@@ -166,41 +169,23 @@ function SnowOverlay() {
 function HalloweenOverlay() {
   return (
     <div style={overlayBase}>
-      {/* tiny spider hanging from top-right */}
+      {/* tiny pumpkin in bottom-right corner */}
       <div
         style={{
           position: "absolute",
-          top: 0,
-          right: 6,
+          bottom: 1,
+          right: 1,
+          width: 14,
+          height: 14,
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
+          justifyContent: "center",
+          fontSize: 12,
+          lineHeight: 1,
         }}
       >
-        <div
-          style={{ width: 1, height: 10, background: "rgba(255,255,255,0.45)" }}
-        />
-        <div
-          style={{
-            width: 7,
-            height: 6,
-            borderRadius: "50%",
-            background: "rgba(30,30,30,0.85)",
-            border: "1px solid rgba(255,200,0,0.5)",
-          }}
-        />
+        🎃
       </div>
-      {/* subtle orange tint at bottom */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: 10,
-          background: "linear-gradient(transparent, rgba(255,100,0,0.18))",
-        }}
-      />
     </div>
   );
 }
