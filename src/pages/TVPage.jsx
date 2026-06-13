@@ -370,6 +370,8 @@ export default function TVPage({
   watched,
   onMarkWatched,
   onMarkUnwatched,
+  onMarkWatchedBatch,
+  onMarkUnwatchedBatch,
   downloads,
   onGoToDownloads,
 }) {
@@ -505,13 +507,14 @@ export default function TVPage({
             const count = s.episode_count || 0;
             if (!count) return false;
             for (let i = 1; i <= count; i++) {
-              if (!watchedRef.current?.[`tv_${item.id}_s${s.season_number}e${i}`])
+              if (
+                !watchedRef.current?.[`tv_${item.id}_s${s.season_number}e${i}`]
+              )
                 return true;
             }
             return false;
           });
-          const target =
-            incomplete || validSeasons[0] || d.seasons?.[0];
+          const target = incomplete || validSeasons[0] || d.seasons?.[0];
           if (target) setSelectedSeason(target.season_number);
         }
       })
@@ -605,7 +608,10 @@ export default function TVPage({
           setSeasonData(d);
           // Cache episodes per season so markSeasonWatched can use real ep numbers
           if (d?.episodes?.length) {
-            setSeasonDataCache((prev) => ({ ...prev, [selectedSeason]: d.episodes }));
+            setSeasonDataCache((prev) => ({
+              ...prev,
+              [selectedSeason]: d.episodes,
+            }));
           }
         }
       })
@@ -1115,76 +1121,117 @@ export default function TVPage({
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Clear any legacy/mismatched keys for this season first
-      const clearLegacy = () => {
+      const buildKeys = (eps) => {
+        // Keys to remove (legacy mismatches) + keys to add
+        const toRemove = [];
         const prefix = `tv_${item.id}_s${seasonNum}e`;
         for (const key of Object.keys(watchedRef.current || {})) {
-          if (key.startsWith(prefix)) onMarkUnwatched?.(key);
+          if (key.startsWith(prefix)) toRemove.push(key);
         }
-      };
-
-      const applyWatched = (eps) => {
-        clearLegacy();
+        const toAdd = [];
         for (const ep of eps) {
           if (ep.air_date && new Date(ep.air_date) > today) continue;
-          onMarkWatched?.(`tv_${item.id}_s${seasonNum}e${ep.episode_number}`);
+          toAdd.push(`tv_${item.id}_s${seasonNum}e${ep.episode_number}`);
         }
+        return { toRemove, toAdd };
+      };
+
+      const apply = (eps) => {
+        const { toRemove, toAdd } = buildKeys(eps);
+        if (toRemove.length)
+          (onMarkUnwatchedBatch ?? ((ks) => ks.forEach(onMarkUnwatched)))(
+            toRemove,
+          );
+        if (toAdd.length)
+          (onMarkWatchedBatch ?? ((ks) => ks.forEach(onMarkWatched)))(toAdd);
       };
 
       if (seasonNum === selectedSeason && currentSeasonEpisodes.length > 0) {
-        applyWatched(currentSeasonEpisodes);
+        apply(currentSeasonEpisodes);
       } else if (seasonDataCache[seasonNum]) {
-        applyWatched(seasonDataCache[seasonNum]);
+        apply(seasonDataCache[seasonNum]);
       } else {
         tmdbFetch(`/tv/${item.id}/season/${seasonNum}`, apiKey).then((d) => {
           if (d?.episodes?.length) {
-            setSeasonDataCache((prev) => ({ ...prev, [seasonNum]: d.episodes }));
-            applyWatched(d.episodes);
+            setSeasonDataCache((prev) => ({
+              ...prev,
+              [seasonNum]: d.episodes,
+            }));
+            apply(d.episodes);
           }
         });
       }
     },
-    [selectedSeason, currentSeasonEpisodes, seasonDataCache, item.id, apiKey, onMarkWatched, onMarkUnwatched],
+    [
+      selectedSeason,
+      currentSeasonEpisodes,
+      seasonDataCache,
+      item.id,
+      apiKey,
+      onMarkWatched,
+      onMarkUnwatched,
+      onMarkWatchedBatch,
+      onMarkUnwatchedBatch,
+    ],
   );
 
   const markSeasonUnwatched = useCallback(
     (seasonNum) => {
-      // Always clear ALL existing watched keys for this season first
-      // (handles legacy keys from old numbering schemes)
-      const applyUnwatched = (eps) => {
-        for (const ep of eps) {
-          onMarkUnwatched?.(`tv_${item.id}_s${seasonNum}e${ep.episode_number}`);
-        }
+      const buildRemoveKeys = (eps) => {
+        // All existing watched keys for this season (covers legacy)
+        const prefix = `tv_${item.id}_s${seasonNum}e`;
+        const fromStore = Object.keys(watchedRef.current || {}).filter((k) =>
+          k.startsWith(prefix),
+        );
+        // Plus keys from the episode list
+        const fromEps = eps.map(
+          (ep) => `tv_${item.id}_s${seasonNum}e${ep.episode_number}`,
+        );
+        return [...new Set([...fromStore, ...fromEps])];
       };
 
-      // Additionally clear any keys already in watched for this season
-      // (covers mismatched legacy keys from before the fix)
-      const clearExisting = () => {
-        const prefix = `tv_${item.id}_s${seasonNum}e`;
-        for (const key of Object.keys(watchedRef.current || {})) {
-          if (key.startsWith(prefix)) {
-            onMarkUnwatched?.(key);
-          }
-        }
+      const apply = (eps) => {
+        const toRemove = buildRemoveKeys(eps);
+        if (toRemove.length)
+          (onMarkUnwatchedBatch ?? ((ks) => ks.forEach(onMarkUnwatched)))(
+            toRemove,
+          );
       };
 
       if (seasonNum === selectedSeason && currentSeasonEpisodes.length > 0) {
-        clearExisting();
-        applyUnwatched(currentSeasonEpisodes);
+        apply(currentSeasonEpisodes);
       } else if (seasonDataCache[seasonNum]) {
-        clearExisting();
-        applyUnwatched(seasonDataCache[seasonNum]);
+        apply(seasonDataCache[seasonNum]);
       } else {
-        clearExisting();
+        // Clear existing keys immediately, then fetch to ensure completeness
+        const prefix = `tv_${item.id}_s${seasonNum}e`;
+        const existing = Object.keys(watchedRef.current || {}).filter((k) =>
+          k.startsWith(prefix),
+        );
+        if (existing.length)
+          (onMarkUnwatchedBatch ?? ((ks) => ks.forEach(onMarkUnwatched)))(
+            existing,
+          );
         tmdbFetch(`/tv/${item.id}/season/${seasonNum}`, apiKey).then((d) => {
           if (d?.episodes?.length) {
-            setSeasonDataCache((prev) => ({ ...prev, [seasonNum]: d.episodes }));
-            applyUnwatched(d.episodes);
+            setSeasonDataCache((prev) => ({
+              ...prev,
+              [seasonNum]: d.episodes,
+            }));
+            apply(d.episodes);
           }
         });
       }
     },
-    [selectedSeason, currentSeasonEpisodes, seasonDataCache, item.id, apiKey, onMarkUnwatched],
+    [
+      selectedSeason,
+      currentSeasonEpisodes,
+      seasonDataCache,
+      item.id,
+      apiKey,
+      onMarkUnwatched,
+      onMarkUnwatchedBatch,
+    ],
   );
 
   const currentProgressKey = selectedEp

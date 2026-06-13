@@ -805,6 +805,27 @@ export default function App() {
     });
   }, []);
 
+  // Batch versions
+  const markWatchedBatch = useCallback((keys) => {
+    if (!keys?.length) return;
+    setWatched((prev) => {
+      const next = { ...prev };
+      for (const key of keys) next[key] = true;
+      storage.set("watched", next);
+      return next;
+    });
+  }, []);
+
+  const markUnwatchedBatch = useCallback((keys) => {
+    if (!keys?.length) return;
+    setWatched((prev) => {
+      const next = { ...prev };
+      for (const key of keys) delete next[key];
+      storage.set("watched", next);
+      return next;
+    });
+  }, []);
+
   const removeHistory = useCallback((item) => {
     setHistory((prev) => {
       const next = prev.filter((h) => {
@@ -1010,6 +1031,8 @@ export default function App() {
                 watched={watched}
                 onMarkWatched={markWatched}
                 onMarkUnwatched={markUnwatched}
+                onMarkWatchedBatch={markWatchedBatch}
+                onMarkUnwatchedBatch={markUnwatchedBatch}
                 downloads={downloads}
                 onGoToDownloads={handleGoToDownloads}
               />
