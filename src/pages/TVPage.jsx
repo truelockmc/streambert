@@ -375,6 +375,7 @@ export default function TVPage({
 }) {
   const [details, setDetails] = useState(null);
   const [seasonData, setSeasonData] = useState(null);
+  const [seasonDataCache, setSeasonDataCache] = useState({}); // seasonNum → episodes[]
   const [failedSeasons, setFailedSeasons] = useState(() => new Set()); // season numbers which give 404 on TMDB
   const [selectedSeason, setSelectedSeason] = useState(() =>
     item.season != null ? Number(item.season) : 1,
@@ -504,14 +505,13 @@ export default function TVPage({
             const count = s.episode_count || 0;
             if (!count) return false;
             for (let i = 1; i <= count; i++) {
-              if (
-                !watchedRef.current?.[`tv_${item.id}_s${s.season_number}e${i}`]
-              )
+              if (!watchedRef.current?.[`tv_${item.id}_s${s.season_number}e${i}`])
                 return true;
             }
             return false;
           });
-          const target = incomplete || validSeasons[0] || d.seasons?.[0];
+          const target =
+            incomplete || validSeasons[0] || d.seasons?.[0];
           if (target) setSelectedSeason(target.season_number);
         }
       })
@@ -601,7 +601,13 @@ export default function TVPage({
     let mounted = true;
     tmdbFetch(`/tv/${item.id}/season/${tmdbSeasonToFetch}`, apiKey)
       .then((d) => {
-        if (mounted) setSeasonData(d);
+        if (mounted) {
+          setSeasonData(d);
+          // Cache episodes per season so markSeasonWatched can use real ep numbers
+          if (d?.episodes?.length) {
+            setSeasonDataCache((prev) => ({ ...prev, [selectedSeason]: d.episodes }));
+          }
+        }
       })
       .catch(() => {
         if (mounted) {
@@ -888,6 +894,31 @@ export default function TVPage({
       }));
   }, [episodeGroupData, selectedSeason]);
 
+  // Map of seasonNum → array of episode_numbers for ALL seasons.
+  // Used by seasonWatchedMap and markSeason*
+  const allSeasonsEpNumbers = useMemo(() => {
+    const map = {}; // seasonNum → number[]
+    if (episodeGroupData?.groups) {
+      const sortedGroups = [...episodeGroupData.groups].sort(
+        (a, b) => a.order - b.order,
+      );
+      sortedGroups.forEach((group, idx) => {
+        const seasonNum = idx + 1;
+        map[seasonNum] = [...(group.episodes || [])]
+          .sort((a, b) => a.order - b.order)
+          .map((_, i) => i + 1);
+      });
+    } else if (useAnilistSeasons && seasonData?.episodes) {
+      let offset = 0;
+      for (const s of anilistSeasons) {
+        const count = s.episodes || 0;
+        map[s.seasonNum] = Array.from({ length: count }, (_, i) => i + 1);
+        offset += count;
+      }
+    }
+    return map;
+  }, [episodeGroupData, useAnilistSeasons, anilistSeasons, seasonData]);
+
   // ── Episode slice (AniList virtual seasons only) ───────────────────────────
   const getSeasonEpisodes = useCallback(
     (rawEpisodes) => {
@@ -1019,46 +1050,60 @@ export default function TVPage({
   );
 
   // ── Season watched helpers ─────────────────────────────────────────────────
+  // Pre-build a map: seasonNum → Set of episode numbers that are watched.
+  // Built directly from the watched keys so non-selected seasons are always correct.
+  const watchedBySeasonMap = useMemo(() => {
+    const map = {}; // seasonNum → Set<epNum>
+    const prefix = `tv_${item.id}_`;
+    for (const key of Object.keys(watched || {})) {
+      if (!key.startsWith(prefix)) continue;
+      // key format: tv_{id}_s{season}e{episode}
+      const rest = key.slice(prefix.length); // "s12e408"
+      const m = rest.match(/^s(\d+)e(\d+)$/);
+      if (!m) continue;
+      const sNum = Number(m[1]);
+      const eNum = Number(m[2]);
+      if (!map[sNum]) map[sNum] = new Set();
+      map[sNum].add(eNum);
+    }
+    return map;
+  }, [watched, item.id]);
+
   // Memoized map: seasonNum → "all" | "some" | "none"
-  // Recomputed only when watched/seasons change, not on every render.
   const seasonWatchedMap = useMemo(() => {
     const map = {};
     for (const s of seasons) {
       const num = s.season_number;
       const isSelected = num === selectedSeason;
-      // For the currently-loaded season use actual episode objects so
-      // remapped / non-sequential episode_numbers match the stored keys exactly.
-      const loadedEps =
-        isSelected && currentSeasonEpisodes.length > 0
-          ? currentSeasonEpisodes
-          : null;
-      const count = loadedEps ? loadedEps.length : s.episode_count || 0;
-      if (!count) {
-        map[num] = "none";
+
+      // For the selected season with loaded episodes: use exact episode objects
+      if (isSelected && currentSeasonEpisodes.length > 0) {
+        const epNums = currentSeasonEpisodes.map((ep) => ep.episode_number);
+        const watchedSet = watchedBySeasonMap[num] || new Set();
+        const watchedCount = epNums.filter((n) => watchedSet.has(n)).length;
+        if (watchedCount === 0) map[num] = "none";
+        else if (watchedCount === epNums.length) map[num] = "all";
+        else {
+          const pct = watchedCount / epNums.length;
+          map[num] = pct < 0.375 ? "some25" : pct < 0.625 ? "some50" : "some75";
+        }
         continue;
       }
-      let watchedCount = 0;
-      if (loadedEps) {
-        for (const ep of loadedEps) {
-          if (watched?.[`tv_${item.id}_s${num}e${ep.episode_number}`])
-            watchedCount++;
-        }
-      } else {
-        for (let i = 1; i <= count; i++) {
-          if (watched?.[`tv_${item.id}_s${num}e${i}`]) watchedCount++;
-        }
-      }
-      if (watchedCount === 0) {
-        map[num] = "none";
-      } else if (watchedCount === count) {
-        map[num] = "all";
-      } else {
-        const pct = watchedCount / count;
+
+      // For non-selected seasons: derive watched state from watched keys directly.
+      const count = s.episode_count || 0;
+      const watchedSet = watchedBySeasonMap[num];
+      const watchedCount = watchedSet ? watchedSet.size : 0;
+
+      if (watchedCount === 0) map[num] = "none";
+      else if (count > 0 && watchedCount >= count) map[num] = "all";
+      else {
+        const pct = count > 0 ? watchedCount / count : 0;
         map[num] = pct < 0.375 ? "some25" : pct < 0.625 ? "some50" : "some75";
       }
     }
     return map;
-  }, [seasons, selectedSeason, currentSeasonEpisodes, watched, item.id]);
+  }, [seasons, selectedSeason, currentSeasonEpisodes, watchedBySeasonMap]);
 
   const isSeasonWatched = useCallback(
     (seasonNum) => seasonWatchedMap[seasonNum] === "all",
@@ -1067,47 +1112,79 @@ export default function TVPage({
 
   const markSeasonWatched = useCallback(
     (seasonNum) => {
-      const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
-      const episodes =
-        seasonNum === selectedSeason ? currentSeasonEpisodes : null;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      if (episodes && episodes.length > 0) {
-        // Use actual loaded episode objects
-        for (const ep of episodes) {
+      // Clear any legacy/mismatched keys for this season first
+      const clearLegacy = () => {
+        const prefix = `tv_${item.id}_s${seasonNum}e`;
+        for (const key of Object.keys(watchedRef.current || {})) {
+          if (key.startsWith(prefix)) onMarkUnwatched?.(key);
+        }
+      };
+
+      const applyWatched = (eps) => {
+        clearLegacy();
+        for (const ep of eps) {
           if (ep.air_date && new Date(ep.air_date) > today) continue;
           onMarkWatched?.(`tv_${item.id}_s${seasonNum}e${ep.episode_number}`);
         }
+      };
+
+      if (seasonNum === selectedSeason && currentSeasonEpisodes.length > 0) {
+        applyWatched(currentSeasonEpisodes);
+      } else if (seasonDataCache[seasonNum]) {
+        applyWatched(seasonDataCache[seasonNum]);
       } else {
-        // Episodes not loaded (non-selected season)
-        const count = seasonInfo?.episode_count || 0;
-        for (let i = 1; i <= count; i++) {
-          onMarkWatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
-        }
+        tmdbFetch(`/tv/${item.id}/season/${seasonNum}`, apiKey).then((d) => {
+          if (d?.episodes?.length) {
+            setSeasonDataCache((prev) => ({ ...prev, [seasonNum]: d.episodes }));
+            applyWatched(d.episodes);
+          }
+        });
       }
     },
-    [seasons, selectedSeason, currentSeasonEpisodes, item.id, onMarkWatched],
+    [selectedSeason, currentSeasonEpisodes, seasonDataCache, item.id, apiKey, onMarkWatched, onMarkUnwatched],
   );
 
   const markSeasonUnwatched = useCallback(
     (seasonNum) => {
-      const seasonInfo = seasons.find((s) => s.season_number === seasonNum);
-      const episodes =
-        seasonNum === selectedSeason ? currentSeasonEpisodes : null;
-
-      if (episodes && episodes.length > 0) {
-        for (const ep of episodes) {
+      // Always clear ALL existing watched keys for this season first
+      // (handles legacy keys from old numbering schemes)
+      const applyUnwatched = (eps) => {
+        for (const ep of eps) {
           onMarkUnwatched?.(`tv_${item.id}_s${seasonNum}e${ep.episode_number}`);
         }
-      } else {
-        const count = seasonInfo?.episode_count || 0;
-        for (let i = 1; i <= count; i++) {
-          onMarkUnwatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
+      };
+
+      // Additionally clear any keys already in watched for this season
+      // (covers mismatched legacy keys from before the fix)
+      const clearExisting = () => {
+        const prefix = `tv_${item.id}_s${seasonNum}e`;
+        for (const key of Object.keys(watchedRef.current || {})) {
+          if (key.startsWith(prefix)) {
+            onMarkUnwatched?.(key);
+          }
         }
+      };
+
+      if (seasonNum === selectedSeason && currentSeasonEpisodes.length > 0) {
+        clearExisting();
+        applyUnwatched(currentSeasonEpisodes);
+      } else if (seasonDataCache[seasonNum]) {
+        clearExisting();
+        applyUnwatched(seasonDataCache[seasonNum]);
+      } else {
+        clearExisting();
+        tmdbFetch(`/tv/${item.id}/season/${seasonNum}`, apiKey).then((d) => {
+          if (d?.episodes?.length) {
+            setSeasonDataCache((prev) => ({ ...prev, [seasonNum]: d.episodes }));
+            applyUnwatched(d.episodes);
+          }
+        });
       }
     },
-    [seasons, selectedSeason, currentSeasonEpisodes, item.id, onMarkUnwatched],
+    [selectedSeason, currentSeasonEpisodes, seasonDataCache, item.id, apiKey, onMarkUnwatched],
   );
 
   const currentProgressKey = selectedEp
