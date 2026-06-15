@@ -22,6 +22,7 @@
     "dist:mac": "cross-env ELECTRON_DIST=1 vite build && electron-builder --mac --universal --publish never"
   },
   "dependencies": {
+    "ogl": "^1.0.11",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

@@ -1,0 +1,8 @@
+assistant: claude
+
+worktree:
+  baseBranch: main
+
+defaults:
+  loadDefaultCommands: true
+  loadDefaultWorkflows: true
