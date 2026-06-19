@@ -2052,9 +2052,8 @@ export default function TVPage({
                   <iframe
                     ref={webviewRef}
                     src={playerUrl}
-                    allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                    allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write; web-share"
                     allowFullScreen
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
                     onLoad={() => setWebviewLoading(false)}
                     style={playerFrameStyle}
                     tabIndex={-1}
