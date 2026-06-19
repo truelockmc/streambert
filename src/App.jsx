@@ -17,7 +17,12 @@ import {
   ACCENT_PRESETS,
 } from "./utils/appearance";
 import { collectBackupData } from "./utils/backup";
-import { tmdbFetch, setApiErrorHandlers } from "./utils/api";
+import {
+  detectManagedTmdbApiKey,
+  isManagedTmdbApiKey,
+  tmdbFetch,
+  setApiErrorHandlers,
+} from "./utils/api";
 import { clearAppCaches } from "./utils/storage";
 
 import Sidebar from "./components/Sidebar";
@@ -316,9 +321,12 @@ export default function App() {
   // ── Load API key from secure storage on startup ──
   useEffect(() => {
     let mounted = true;
-    secureStorage.get("apikey").then((val) => {
+    secureStorage.get("apikey").then(async (val) => {
       if (!mounted) return;
-      setApiKey(val || null);
+      const managed = val ? null : await detectManagedTmdbApiKey();
+      if (!mounted) return;
+      if (managed && window.electron) secureStorage.set("apikey", managed);
+      setApiKey(val || managed || null);
       setApiKeyLoaded(true);
     });
     return () => {
@@ -362,7 +370,7 @@ export default function App() {
 
   // ── Validate stored API key on startup ───────────────────────────────────
   useEffect(() => {
-    if (!apiKey) {
+    if (!apiKey || isManagedTmdbApiKey(apiKey)) {
       setApiKeyStatus("ok");
       return;
     }

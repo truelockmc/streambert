@@ -468,6 +468,12 @@ ipcMain.handle("get-pip-webcontents-id", () => {
   return null;
 });
 
+ipcMain.handle("get-default-tmdb-token", () => {
+  const token = process.env.STREAMBERT_TMDB_TOKEN || null;
+  delete process.env.STREAMBERT_TMDB_TOKEN;
+  return token;
+});
+
 // -- Popout window controls (used by popout-preload.js title bar buttons) -----
 ipcMain.handle("popout-window-minimize", () => {
   if (pipWindow && !pipWindow.isDestroyed()) pipWindow.minimize();
