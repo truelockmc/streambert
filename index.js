@@ -230,6 +230,7 @@ function createWindow() {
       additionalArguments: ["--js-flags=--max-old-space-size=256 --expose-gc"],
     },
   });
+  playerIpc.registerWindowStateListeners(mainWindow);
 
   // Force long-lived disk caching for TMDB images in the default session.
   session.defaultSession.webRequest.onHeadersReceived(

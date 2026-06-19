@@ -52,19 +52,26 @@ export async function checkForUpdates() {
   const url =
     data.html_url || `https://github.com/${GITHUB_REPO}/releases/latest`;
 
+  const toAssetInfo = (asset) => ({
+    url: asset.browser_download_url,
+    digest: asset.digest || null,
+    name: asset.name,
+    size: asset.size || null,
+  });
+
   // Map release assets to install formats
   const assets = {};
   for (const asset of data.assets || []) {
     const name = asset.name.toLowerCase();
     if (name.endsWith(".appimage"))
-      assets.appimage = asset.browser_download_url;
-    else if (name.endsWith(".deb")) assets.deb = asset.browser_download_url;
+      assets.appimage = toAssetInfo(asset);
+    else if (name.endsWith(".deb")) assets.deb = toAssetInfo(asset);
     else if (name.endsWith(".exe"))
-      assets.exe = asset.browser_download_url;
+      assets.exe = toAssetInfo(asset);
     else if (name.endsWith(".pacman"))
-      assets.pacman = asset.browser_download_url;
+      assets.pacman = toAssetInfo(asset);
     else if (name.endsWith(".dmg"))
-      assets.dmg = asset.browser_download_url;
+      assets.dmg = toAssetInfo(asset);
   }
 
   return {

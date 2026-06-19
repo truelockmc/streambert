@@ -1025,6 +1025,7 @@ export default function App() {
                 onMarkWatched={markWatched}
                 onMarkUnwatched={markUnwatched}
                 onRemoveHistory={removeHistory}
+                apiKey={apiKey}
               />
             )}
             {page === "settings" && (

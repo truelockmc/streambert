@@ -16,12 +16,13 @@ export default function LibraryPage({
   onMarkWatched,
   onMarkUnwatched,
   onRemoveHistory,
+  apiKey,
 }) {
   const allItems = useMemo(
     () => [...inProgress, ...saved],
     [inProgress, saved],
   );
-  const { ratingsMap, ageLimitSetting } = useRatings(allItems);
+  const { ratingsMap, ageLimitSetting } = useRatings(allItems, apiKey);
 
   const [sort, setSort] = useState(
     () => storage.get(STORAGE_KEYS.LIBRARY_SORT) || "manual",
