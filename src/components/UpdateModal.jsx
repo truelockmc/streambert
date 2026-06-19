@@ -446,9 +446,11 @@ export default function UpdateModal({
     return () => window.electron.offUpdateProgress(handler);
   }, []);
 
-  const assetUrl = format && assets?.[format];
+  const asset = format ? assets?.[format] : null;
+  const assetUrl = typeof asset === "string" ? asset : asset?.url;
+  const assetDigest = typeof asset === "string" ? null : asset?.digest;
   const canInstall =
-    format && assetUrl && activeDownloads === 0 && phase === "idle";
+    format && assetUrl && assetDigest && activeDownloads === 0 && phase === "idle";
 
   const handleInstall = async () => {
     if (!canInstall) return;
@@ -461,6 +463,7 @@ export default function UpdateModal({
       const result = await window.electron.downloadAndInstallUpdate({
         url: assetUrl,
         format,
+        digest: assetDigest,
       });
       if (cancelRef.current) return;
       if (!result.ok) throw new Error(result.error || "Update failed");
@@ -693,6 +696,25 @@ export default function UpdateModal({
               style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}
             >
               Could not detect install format. Use the{" "}
+              <a
+                href={url}
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.electron?.openExternal(url);
+                }}
+                style={{ color: "var(--red)", cursor: "pointer" }}
+              >
+                GitHub releases page
+              </a>{" "}
+              to download manually.
+            </div>
+          )}
+
+          {format && assetUrl && !assetDigest && phase === "idle" && (
+            <div
+              style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}
+            >
+              This release asset does not include a checksum. Use the{" "}
               <a
                 href={url}
                 onClick={(e) => {

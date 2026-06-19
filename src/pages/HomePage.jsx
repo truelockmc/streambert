@@ -70,7 +70,7 @@ export default function HomePage({
     [inProgress, trending, trendingTV, recommendedItems, topRatedItems],
   );
 
-  const { ratingsMap, ageLimitSetting } = useRatings(allItems);
+  const { ratingsMap, ageLimitSetting } = useRatings(allItems, apiKey);
 
   const getRating = useCallback(
     (item) => getRatingForItem(item, ratingsMap),
