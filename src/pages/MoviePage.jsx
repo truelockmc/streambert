@@ -50,6 +50,7 @@ import {
   getFailoverSource,
   setFailoverSource,
   clearFailoverSource,
+  isElectron,
 } from "../utils/storage";
 import {
   fetchMovieRating,
@@ -281,6 +282,8 @@ export default function MoviePage({
   // Fetch AniList data + auto-set source for anime/non-anime
   useEffect(() => {
     let mounted = true;
+    const browserDefaultSource =
+      getNextNonAsyncSource(ANIME_DEFAULT_SOURCE) || NON_ANIME_DEFAULT_SOURCE;
     if (isAnime) {
       fetchAnilistData(item.title || item.name, "ANIME", item.id).then(
         (data) => {
@@ -289,18 +292,28 @@ export default function MoviePage({
       );
       // Switch to anime source if current source is not an anime source
       const currentSrc = PLAYER_SOURCES.find((s) => s.id === playerSource);
-      if (!currentSrc?.tag) {
+      if (!currentSrc?.tag || (!isElectron && sourceIsAsync(currentSrc.id))) {
         const saved = storage.get("playerSource");
         const savedSrc = PLAYER_SOURCES.find((s) => s.id === saved);
-        setPlayerSource(savedSrc?.tag ? saved : ANIME_DEFAULT_SOURCE);
+        const savedIsUsableAnime =
+          savedSrc?.tag && (isElectron || !sourceIsAsync(savedSrc.id));
+        setPlayerSource(
+          savedIsUsableAnime
+            ? saved
+            : isElectron
+              ? ANIME_DEFAULT_SOURCE
+              : browserDefaultSource,
+        );
       }
     } else {
       // Switch back to non-anime source if current source is anime-only
       const currentSrc = PLAYER_SOURCES.find((s) => s.id === playerSource);
-      if (currentSrc?.tag) {
+      if (currentSrc?.tag || (!isElectron && sourceIsAsync(currentSrc?.id))) {
         const saved = storage.get("playerSource");
         const savedSrc = PLAYER_SOURCES.find((s) => s.id === saved);
-        setPlayerSource(!savedSrc?.tag ? saved : NON_ANIME_DEFAULT_SOURCE);
+        const savedIsUsable =
+          savedSrc && !savedSrc.tag && (isElectron || !sourceIsAsync(savedSrc.id));
+        setPlayerSource(savedIsUsable ? saved : NON_ANIME_DEFAULT_SOURCE);
       }
     }
     return () => {
@@ -331,6 +344,21 @@ export default function MoviePage({
     }
 
     if (!sourceIsAsync(playerSource)) return;
+    if (!isElectron) {
+      const next = getNextNonAsyncSource(playerSource);
+      if (next && next !== playerSource) {
+        setFailoverSource(epKey, next);
+        setM3u8Url(null);
+        setInterceptedSubs([]);
+        resolvedPlayerUrlRef.current = null;
+        setResolvedPlayerUrl(null);
+        setResolveError(null);
+        setPlayerSource(next);
+      } else {
+        setResolveError("AllManga playback requires the desktop app.");
+      }
+      return;
+    }
     // Use refs as guards
     if (resolvedPlayerUrlRef.current || resolvingUrlRef.current) return;
     resolvingUrlRef.current = true;
@@ -477,6 +505,7 @@ export default function MoviePage({
 
   // Attach webview load events so we know when the new source has painted
   useEffect(() => {
+    if (!isElectron) return;
     if (!playing) return;
     const wv = webviewRef.current;
     if (!wv) return;
@@ -491,7 +520,7 @@ export default function MoviePage({
 
   // ── Auto-track progress + auto-watched every 5s ──────────────────────────
   useEffect(() => {
-    if (!playing || !sourceSupportsProgress(playerSource)) return;
+    if (!playing || !isElectron || !sourceSupportsProgress(playerSource)) return;
     let interval = null;
     const timer = setTimeout(() => {
       interval = setInterval(async () => {
@@ -627,7 +656,7 @@ export default function MoviePage({
 
   // ── PiP pop-out: navigate main webview away so only one stream is active ──
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || !isElectron) return;
     const openH = window.electron?.onPipOpened?.(async () => {
       setPipOpen(true);
       pipWebContentsIdRef.current =
@@ -682,6 +711,33 @@ export default function MoviePage({
         dl.status === "local" ||
         dl.status === "downloading"),
   );
+  const availablePlayerSources = isElectron
+    ? PLAYER_SOURCES
+    : PLAYER_SOURCES.filter((src) => !sourceIsAsync(src.id));
+  const playerUrl = pipOpen
+    ? "about:blank"
+    : sourceIsAsync(playerSource)
+      ? resolvedPlayerUrl || "about:blank"
+      : getSourceUrl(
+          playerSource,
+          "movie",
+          item.id,
+          null,
+          null,
+          {},
+          playerAccentColor,
+          playerSubLang,
+        );
+  const playerFrameHidden =
+    webviewLoading || (sourceIsAsync(playerSource) && !resolvedPlayerUrl);
+  const playerFrameStyle = {
+    position: "absolute",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    border: "none",
+    visibility: playerFrameHidden ? "hidden" : "visible",
+  };
 
   return (
     <div className="fade-in">
@@ -954,40 +1010,26 @@ export default function MoviePage({
                 </button>
               </div>
             )}
-            <webview
-              ref={webviewRef}
-              src={
-                pipOpen
-                  ? "about:blank"
-                  : sourceIsAsync(playerSource)
-                    ? resolvedPlayerUrl || "about:blank"
-                    : getSourceUrl(
-                        playerSource,
-                        "movie",
-                        item.id,
-                        null,
-                        null,
-                        {},
-                        playerAccentColor,
-                        playerSubLang,
-                      )
-              }
-              partition="persist:player"
-              allowpopups="false"
-              sandbox="allow-scripts allow-same-origin allow-forms"
-              style={{
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                border: "none",
-                visibility:
-                  webviewLoading ||
-                  (sourceIsAsync(playerSource) && !resolvedPlayerUrl)
-                    ? "hidden"
-                    : "visible",
-              }}
-            />
+            {isElectron ? (
+              <webview
+                ref={webviewRef}
+                src={playerUrl}
+                partition="persist:player"
+                allowpopups="false"
+                sandbox="allow-scripts allow-same-origin allow-forms"
+                style={playerFrameStyle}
+              />
+            ) : (
+              <iframe
+                ref={webviewRef}
+                src={playerUrl}
+                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                allowFullScreen
+                sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
+                onLoad={() => setWebviewLoading(false)}
+                style={playerFrameStyle}
+              />
+            )}
             {/* Left-side overlay button group, flex row, no fixed px offsets */}
             <div className="player-overlay-group">
               <button
@@ -1041,39 +1083,25 @@ export default function MoviePage({
                 )}
               </button>
               {/* Pop-out button*/}
-              <button
-                className="player-overlay-btn"
-                onClick={() => {
-                  if (pipOpen) {
-                    window.electron?.closePipWindow?.();
-                    return;
-                  }
-                  const url = sourceIsAsync(playerSource)
-                    ? resolvedPlayerUrl
-                    : getSourceUrl(
-                        playerSource,
-                        "movie",
-                        item.id,
-                        null,
-                        null,
-                        {},
-                        playerAccentColor,
-                        playerSubLang,
-                      );
-                  if (!url) return;
-                  pipUrlRef.current = url;
-                  window.electron?.openPipWindow?.(url, item.title);
-                }}
-                title={pipOpen ? "Close pop-out" : "Pop out player"}
-                disabled={
-                  !pipOpen &&
-                  (webviewLoading ||
-                    !!(sourceIsAsync(playerSource) && !resolvedPlayerUrl))
-                }
-                style={pipOpen ? { color: "var(--red)" } : undefined}
-              >
-                <PopOutIcon />
-              </button>
+              {isElectron && (
+                <button
+                  className="player-overlay-btn"
+                  onClick={() => {
+                    if (pipOpen) {
+                      window.electron?.closePipWindow?.();
+                      return;
+                    }
+                    if (!playerUrl || playerUrl === "about:blank") return;
+                    pipUrlRef.current = playerUrl;
+                    window.electron?.openPipWindow?.(playerUrl, item.title);
+                  }}
+                  title={pipOpen ? "Close pop-out" : "Pop out player"}
+                  disabled={!pipOpen && playerFrameHidden}
+                  style={pipOpen ? { color: "var(--red)" } : undefined}
+                >
+                  <PopOutIcon />
+                </button>
+              )}
             </div>
             {showSourceMenu && menuPos && (
               <div
@@ -1081,7 +1109,7 @@ export default function MoviePage({
                 style={{ top: menuPos.top, left: menuPos.left }}
                 onClick={(e) => e.stopPropagation()}
               >
-                {PLAYER_SOURCES.map((src) => (
+                {availablePlayerSources.map((src) => (
                   <button
                     key={src.id}
                     className={
@@ -1117,48 +1145,50 @@ export default function MoviePage({
                 ))}
               </div>
             )}
-            <button
-              className="player-overlay-btn"
-              onClick={() =>
-                movieDownload
-                  ? onGoToDownloads?.(movieDownload.id)
-                  : (setShowSourceMenu(false), setShowDownload(true))
-              }
-              title={
-                movieDownload
-                  ? movieDownload.status === "downloading"
-                    ? "Downloading… - view in Downloads"
-                    : "Already downloaded - view in Downloads"
-                  : "Download"
-              }
-            >
-              {movieDownload ? (
-                <span
-                  className="player-downloaded-icon"
-                  style={{
-                    color:
-                      movieDownload.status === "downloading"
-                        ? "var(--red)"
-                        : "#4caf50",
-                  }}
-                >
-                  {movieDownload.status === "downloading" ? "↓" : "✓"}
-                </span>
-              ) : (
-                <DownloadIcon />
-              )}
-              {!movieDownload && m3u8Url && (
-                <span className="player-overlay-dot" />
-              )}
-              {!sourceSupportsProgress(playerSource) && (
-                <span
-                  className="player-no-progress-hint"
-                  title="No automatic progress tracking for this source"
-                >
-                  ⚠ no tracking
-                </span>
-              )}
-            </button>
+            {isElectron && (
+              <button
+                className="player-overlay-btn"
+                onClick={() =>
+                  movieDownload
+                    ? onGoToDownloads?.(movieDownload.id)
+                    : (setShowSourceMenu(false), setShowDownload(true))
+                }
+                title={
+                  movieDownload
+                    ? movieDownload.status === "downloading"
+                      ? "Downloading… - view in Downloads"
+                      : "Already downloaded - view in Downloads"
+                    : "Download"
+                }
+              >
+                {movieDownload ? (
+                  <span
+                    className="player-downloaded-icon"
+                    style={{
+                      color:
+                        movieDownload.status === "downloading"
+                          ? "var(--red)"
+                          : "#4caf50",
+                    }}
+                  >
+                    {movieDownload.status === "downloading" ? "↓" : "✓"}
+                  </span>
+                ) : (
+                  <DownloadIcon />
+                )}
+                {!movieDownload && m3u8Url && (
+                  <span className="player-overlay-dot" />
+                )}
+                {!sourceSupportsProgress(playerSource) && (
+                  <span
+                    className="player-no-progress-hint"
+                    title="No automatic progress tracking for this source"
+                  >
+                    ⚠ no tracking
+                  </span>
+                )}
+              </button>
+            )}
           </div>
 
           {displayPct > 0 && (

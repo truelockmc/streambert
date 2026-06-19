@@ -1,4 +1,5 @@
 node_modules/
+.vercel/
 temp/
 download_config.ini
 dist/

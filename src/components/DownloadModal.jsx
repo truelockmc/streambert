@@ -498,10 +498,12 @@ export default function DownloadModal({
   }, [m3u8Url, subEnabled, wyzieApiKey]);
 
   const pickBinaryFolder = async () => {
+    if (!isElectron) return;
     const folder = await window.electron.pickFolder();
     if (folder) setDownloaderFolder(folder);
   };
   const pickDownloadFolder = async () => {
+    if (!isElectron) return;
     const folder = await window.electron.pickFolder();
     if (folder) {
       setDownloadPath(folder);
@@ -511,6 +513,7 @@ export default function DownloadModal({
   };
 
   const handleDownload = async () => {
+    if (!isElectron) return;
     if (!downloader?.token || !downloadPath || !m3u8Url) return;
     setDownloadStatus("starting");
 
@@ -1060,11 +1063,13 @@ export default function DownloadModal({
                       Download the latest release from{" "}
                       <a
                         className="download-link"
-                        href="#"
+                        href={releaseUrl}
+                        target={isElectron ? undefined : "_blank"}
+                        rel={isElectron ? undefined : "noreferrer"}
                         onClick={(e) => {
+                          if (!isElectron) return;
                           e.preventDefault();
-                          isElectron &&
-                            window.electron.openExternal(releaseUrl);
+                          window.electron.openExternal(releaseUrl);
                         }}
                       >
                         github.com/truelockmc/vid-dl-cli-only/releases/latest

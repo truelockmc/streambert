@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { imgUrl } from "../utils/api";
+import { isElectron } from "../utils/storage";
 import { useSeasonalEvent } from "../components/seasonalEvents.jsx";
 import {
   StreambertLogo,
@@ -228,15 +229,17 @@ export default function Sidebar({
           icon={<SettingsIcon />}
           label="Settings"
         />
-        <button
-          className="sidebar-btn"
-          onClick={() => window.electron?.quitApp?.()}
-          title="Quit App"
-          style={{ color: "#e53e3e", marginTop: 4 }}
-        >
-          <QuitIcon />
-          <span className="tooltip">Quit App</span>
-        </button>
+        {isElectron && (
+          <button
+            className="sidebar-btn"
+            onClick={() => window.electron?.quitApp?.()}
+            title="Quit App"
+            style={{ color: "#e53e3e", marginTop: 4 }}
+          >
+            <QuitIcon />
+            <span className="tooltip">Quit App</span>
+          </button>
+        )}
       </div>
     </div>
   );

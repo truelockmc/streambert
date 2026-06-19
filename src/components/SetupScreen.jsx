@@ -72,11 +72,15 @@ function errorMessage(reason, status) {
 }
 
 function ExternalLink({ href, className, children }) {
+  const isDesktop = typeof window !== "undefined" && !!window.electron;
   return (
     <a
       className={className}
       href={href}
+      target={isDesktop ? undefined : "_blank"}
+      rel={isDesktop ? undefined : "noreferrer"}
       onClick={(e) => {
+        if (!isDesktop) return;
         e.preventDefault();
         window.electron.openExternal(href);
       }}

@@ -11,6 +11,7 @@
   "private": true,
   "scripts": {
     "dev": "vite build --watch",
+    "build": "vite build",
     "start": "vite build && electron .",
     "dist": "cross-env ELECTRON_DIST=1 vite build && npm run dist:linux && npm run dist:win && npm run dist:mac",
     "dist:linux": "cross-env ELECTRON_DIST=1 vite build && electron-builder --linux deb rpm AppImage pacman --publish never",

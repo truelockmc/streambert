@@ -1755,7 +1755,8 @@ kbd {
 }
 
 /* ── Webview player ─────────────────────────────────────────────────────── */
-.player-wrap webview {
+.player-wrap webview,
+.player-wrap iframe {
     position: absolute;
     inset: 0;
     width: 100%;
