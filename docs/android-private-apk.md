@@ -22,8 +22,8 @@ direct-stream player; the current movie/TV sources are embed providers.
 
 - Node.js and npm.
 - Android Studio with Android SDK installed.
-- A working Java runtime compatible with the generated Android Gradle Plugin.
-  Use the JDK bundled with current Android Studio or another JDK 17+ install.
+- A working Java runtime compatible with Capacitor Android 8.
+  Use the JDK bundled with current Android Studio or another JDK 21+ install.
 - Optional: `adb` for installing the APK on a device.
 
 ## Build A Debug APK
@@ -31,6 +31,13 @@ direct-stream player; the current movie/TV sources are embed providers.
 ```sh
 npm ci
 npm run android:debug
+```
+
+If Java is installed outside the system path, run the build with `JAVA_HOME`
+pointing at that JDK. For example:
+
+```sh
+JAVA_HOME=/path/to/jdk-21 npm run android:debug
 ```
 
 The debug APK is written to:
