@@ -49,6 +49,9 @@ import {
 import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
 import BlockedStatsModal from "../components/BlockedStatsModal";
+import WebPlayerGuard, {
+  useWebPlayerGuard,
+} from "../components/WebPlayerGuard";
 import { useBlockedStats } from "../utils/useBlockedStats";
 import {
   storage,
@@ -1614,6 +1617,15 @@ export default function TVPage({
     background: "black",
     visibility: playerFrameHidden ? "hidden" : "visible",
   };
+  const webPlayerGuard = useWebPlayerGuard(playerUrl, {
+    enabled: !isElectron && playing && playerUrl !== "about:blank",
+  });
+  const playerWrapClassName = [
+    "player-wrap",
+    playerFullscreen ? " player-wrap--fullscreen" : "",
+    webPlayerGuard.enabled ? " player-wrap--web-guarded" : "",
+    webPlayerGuard.unlocked ? " player-wrap--web-guard-open" : "",
+  ].join("");
 
   const currentEpWatched = currentProgressKey
     ? !!watched?.[currentProgressKey]
@@ -1768,7 +1780,7 @@ export default function TVPage({
                 )}
               </div>
               <div
-                className={`player-wrap${playerFullscreen ? " player-wrap--fullscreen" : ""}`}
+                className={playerWrapClassName}
                 ref={playerWrapRef}
               >
                 {/* Universal source-loading overlay, shown instantly on every source/episode switch */}
@@ -2054,11 +2066,18 @@ export default function TVPage({
                     src={playerUrl}
                     allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write; web-share"
                     allowFullScreen
+                    referrerPolicy="no-referrer"
                     onLoad={() => setWebviewLoading(false)}
                     style={playerFrameStyle}
                     tabIndex={-1}
                   />
                 )}
+                <WebPlayerGuard
+                  hidden={!webPlayerGuard.enabled || playerFrameHidden}
+                  unlocked={webPlayerGuard.unlocked}
+                  onUnlock={webPlayerGuard.unlock}
+                  onLock={webPlayerGuard.lock}
+                />
                 {/* Left-side overlay button group, flex row, no fixed px offsets */}
                 <div className="player-overlay-group">
                   <button

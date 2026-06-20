@@ -1764,6 +1764,40 @@ kbd {
     border: none;
 }
 
+.player-wrap--web-guarded:not(.player-wrap--web-guard-open) iframe {
+    pointer-events: none;
+}
+
+.web-player-guard {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at center, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.34));
+    pointer-events: auto;
+}
+
+.web-player-guard--unlocked {
+    align-items: flex-end;
+    padding: 0 0 14px;
+    background: transparent;
+    pointer-events: none;
+}
+
+.web-player-guard__button {
+    position: relative;
+    top: auto;
+    right: auto;
+    pointer-events: auto;
+    opacity: 1;
+}
+
+.player-wrap .web-player-guard .player-overlay-btn {
+    opacity: 1;
+}
+
 /* ── Player download overlay button ────────────────────────────────────── */
 .player-overlay-btn {
     position: absolute;
