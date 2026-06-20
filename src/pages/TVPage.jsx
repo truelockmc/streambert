@@ -60,6 +60,7 @@ import {
   setFailoverSource,
   clearFailoverSource,
   isElectron,
+  isAndroidNative,
 } from "../utils/storage";
 import { useAutoplay } from "../utils/useAutoplay";
 import { fetchAniSkipTimings } from "../utils/aniSkip";
@@ -1618,7 +1619,8 @@ export default function TVPage({
     visibility: playerFrameHidden ? "hidden" : "visible",
   };
   const webPlayerGuard = useWebPlayerGuard(playerUrl, {
-    enabled: !isElectron && playing && playerUrl !== "about:blank",
+    enabled:
+      !isElectron && !isAndroidNative && playing && playerUrl !== "about:blank",
   });
   const playerWrapClassName = [
     "player-wrap",

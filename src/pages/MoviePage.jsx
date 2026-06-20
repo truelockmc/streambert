@@ -54,6 +54,7 @@ import {
   setFailoverSource,
   clearFailoverSource,
   isElectron,
+  isAndroidNative,
 } from "../utils/storage";
 import {
   fetchMovieRating,
@@ -742,7 +743,8 @@ export default function MoviePage({
     visibility: playerFrameHidden ? "hidden" : "visible",
   };
   const webPlayerGuard = useWebPlayerGuard(playerUrl, {
-    enabled: !isElectron && playing && playerUrl !== "about:blank",
+    enabled:
+      !isElectron && !isAndroidNative && playing && playerUrl !== "about:blank",
   });
   const playerWrapClassName = [
     "player-wrap",

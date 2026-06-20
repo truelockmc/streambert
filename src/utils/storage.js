@@ -130,6 +130,15 @@ export const clearFailoverSource = (epKey) => {
 /** True when running inside Electron (contextBridge exposed). */
 export const isElectron = typeof window !== "undefined" && !!window.electron;
 
+/** True when running from a Capacitor native shell. */
+export const isCapacitorNative =
+  typeof window !== "undefined" &&
+  !!window.Capacitor?.isNativePlatform?.();
+
+/** True for the private Android APK shell. */
+export const isAndroidNative =
+  isCapacitorNative && window.Capacitor?.getPlatform?.() === "android";
+
 /** Format a byte count into a human-readable string. */
 export function formatBytes(bytes) {
   if (bytes === null || bytes === undefined) return "…";
