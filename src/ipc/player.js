@@ -7,8 +7,39 @@ const fs = require("fs");
 const https = require("https");
 const http = require("http");
 const os = require("os");
+const crypto = require("crypto");
 
 let _updateAbortController = null;
+
+function normaliseSha256Digest(digest) {
+  if (typeof digest !== "string") return null;
+  const trimmed = digest.trim().toLowerCase();
+  const match =
+    trimmed.match(/^sha256:([a-f0-9]{64})$/) ||
+    trimmed.match(/^([a-f0-9]{64})$/);
+  return match ? match[1] : null;
+}
+
+function sha256File(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash("sha256");
+    const stream = fs.createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
+}
+
+function registerWindowStateListeners(win) {
+  if (!win || win.isDestroyed()) return;
+  const pushMaximized = (v) => {
+    if (!win.isDestroyed()) win.webContents.send("window-maximized", v);
+  };
+  win.on("maximize", () => pushMaximized(true));
+  win.on("unmaximize", () => pushMaximized(false));
+  win.on("enter-full-screen", () => pushMaximized(true));
+  win.on("leave-full-screen", () => pushMaximized(false));
+}
 
 function register(getMainWindow, { writeSecretMigration }) {
   // ── Open file at specific timestamp in mpv / VLC ─────────────────────────
@@ -113,19 +144,6 @@ function register(getMainWindow, { writeSecretMigration }) {
     return mw ? mw.isMaximized() : false;
   });
 
-  // Push maximize state to the renderer so WindowTitlebar doesn't need to poll
-  const pushMaximized = (v) => {
-    const mw = getMainWindow();
-    if (mw && !mw.isDestroyed()) mw.webContents.send("window-maximized", v);
-  };
-  const mwForEvents = getMainWindow();
-  if (mwForEvents) {
-    mwForEvents.on("maximize", () => pushMaximized(true));
-    mwForEvents.on("unmaximize", () => pushMaximized(false));
-    mwForEvents.on("enter-full-screen", () => pushMaximized(true));
-    mwForEvents.on("leave-full-screen", () => pushMaximized(false));
-  }
-
   ipcMain.handle("quit-app", () => {
     const mw = getMainWindow();
     if (mw && !mw.isDestroyed()) mw.close();
@@ -208,12 +226,17 @@ function register(getMainWindow, { writeSecretMigration }) {
     return null;
   });
 
-  ipcMain.handle("download-and-install-update", async (_, { url, format }) => {
+  ipcMain.handle("download-and-install-update", async (_, { url, format, digest }) => {
     try {
 
       const ALLOWED_FORMATS = ["exe", "deb", "pacman", "dmg", "dmg_arm64", "appimage"];
       if (!ALLOWED_FORMATS.includes(format)) {
         return { ok: false, error: "Invalid format" };
+      }
+
+      const expectedSha256 = normaliseSha256Digest(digest);
+      if (!expectedSha256) {
+        return { ok: false, error: "Missing or invalid update checksum" };
       }
 
       const TRUSTED_ORIGIN   = "https://github.com";
@@ -339,6 +362,24 @@ function register(getMainWindow, { writeSecretMigration }) {
       });
 
       if (signal.aborted) return { ok: false, error: "Cancelled" };
+
+      const sendVerifying = () => {
+        const mw = getMainWindow();
+        if (mw && !mw.isDestroyed()) {
+          mw.webContents.send("update-progress", {
+            percent: 100,
+            label: "Verifying…",
+          });
+        }
+      };
+      sendVerifying();
+      const actualSha256 = await sha256File(destPath);
+      if (actualSha256 !== expectedSha256) {
+        try {
+          fs.unlinkSync(destPath);
+        } catch {}
+        return { ok: false, error: "Update checksum verification failed" };
+      }
 
       // ── Helper: send "Installing…" to renderer ──────────────────────────────
       const sendInstalling = () => {
@@ -520,4 +561,4 @@ function register(getMainWindow, { writeSecretMigration }) {
   });
 }
 
-module.exports = { register };
+module.exports = { register, registerWindowStateListeners };

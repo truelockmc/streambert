@@ -56,7 +56,7 @@ export const STORAGE_KEYS = {
   // Subtitle settings
   SUBTITLE_ENABLED: "subtitleDownload",
   SUBTITLE_LANG: "subtitleLang",
-  // NOTE: SUBDL_API_KEY, WYZIE_API_KEY and API_KEY are stored encrypted via secureStorage
+  // NOTE: SUBDL_API_KEY, WYZIE_API_KEY and API_KEY are stored through secureStorage
   SUBDL_API_KEY: "subdlApiKey",
   WYZIE_API_KEY: "wyzieApiKey",
   // Appearance & behaviour
@@ -130,6 +130,15 @@ export const clearFailoverSource = (epKey) => {
 /** True when running inside Electron (contextBridge exposed). */
 export const isElectron = typeof window !== "undefined" && !!window.electron;
 
+/** True when running from a Capacitor native shell. */
+export const isCapacitorNative =
+  typeof window !== "undefined" &&
+  !!window.Capacitor?.isNativePlatform?.();
+
+/** True for the private Android APK shell. */
+export const isAndroidNative =
+  isCapacitorNative && window.Capacitor?.getPlatform?.() === "android";
+
 /** Format a byte count into a human-readable string. */
 export function formatBytes(bytes) {
   if (bytes === null || bytes === undefined) return "…";
@@ -143,10 +152,11 @@ export function formatBytes(bytes) {
 }
 
 // ── Secure storage for sensitive keys ────────────────────────────────────────
-// Uses Electron safeStorage (OS keychain / DPAPI / libsecret).
-// All methods are async. Non-Electron environments silently fall back to no-op.
+// Uses Electron safeStorage (OS keychain / DPAPI / libsecret) in the desktop app.
+// Browser builds fall back to the app-prefixed localStorage used by the rest of
+// Streambert, so setup remains usable from a web link.
 //
-// Sensitive keys managed here (NOT stored in localStorage):
+// Sensitive keys managed here:
 //   "apikey"      - TMDB API key
 //   "subdlApiKey" - SubDL API key
 //   "wyzieApiKey" - Wyzie API key
@@ -157,13 +167,17 @@ const _isElectronSecure =
 export const secureStorage = {
   /** Read an encrypted value. Returns null if not set. */
   async get(key) {
-    if (!_isElectronSecure) return null;
+    if (!_isElectronSecure) return storage.get(key);
     return window.electron.secureGet(key);
   },
 
   /** Write an encrypted value. Pass null/empty to delete. */
   async set(key, value) {
-    if (!_isElectronSecure) return;
+    if (!_isElectronSecure) {
+      if (value == null || value === "") storage.remove(key);
+      else storage.set(key, value);
+      return;
+    }
     return window.electron.secureSet(key, value ?? "");
   },
 };

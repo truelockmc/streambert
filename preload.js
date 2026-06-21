@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld("electron", {
   scanDirectory: (path) => ipcRenderer.invoke("scan-directory", path),
 
   // Misc
+  getDefaultTmdbToken: () => ipcRenderer.invoke("get-default-tmdb-token"),
   pickFolder: () => ipcRenderer.invoke("pick-folder"),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
   openPath: (filePath) => ipcRenderer.invoke("open-path", filePath),

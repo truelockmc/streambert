@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { CloseIcon, ExternalLinkIcon } from "./Icons";
-import { storage } from "../utils/storage";
+import { isElectron, storage } from "../utils/storage";
 
 export const DEFAULT_INVIDIOUS_BASE = "https://inv.nadeko.net";
 
@@ -104,12 +104,14 @@ export default function TrailerModal({ trailerKey, title, onClose }) {
   const openInBrowser = () => {
     const preferred = getInvidiousBase();
     const url = `${preferred}/watch?v=${trailerKey}`;
-    window.electron?.openExternal(url);
+    if (isElectron) window.electron?.openExternal(url);
+    else window.open(url, "_blank", "noreferrer");
   };
 
   useEffect(() => {
     const wv = webviewRef.current;
     if (!wv || !currentSrc) return;
+    if (!isElectron) return;
 
     const onLoad = () => {
       wv.executeJavaScript(DETECT_BOT_JS)
@@ -231,7 +233,8 @@ export default function TrailerModal({ trailerKey, title, onClose }) {
             </div>
           )}
 
-          {currentSrc && (
+          {currentSrc &&
+            (isElectron ? (
             <webview
               ref={webviewRef}
               src={currentSrc}
@@ -247,7 +250,24 @@ export default function TrailerModal({ trailerKey, title, onClose }) {
                 transition: "opacity 0.2s",
               }}
             />
-          )}
+            ) : (
+              <iframe
+                ref={webviewRef}
+                src={currentSrc}
+                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                allowFullScreen
+                onLoad={() => setStatusMsg(null)}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  border: "none",
+                  opacity: statusMsg ? 0 : 1,
+                  transition: "opacity 0.2s",
+                }}
+              />
+            ))}
         </div>
       </div>
     </div>

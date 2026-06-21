@@ -230,6 +230,7 @@ function createWindow() {
       additionalArguments: ["--js-flags=--max-old-space-size=256 --expose-gc"],
     },
   });
+  playerIpc.registerWindowStateListeners(mainWindow);
 
   // Force long-lived disk caching for TMDB images in the default session.
   session.defaultSession.webRequest.onHeadersReceived(
@@ -465,6 +466,12 @@ ipcMain.handle("close-pip-window", () => {
 ipcMain.handle("get-pip-webcontents-id", () => {
   if (pipWindow && !pipWindow.isDestroyed()) return pipWindow.webContents.id;
   return null;
+});
+
+ipcMain.handle("get-default-tmdb-token", () => {
+  const token = process.env.STREAMBERT_TMDB_TOKEN || null;
+  delete process.env.STREAMBERT_TMDB_TOKEN;
+  return token;
 });
 
 // -- Popout window controls (used by popout-preload.js title bar buttons) -----

@@ -11,7 +11,15 @@
   "private": true,
   "scripts": {
     "dev": "vite build --watch",
+    "build": "vite build",
     "start": "vite build && electron .",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android",
+    "android:debug": "npm run android:sync && cd android && ./gradlew assembleDebug",
+    "mac:icon": "scripts/macos/build-app-icon.sh",
+    "mac:app": "npm run mac:icon && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false ELECTRON_DIST=1 vite build && electron-builder --mac dir --publish never",
+    "mac:install-autostart": "scripts/macos/install-autostart.sh",
+    "mac:uninstall-autostart": "scripts/macos/uninstall-autostart.sh",
     "dist": "cross-env ELECTRON_DIST=1 vite build && npm run dist:linux && npm run dist:win && npm run dist:mac",
     "dist:linux": "cross-env ELECTRON_DIST=1 vite build && electron-builder --linux deb rpm AppImage pacman --publish never",
     "dist:deb": "cross-env ELECTRON_DIST=1 vite build && electron-builder --linux deb --publish never",
@@ -22,16 +30,22 @@
     "dist:mac": "cross-env ELECTRON_DIST=1 vite build && electron-builder --mac --universal --publish never"
   },
   "dependencies": {
+    "@capacitor/core": "^8.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
     "@vitejs/plugin-react": "^4.7.0",
     "cross-env": "^7.0.3",
     "electron": "^40.4.1",
     "electron-builder": "^26.7.0",
     "terser": "^5.46.0",
     "vite": "^7.3.1"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
   },
   "build": {
     "appId": "com.truelockmc.streambert",
@@ -80,7 +94,8 @@
       "!**/node_modules/rollup/**",
       "!**/node_modules/esbuild/**",
       "!**/node_modules/@esbuild/**",
-      "!**/node_modules/@rollup/**"
+      "!**/node_modules/@rollup/**",
+      "!**/node_modules/@capacitor/android/**"
     ],
     "nsis": {
       "oneClick": false,
@@ -100,7 +115,8 @@
       ]
     },
     "mac": {
-      "icon": "public/icon.png",
+      "icon": "build/icon.icns",
+      "identity": null,
       "target": [
         {
           "target": "dmg",

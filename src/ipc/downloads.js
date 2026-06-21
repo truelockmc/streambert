@@ -719,7 +719,7 @@ function register(getMainWindow) {
 
   ipcMain.handle("get-downloads", () => downloads);
 
-  ipcMain.handle("delete-download", (_, { id, filePath }) => {
+  ipcMain.handle("delete-download", (_, { id }) => {
     try {
       const dlEntry = downloads.find((d) => d.id === id);
       if (activeProcs.has(id)) {
@@ -728,9 +728,9 @@ function register(getMainWindow) {
         } catch {}
         activeProcs.delete(id);
       }
-      if (filePath) {
+      if (dlEntry?.filePath) {
         try {
-          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+          if (fs.existsSync(dlEntry.filePath)) fs.unlinkSync(dlEntry.filePath);
         } catch {}
       }
       for (const sp of dlEntry?.subtitlePaths || []) {

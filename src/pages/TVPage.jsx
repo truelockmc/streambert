@@ -49,6 +49,9 @@ import {
 import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
 import BlockedStatsModal from "../components/BlockedStatsModal";
+import WebPlayerGuard, {
+  useWebPlayerGuard,
+} from "../components/WebPlayerGuard";
 import { useBlockedStats } from "../utils/useBlockedStats";
 import {
   storage,
@@ -56,6 +59,8 @@ import {
   getFailoverSource,
   setFailoverSource,
   clearFailoverSource,
+  isElectron,
+  isAndroidNative,
 } from "../utils/storage";
 import { useAutoplay } from "../utils/useAutoplay";
 import { fetchAniSkipTimings } from "../utils/aniSkip";
@@ -644,6 +649,8 @@ export default function TVPage({
     let mounted = true;
     setAnilistData(null);
     setAnilistSeasons(null);
+    const browserDefaultSource =
+      getNextNonAsyncSource(ANIME_DEFAULT_SOURCE) || NON_ANIME_DEFAULT_SOURCE;
     if (isAnime) {
       setAnilistLoading(true);
       fetchAnilistData(item.name || item.title, "ANIME", item.id)
@@ -661,19 +668,29 @@ export default function TVPage({
         });
       // Switch to anime source if current source is not an anime source
       const currentSrc = PLAYER_SOURCES.find((s) => s.id === playerSource);
-      if (!currentSrc?.tag) {
+      if (!currentSrc?.tag || (!isElectron && sourceIsAsync(currentSrc.id))) {
         const saved = storage.get("playerSource");
         const savedSrc = PLAYER_SOURCES.find((s) => s.id === saved);
-        setPlayerSource(savedSrc?.tag ? saved : ANIME_DEFAULT_SOURCE);
+        const savedIsUsableAnime =
+          savedSrc?.tag && (isElectron || !sourceIsAsync(savedSrc.id));
+        setPlayerSource(
+          savedIsUsableAnime
+            ? saved
+            : isElectron
+              ? ANIME_DEFAULT_SOURCE
+              : browserDefaultSource,
+        );
       }
     } else {
       setAnilistLoading(false);
       // Switch back to non-anime source if current source is anime-only
       const currentSrc = PLAYER_SOURCES.find((s) => s.id === playerSource);
-      if (currentSrc?.tag) {
+      if (currentSrc?.tag || (!isElectron && sourceIsAsync(currentSrc?.id))) {
         const saved = storage.get("playerSource");
         const savedSrc = PLAYER_SOURCES.find((s) => s.id === saved);
-        setPlayerSource(!savedSrc?.tag ? saved : NON_ANIME_DEFAULT_SOURCE);
+        const savedIsUsable =
+          savedSrc && !savedSrc.tag && (isElectron || !sourceIsAsync(savedSrc.id));
+        setPlayerSource(savedIsUsable ? saved : NON_ANIME_DEFAULT_SOURCE);
       }
     }
     return () => {
@@ -705,6 +722,21 @@ export default function TVPage({
     }
 
     if (!isAsync) return;
+    if (!isElectron) {
+      const next = getNextNonAsyncSource(playerSource);
+      if (next && next !== playerSource) {
+        setFailoverSource(epKey, next);
+        setM3u8Url(null);
+        setInterceptedSubs([]);
+        resolvedPlayerUrlRef.current = null;
+        setResolvedPlayerUrl(null);
+        setResolveError(null);
+        setPlayerSource(next);
+      } else {
+        setResolveError("AllManga playback requires the desktop app.");
+      }
+      return;
+    }
     // Use refs as guards
     if (resolvedPlayerUrlRef.current || resolvingUrlRef.current) return;
     resolvingUrlRef.current = true;
@@ -1136,6 +1168,7 @@ export default function TVPage({
   // Attach webview load events so we know when the new source has painted.
   // Also poll for video duration so AniSkip markers appear without waiting for the 5s progress tick.
   useEffect(() => {
+    if (!isElectron) return;
     if (!playing) return;
     const wv = webviewRef.current;
     if (!wv) return;
@@ -1197,6 +1230,7 @@ export default function TVPage({
   // ── AniSkip: auto-skip or show manual prompt ─────────────────
   // ── AniSkip: manual skip handler ─────────────────────────────────────────
   const handleManualSkip = useCallback(async () => {
+    if (!isElectron) return;
     if (!skipPrompt || !skipTimings?.[skipPrompt]) return;
     const rawEnd = skipTimings[skipPrompt].endTime;
     const endTime = Number(rawEnd);
@@ -1214,6 +1248,7 @@ export default function TVPage({
   // Use webview before-input-event so Enter reaches main-ui before the webview
   // handles it (avoids the webview's Space/Enter play-pause intercepting it).
   useEffect(() => {
+    if (!isElectron) return;
     if (!skipPrompt) return;
     const wv = webviewRef.current;
     if (!wv) return;
@@ -1230,10 +1265,10 @@ export default function TVPage({
   // Skip detection runs every tick, progress is saved every 5th tick (5s).
   useEffect(() => {
     const aniSkipActive =
-      introSkipMode !== "off" && playing && !!skipTimings && isAsync;
+      isElectron && introSkipMode !== "off" && playing && !!skipTimings && isAsync;
 
     if (!aniSkipActive) setSkipPrompt(null);
-    if (!playing || !currentProgressKey) return;
+    if (!playing || !isElectron || !currentProgressKey) return;
 
     const TICK = aniSkipActive ? 1000 : 5000;
     let tickCount = 0;
@@ -1397,6 +1432,7 @@ export default function TVPage({
 
   // Skip backward/forward by N seconds via webview JS injection
   const seekBy = useCallback(async (seconds) => {
+    if (!isElectron) return;
     try {
       const wv = webviewRef.current;
       if (!wv) return;
@@ -1410,6 +1446,7 @@ export default function TVPage({
   }, []);
 
   useEffect(() => {
+    if (!isElectron) return;
     const wv = webviewRef.current;
     if (!wv || !playing || !isAsync) return;
 
@@ -1503,7 +1540,7 @@ export default function TVPage({
   // the native Fullscreen API which would otherwise fullscreen the entire app).
   // Videasy and AllManga handle fullscreen internally via CSS, skip those.
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || !isElectron) return;
     if (!NEEDS_INTERCEPT.includes(playerSource)) return;
     const enterH = window.electron?.onWebviewEnterFullscreen?.(() => {
       // requestFullscreen() is rejected when Electron is already in fullscreen -> use css overlay
@@ -1525,7 +1562,7 @@ export default function TVPage({
 
   // ── PiP pop-out: navigate main webview away so only one stream is active ──
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || !isElectron) return;
     const openH = window.electron?.onPipOpened?.(async () => {
       setPipOpen(true);
       pipWebContentsIdRef.current =
@@ -1550,6 +1587,47 @@ export default function TVPage({
   const mediaName = selectedEp
     ? `${title}${effectiveYear ? ` (${effectiveYear})` : ""} S${String(selectedSeason).padStart(2, "0")} E${String(selectedEp.episode_number).padStart(2, "0")}`
     : title;
+  const availablePlayerSources = isElectron
+    ? PLAYER_SOURCES
+    : PLAYER_SOURCES.filter((src) => !sourceIsAsync(src.id));
+  const playerUrl = !selectedEp
+    ? "about:blank"
+    : pipOpen
+      ? "about:blank"
+      : isAsync
+        ? resolvedPlayerUrl || "about:blank"
+        : getSourceUrl(
+            playerSource,
+            "tv",
+            item.id,
+            playerEp.season,
+            playerEp.episode,
+            {},
+            playerAccentColor,
+            playerSubLang,
+          );
+  const playerFrameHidden = webviewLoading || (isAsync && !resolvedPlayerUrl);
+  const playerFrameStyle = {
+    position: "absolute",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    border: "none",
+    outline: "none",
+    boxShadow: "none",
+    background: "black",
+    visibility: playerFrameHidden ? "hidden" : "visible",
+  };
+  const webPlayerGuard = useWebPlayerGuard(playerUrl, {
+    enabled:
+      !isElectron && !isAndroidNative && playing && playerUrl !== "about:blank",
+  });
+  const playerWrapClassName = [
+    "player-wrap",
+    playerFullscreen ? " player-wrap--fullscreen" : "",
+    webPlayerGuard.enabled ? " player-wrap--web-guarded" : "",
+    webPlayerGuard.unlocked ? " player-wrap--web-guard-open" : "",
+  ].join("");
 
   const currentEpWatched = currentProgressKey
     ? !!watched?.[currentProgressKey]
@@ -1704,7 +1782,7 @@ export default function TVPage({
                 )}
               </div>
               <div
-                className={`player-wrap${playerFullscreen ? " player-wrap--fullscreen" : ""}`}
+                className={playerWrapClassName}
                 ref={playerWrapRef}
               >
                 {/* Universal source-loading overlay, shown instantly on every source/episode switch */}
@@ -1974,42 +2052,33 @@ export default function TVPage({
                     </div>
                   </div>
                 )}
-                <webview
-                  ref={webviewRef}
-                  src={
-                    pipOpen
-                      ? "about:blank"
-                      : isAsync
-                        ? resolvedPlayerUrl || "about:blank"
-                        : getSourceUrl(
-                            playerSource,
-                            "tv",
-                            item.id,
-                            playerEp.season,
-                            playerEp.episode,
-                            {},
-                            playerAccentColor,
-                            playerSubLang,
-                          )
-                  }
-                  partition="persist:player"
-                  allowpopups="false"
-                  sandbox="allow-scripts allow-same-origin allow-forms"
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    border: "none",
-                    outline: "none",
-                    boxShadow: "none",
-                    background: "black",
-                    visibility:
-                      webviewLoading || (isAsync && !resolvedPlayerUrl)
-                        ? "hidden"
-                        : "visible",
-                  }}
-                  tabIndex={-1}
+                {isElectron ? (
+                  <webview
+                    ref={webviewRef}
+                    src={playerUrl}
+                    partition="persist:player"
+                    allowpopups="false"
+                    sandbox="allow-scripts allow-same-origin allow-forms"
+                    style={playerFrameStyle}
+                    tabIndex={-1}
+                  />
+                ) : (
+                  <iframe
+                    ref={webviewRef}
+                    src={playerUrl}
+                    allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write; web-share"
+                    allowFullScreen
+                    referrerPolicy="no-referrer"
+                    onLoad={() => setWebviewLoading(false)}
+                    style={playerFrameStyle}
+                    tabIndex={-1}
+                  />
+                )}
+                <WebPlayerGuard
+                  hidden={!webPlayerGuard.enabled || playerFrameHidden}
+                  unlocked={webPlayerGuard.unlocked}
+                  onUnlock={webPlayerGuard.unlock}
+                  onLock={webPlayerGuard.lock}
                 />
                 {/* Left-side overlay button group, flex row, no fixed px offsets */}
                 <div className="player-overlay-group">
@@ -2066,41 +2135,28 @@ export default function TVPage({
                     )}
                   </button>
                   {/* Pop-out button */}
-                  <button
-                    className="player-overlay-btn"
-                    onClick={() => {
-                      if (pipOpen) {
-                        window.electron?.closePipWindow?.();
-                        return;
-                      }
-                      const url = isAsync
-                        ? resolvedPlayerUrl
-                        : getSourceUrl(
-                            playerSource,
-                            "tv",
-                            item.id,
-                            playerEp.season,
-                            playerEp.episode,
-                            {},
-                            playerAccentColor,
-                            playerSubLang,
-                          );
-                      if (!url) return;
-                      pipUrlRef.current = url;
-                      window.electron?.openPipWindow?.(
-                        url,
-                        item.name ?? item.title,
-                      );
-                    }}
-                    title={pipOpen ? "Close pop-out" : "Pop out player"}
-                    disabled={
-                      !pipOpen &&
-                      (webviewLoading || !!(isAsync && !resolvedPlayerUrl))
-                    }
-                    style={pipOpen ? { color: "var(--red)" } : undefined}
-                  >
-                    <PopOutIcon />
-                  </button>
+                  {isElectron && (
+                    <button
+                      className="player-overlay-btn"
+                      onClick={() => {
+                        if (pipOpen) {
+                          window.electron?.closePipWindow?.();
+                          return;
+                        }
+                        if (!playerUrl || playerUrl === "about:blank") return;
+                        pipUrlRef.current = playerUrl;
+                        window.electron?.openPipWindow?.(
+                          playerUrl,
+                          item.name ?? item.title,
+                        );
+                      }}
+                      title={pipOpen ? "Close pop-out" : "Pop out player"}
+                      disabled={!pipOpen && playerFrameHidden}
+                      style={pipOpen ? { color: "var(--red)" } : undefined}
+                    >
+                      <PopOutIcon />
+                    </button>
+                  )}
                 </div>
                 {showSourceMenu && menuPos && (
                   <div
@@ -2108,7 +2164,7 @@ export default function TVPage({
                     style={{ top: menuPos.top, left: menuPos.left }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {PLAYER_SOURCES.map((src) => (
+                    {availablePlayerSources.map((src) => (
                       <button
                         key={src.id}
                         className={
@@ -2152,48 +2208,50 @@ export default function TVPage({
                     ))}
                   </div>
                 )}
-                <button
-                  className="player-overlay-btn"
-                  onClick={() =>
-                    currentEpDownload
-                      ? onGoToDownloads?.(currentEpDownload.id)
-                      : (setShowSourceMenu(false), setShowDownload(true))
-                  }
-                  title={
-                    currentEpDownload
-                      ? currentEpDownload.status === "downloading"
-                        ? "Downloading… - view in Downloads"
-                        : "Already downloaded - view in Downloads"
-                      : "Download"
-                  }
-                >
-                  {currentEpDownload ? (
-                    <span
-                      className="player-downloaded-icon"
-                      style={{
-                        color:
-                          currentEpDownload.status === "downloading"
-                            ? "var(--red)"
-                            : "#4caf50",
-                      }}
-                    >
-                      {currentEpDownload.status === "downloading" ? "↓" : "✓"}
-                    </span>
-                  ) : (
-                    <DownloadIcon />
-                  )}
-                  {!currentEpDownload && m3u8Url && (
-                    <span className="player-overlay-dot" />
-                  )}
-                  {!supportsProgress && (
-                    <span
-                      className="player-no-progress-hint"
-                      title="No automatic progress tracking for this source"
-                    >
-                      ⚠ no tracking
-                    </span>
-                  )}
-                </button>
+                {isElectron && (
+                  <button
+                    className="player-overlay-btn"
+                    onClick={() =>
+                      currentEpDownload
+                        ? onGoToDownloads?.(currentEpDownload.id)
+                        : (setShowSourceMenu(false), setShowDownload(true))
+                    }
+                    title={
+                      currentEpDownload
+                        ? currentEpDownload.status === "downloading"
+                          ? "Downloading… - view in Downloads"
+                          : "Already downloaded - view in Downloads"
+                        : "Download"
+                    }
+                  >
+                    {currentEpDownload ? (
+                      <span
+                        className="player-downloaded-icon"
+                        style={{
+                          color:
+                            currentEpDownload.status === "downloading"
+                              ? "var(--red)"
+                              : "#4caf50",
+                        }}
+                      >
+                        {currentEpDownload.status === "downloading" ? "↓" : "✓"}
+                      </span>
+                    ) : (
+                      <DownloadIcon />
+                    )}
+                    {!currentEpDownload && m3u8Url && (
+                      <span className="player-overlay-dot" />
+                    )}
+                    {!supportsProgress && (
+                      <span
+                        className="player-no-progress-hint"
+                        title="No automatic progress tracking for this source"
+                      >
+                        ⚠ no tracking
+                      </span>
+                    )}
+                  </button>
+                )}
 
                 {/* Skip controls are injected directly into the webview DOM*/}
 
@@ -2476,7 +2534,7 @@ export default function TVPage({
         />
       )}
 
-      {showDownload && (
+      {showDownload && isElectron && (
         <DownloadModal
           onClose={() => setShowDownload(false)}
           m3u8Url={m3u8Url}

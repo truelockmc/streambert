@@ -1,5 +1,6 @@
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const IMG_BASE = "https://image.tmdb.org/t/p";
+export const MANAGED_TMDB_API_KEY = "__streambert_managed_tmdb__";
 
 // ── TMDB metadata language ────────────────────────────────────────────────────
 // Read lazily from localStorage so it always reflects the current setting.
@@ -29,6 +30,28 @@ let _onUnreachable = null;
 export const setApiErrorHandlers = (onAuth, onUnreachable) => {
   _onAuthError = onAuth;
   _onUnreachable = onUnreachable;
+};
+
+export const isManagedTmdbApiKey = (apiKey) =>
+  apiKey === MANAGED_TMDB_API_KEY;
+
+export const detectManagedTmdbApiKey = async () => {
+  if (typeof window === "undefined") return null;
+
+  const electronToken = await window.electron?.getDefaultTmdbToken?.();
+  if (electronToken) return electronToken;
+
+  if (window.electron) return null;
+
+  try {
+    const res = await fetch(
+      `/api/tmdb?path=${encodeURIComponent(withLanguage("/configuration"))}`,
+      { cache: "no-store" },
+    );
+    return res.ok ? MANAGED_TMDB_API_KEY : null;
+  } catch {
+    return null;
+  }
 };
 
 // ── In-memory TMDB response cache (session-scoped, cleared on page reload) ───
@@ -69,7 +92,7 @@ function _releaseSlot() {
   }
 }
 
-export const tmdbFetch = async (path, apiKey) => {
+export const tmdbFetch = async (path, apiKey, options = {}) => {
   const localizedPath = withLanguage(path);
   const cacheKey = `${apiKey}|${localizedPath}`;
   const cached = _tmdbCache.get(cacheKey);
@@ -78,9 +101,15 @@ export const tmdbFetch = async (path, apiKey) => {
   await _acquireSlot();
 
   let res;
+  const managed = isManagedTmdbApiKey(apiKey);
+  const fetchUrl = managed
+    ? `/api/tmdb?path=${encodeURIComponent(localizedPath)}`
+    : `${TMDB_BASE}${localizedPath}`;
+  const headers = managed ? {} : { Authorization: `Bearer ${apiKey}` };
   try {
-    res = await fetch(`${TMDB_BASE}${localizedPath}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
+    res = await fetch(fetchUrl, {
+      headers,
+      signal: options.signal,
     });
   } catch {
     _releaseSlot();

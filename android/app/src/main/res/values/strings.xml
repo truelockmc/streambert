@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Streambert</string>
+    <string name="title_activity_main">Streambert</string>
+    <string name="package_name">com.truelockmc.streambert</string>
+    <string name="custom_url_scheme">com.truelockmc.streambert</string>
+</resources>
