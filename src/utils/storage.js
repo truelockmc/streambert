@@ -34,6 +34,7 @@ export const storage = {
 // Centralised storage key registry
 export const STORAGE_KEYS = {
   API_KEY: "apikey",
+  UPDATE_SOURCE: "updateSource",
   PLAYER_SOURCE: "playerSource",
   ALLMANGA_DUB_MODE: "allmangaDubMode",
   WATCH_PROGRESS: "progress",

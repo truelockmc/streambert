@@ -19,7 +19,11 @@ import { SUBTITLE_LANGUAGES } from "../utils/subtitles";
 import { DEFAULT_INVIDIOUS_BASE } from "../components/TrailerModal";
 import { RATING_COUNTRIES } from "../utils/ageRating";
 import { WarningIcon } from "../components/Icons";
-import { checkForUpdates } from "../utils/updates";
+import {
+  checkForUpdatesWithFallback,
+  UPDATE_SOURCES,
+  DEFAULT_UPDATE_SOURCE,
+} from "../utils/updates";
 import {
   HOME_ROWS,
   loadHomeLayout,
@@ -537,6 +541,9 @@ function VersionSection() {
   });
   const [autoSaved, setAutoSaved] = useState(false);
   const [currentVersion, setCurrentVersion] = useState("0.0.0");
+  const [updateSource, setUpdateSource] = useState(
+    () => storage.get(STORAGE_KEYS.UPDATE_SOURCE) || DEFAULT_UPDATE_SOURCE,
+  );
 
   useEffect(() => {
     if (window.electron?.getAppVersion) {
@@ -550,13 +557,23 @@ function VersionSection() {
     setChecking(true);
     setResult(null);
     try {
-      const r = await checkForUpdates();
+      const r = await checkForUpdatesWithFallback(updateSource);
       setResult(r);
     } catch (e) {
-      setResult({ error: e.message || "Could not reach GitHub." });
+      setResult({
+        error:
+          e.message ||
+          `Could not reach ${UPDATE_SOURCES[updateSource]?.label || "the update server"}.`,
+      });
     } finally {
       setChecking(false);
     }
+  };
+
+  const changeSource = (src) => {
+    setUpdateSource(src);
+    storage.set(STORAGE_KEYS.UPDATE_SOURCE, src);
+    setResult(null);
   };
 
   const toggleAuto = (val) => {
@@ -608,6 +625,37 @@ function VersionSection() {
           {checking ? "Checking…" : "Check for Updates"}
         </button>
 
+        {/* Update source toggle */}
+        <div
+          style={{
+            display: "inline-flex",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            overflow: "hidden",
+          }}
+        >
+          {Object.values(UPDATE_SOURCES).map((src) => (
+            <button
+              key={src.id}
+              onClick={() => changeSource(src.id)}
+              disabled={checking}
+              title={`Check for updates via ${src.label}`}
+              style={{
+                border: "none",
+                padding: "6px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: checking ? "not-allowed" : "pointer",
+                background:
+                  updateSource === src.id ? "var(--red)" : "var(--surface2)",
+                color: updateSource === src.id ? "#fff" : "var(--text3)",
+              }}
+            >
+              {src.label}
+            </button>
+          ))}
+        </div>
+
         {result && !result.error && result.hasUpdate && (
           <button
             onClick={() => setShowUpdateModal(true)}
@@ -634,6 +682,13 @@ function VersionSection() {
           >
             🎉 v{result.latest} available. Install Update
           </button>
+        )}
+
+        {result?.usedFallback && (
+          <span style={{ fontSize: 12, color: "var(--text3)" }}>
+            ({UPDATE_SOURCES[result.fallbackFrom]?.label || result.fallbackFrom}{" "}
+            unavailable, used {result.sourceLabel} instead)
+          </span>
         )}
 
         {result && !result.error && !result.hasUpdate && (

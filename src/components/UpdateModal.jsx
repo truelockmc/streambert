@@ -1,5 +1,35 @@
 import { useState, useEffect, useRef } from "react";
 
+// ── Image component that proxies through Electron main process ────────────────
+// Fixes Codeberg (and other external) images being blocked by Electron's CSP.
+// Falls back to direct <img src> when not running in Electron.
+function ReleaseImage({ src, alt, style }) {
+  const [resolvedSrc, setResolvedSrc] = useState(null);
+
+  useEffect(() => {
+    if (!src) return;
+    if (window.electron?.fetchReleaseImage) {
+      window.electron.fetchReleaseImage(src).then((dataUri) => {
+        setResolvedSrc(dataUri || src); // null means blocked/failed → try direct
+      });
+    } else {
+      setResolvedSrc(src);
+    }
+  }, [src]);
+
+  if (!resolvedSrc) return null;
+  return (
+    <img
+      src={resolvedSrc}
+      alt={alt}
+      style={style}
+      onError={(e) => {
+        e.currentTarget.style.display = "none";
+      }}
+    />
+  );
+}
+
 // ── Inline markdown + GitHub formatter ──────────────────────────────
 // Handles: ~~strike~~, **bold**, *italic*, _italic_, `code`,
 //          ![img](url), [link](url), bare https:// URLs, @mentions
@@ -55,7 +85,7 @@ function inlineFormat(text) {
       const mm = raw.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
       if (mm) {
         parts.push(
-          <img
+          <ReleaseImage
             key={k++}
             src={mm[2]}
             alt={mm[1]}
@@ -64,9 +94,6 @@ function inlineFormat(text) {
               verticalAlign: "middle",
               borderRadius: 6,
               border: "1px solid var(--border)",
-            }}
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
             }}
           />,
         );
@@ -262,7 +289,7 @@ function renderChangelog(text) {
       const alt = altMatch ? altMatch[1] : "";
       elements.push(
         <div key={key++} style={{ margin: "10px 0" }}>
-          <img
+          <ReleaseImage
             src={src}
             alt={alt}
             style={{
@@ -270,9 +297,6 @@ function renderChangelog(text) {
               borderRadius: 8,
               border: "1px solid var(--border)",
               display: "block",
-            }}
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
             }}
           />
           {alt && (
@@ -415,7 +439,7 @@ export default function UpdateModal({
   activeDownloads = 0,
   onClose,
 }) {
-  const { latest, current, url, changelog, assets } = updateInfo;
+  const { latest, current, url, changelog, assets, sourceLabel } = updateInfo;
 
   const [phase, setPhase] = useState("idle"); // idle | downloading | installing | done | error
   const [format, setFormat] = useState(null); // "appimage" | "deb" | "exe" | "dmg" | null
@@ -481,13 +505,14 @@ export default function UpdateModal({
     onClose();
   };
 
-  const formatLabel = {
-    appimage: "AppImage",
-    deb: ".deb package",
-    pacman: ".pacman (Arch)",
-    exe: "Windows installer",
-    dmg: "macOS installer (Universal)",
-  }[format] || "installer";
+  const formatLabel =
+    {
+      appimage: "AppImage",
+      deb: ".deb package",
+      pacman: ".pacman (Arch)",
+      exe: "Windows installer",
+      dmg: "macOS installer (Universal)",
+    }[format] || "installer";
 
   const busy = phase === "downloading" || phase === "installing";
 
@@ -571,7 +596,9 @@ export default function UpdateModal({
                 {current && (
                   <>
                     <span style={{ color: "var(--text3)" }}>v{current}</span>
-                    <span style={{ color: "var(--text3)", fontSize: 11 }}>→</span>
+                    <span style={{ color: "var(--text3)", fontSize: 11 }}>
+                      →
+                    </span>
                   </>
                 )}
                 <a
@@ -586,7 +613,7 @@ export default function UpdateModal({
                     textDecoration: "none",
                     cursor: "pointer",
                   }}
-                  title="View on GitHub"
+                  title={`View on ${sourceLabel || "GitHub"}`}
                 >
                   v{latest} ↗
                 </a>
@@ -701,7 +728,7 @@ export default function UpdateModal({
                 }}
                 style={{ color: "var(--red)", cursor: "pointer" }}
               >
-                GitHub releases page
+                {sourceLabel || "GitHub"} releases page
               </a>{" "}
               to download manually.
             </div>
@@ -813,7 +840,7 @@ export default function UpdateModal({
                     cursor: "pointer",
                   }}
                 >
-                  GitHub ↗
+                  {sourceLabel || "GitHub"} ↗
                 </a>
                 <button
                   className="btn"

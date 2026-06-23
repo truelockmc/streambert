@@ -33,7 +33,10 @@ const TVPage = lazy(() => import("./pages/TVPage"));
 const LibraryPage = lazy(() => import("./pages/LibraryPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const DownloadsPage = lazy(() => import("./pages/DownloadsPage"));
-import { checkForUpdates } from "./utils/updates";
+import {
+  checkForUpdatesWithFallback,
+  DEFAULT_UPDATE_SOURCE,
+} from "./utils/updates";
 
 export default function App() {
   // apiKey loaded async from secure storage (OS keychain)
@@ -121,7 +124,9 @@ export default function App() {
   // ── Startup update check ─────────────────────────────────────────────────
   useEffect(() => {
     if (!storage.get("autoCheckUpdates")) return;
-    checkForUpdates()
+    const source =
+      storage.get(STORAGE_KEYS.UPDATE_SOURCE) || DEFAULT_UPDATE_SOURCE;
+    checkForUpdatesWithFallback(source)
       .then((r) => {
         if (r.hasUpdate) setUpdateBanner(r);
       })
