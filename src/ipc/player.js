@@ -12,14 +12,19 @@ let _updateAbortController = null;
 
 // ── Trusted release sources for the auto-updater ──────────────────────────────
 // Same validation logic applies to every entry below, adding a new source
-// (e.g. Codeberg) means adding a row here, not a new code path.
-const REPO_PATH = "/truelockmc/streambert/releases/download/";
+// means adding a row here, not a new code path.
+//
+// IMPORTANT: GitHub and Codeberg use completely different asset URL structures:
+//   GitHub:   https://github.com/<owner>/<repo>/releases/download/<tag>/<file>
+//   Codeberg: https://codeberg.org/attachments/<uuid>
+//             (Gitea stores release attachments under /attachments/, not under the repo path)
 const TRUSTED_UPDATE_SOURCES = [
   {
     id: "github",
     origin: "https://github.com",
-    pathPrefix: REPO_PATH,
-    // Domains allowed as redirect targets (GitHub CDN).
+    // Must match the full repo path so an attacker can't use
+    // a different repo on github.com to serve a malicious binary.
+    pathPrefix: "/truelockmc/streambert/releases/download/",
     redirectHosts: [
       "github.com",
       "objects.githubusercontent.com",
@@ -29,7 +34,9 @@ const TRUSTED_UPDATE_SOURCES = [
   {
     id: "codeberg",
     origin: "https://codeberg.org",
-    pathPrefix: REPO_PATH,
+    // Codeberg (Gitea) release assets are served from /attachments/<uuid>.
+    // The UUID is random and unguessable.
+    pathPrefix: "/attachments/",
     redirectHosts: ["codeberg.org"],
   },
 ];
@@ -265,7 +272,6 @@ function register(getMainWindow, { writeSecretMigration }) {
       }
 
       // Same check for every trusted source (GitHub, Codeberg, ...)
-      // see TRUSTED_UPDATE_SOURCES above.
       const trustedSource = findTrustedUpdateSource(parsed);
       if (!trustedSource) {
         return { ok: false, error: "Unauthorized update source" };
@@ -507,88 +513,83 @@ function register(getMainWindow, { writeSecretMigration }) {
   });
 
   // ── Proxy release-note images through the main process ───────────────────
-  // Codeberg (and GitHub) release images are served from external hosts that
-  // Electron's renderer CSP blocks. We fetch them here in the main process
-  // (no CSP) and return a base64 data-URI so the UpdateModal can display them.
-  // Only images from trusted release-note domains are proxied.
-  const ALLOWED_IMAGE_HOSTS = [
+  // Codeberg (and GitHub) release images are blocked by Electron's renderer
+  // CSP. Fetch them here in the main process and return a base64 data-URI.
+  const ALLOWED_IMAGE_HOSTS = new Set([
     "codeberg.org",
     "github.com",
     "user-images.githubusercontent.com",
     "private-user-images.githubusercontent.com",
     "objects.githubusercontent.com",
-  ];
-  ipcMain.handle("fetch-release-image", async (_, { url }) => {
+  ]);
+  const IMAGE_SIZE_LIMIT = 10 * 1024 * 1024; // 10 MB
+
+  const fetchImageSecure = (url, resolve, redirectDepth = 0) => {
+    if (redirectDepth > 1) return resolve(null);
     let parsed;
     try {
       parsed = new URL(url);
     } catch {
-      return null;
+      return resolve(null);
     }
-    if (!ALLOWED_IMAGE_HOSTS.includes(parsed.hostname)) return null;
+    if (parsed.protocol !== "https:") return resolve(null);
+    if (!ALLOWED_IMAGE_HOSTS.has(parsed.hostname)) return resolve(null);
 
-    return new Promise((resolve) => {
-      const lib = url.startsWith("https") ? https : http;
-      lib
-        .get(
-          url,
-          { headers: { "User-Agent": "Streambert-ReleaseNotes" } },
-          (res) => {
-            if (
-              res.statusCode >= 300 &&
-              res.statusCode < 400 &&
-              res.headers.location
-            ) {
-              // one redirect allowed (e.g. Codeberg attachment redirects)
-              res.resume();
-              const next = res.headers.location.startsWith("http")
-                ? res.headers.location
-                : new URL(res.headers.location, url).toString();
-              let rParsed;
-              try {
-                rParsed = new URL(next);
-              } catch {
-                return resolve(null);
-              }
-              if (!ALLOWED_IMAGE_HOSTS.includes(rParsed.hostname))
-                return resolve(null);
-              lib
-                .get(
-                  next,
-                  { headers: { "User-Agent": "Streambert-ReleaseNotes" } },
-                  (res2) => {
-                    const chunks = [];
-                    res2.on("data", (c) => chunks.push(c));
-                    res2.on("end", () => {
-                      const ct = res2.headers["content-type"] || "image/png";
-                      resolve(
-                        `data:${ct};base64,${Buffer.concat(chunks).toString("base64")}`,
-                      );
-                    });
-                    res2.on("error", () => resolve(null));
-                  },
-                )
-                .on("error", () => resolve(null));
-              return;
+    https
+      .get(
+        url,
+        { headers: { "User-Agent": "Streambert-ReleaseNotes" } },
+        (res) => {
+          if (
+            res.statusCode >= 300 &&
+            res.statusCode < 400 &&
+            res.headers.location
+          ) {
+            res.resume();
+            const next = res.headers.location.startsWith("http")
+              ? res.headers.location
+              : new URL(res.headers.location, url).toString();
+            return fetchImageSecure(next, resolve, redirectDepth + 1);
+          }
+          if (res.statusCode !== 200) {
+            res.resume();
+            return resolve(null);
+          }
+          const ct = res.headers["content-type"] || "";
+          if (!ct.startsWith("image/")) {
+            res.resume();
+            return resolve(null);
+          }
+
+          const chunks = [];
+          let total = 0;
+          res.on("data", (c) => {
+            total += c.length;
+            if (total > IMAGE_SIZE_LIMIT) {
+              res.destroy();
+              return resolve(null);
             }
-            const chunks = [];
-            res.on("data", (c) => chunks.push(c));
-            res.on("end", () => {
-              const ct = res.headers["content-type"] || "image/png";
-              resolve(
-                `data:${ct};base64,${Buffer.concat(chunks).toString("base64")}`,
-              );
-            });
-            res.on("error", () => resolve(null));
-          },
-        )
-        .on("error", () => resolve(null));
-    });
-  });
+            chunks.push(c);
+          });
+          res.on("end", () =>
+            resolve(
+              `data:${ct};base64,${Buffer.concat(chunks).toString("base64")}`,
+            ),
+          );
+          res.on("error", () => resolve(null));
+        },
+      )
+      .on("error", () => resolve(null));
+  };
+
+  ipcMain.handle(
+    "fetch-release-image",
+    (_, { url }) => new Promise((resolve) => fetchImageSecure(url, resolve)),
+  );
 
   // ── Query video progress across all webview frames ────────────────────────
   // executeJavaScript on a webview only reaches the top frame.
-  // VidSrc / 2embed nest the player inside cross-origin iframes, so we iterate
+  // VidSrc / 2embed nest the player inside cross-origin iframes, iterate
   // all frames from the main process where same-origin restrictions don't apply.
   ipcMain.handle("query-video-progress", async (_, webContentsId) => {
     try {
