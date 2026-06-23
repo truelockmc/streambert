@@ -54,9 +54,58 @@ function findTrustedUpdateSource(parsedUrl) {
 
 function register(getMainWindow, { writeSecretMigration }) {
   // ── Open file at specific timestamp in mpv / VLC ─────────────────────────
+
+  // Extensions considered safe to pass to an external media player.
+  // This also gates the shell.openPath fallback.
+  const ALLOWED_MEDIA_EXTENSIONS = new Set([
+    ".mp4",
+    ".mkv",
+    ".avi",
+    ".mov",
+    ".webm",
+    ".m4v",
+    ".ts",
+    ".m2ts",
+    ".m3u8",
+  ]);
+
+  const ALLOWED_SUBTITLE_EXTENSIONS = new Set([
+    ".srt",
+    ".ass",
+    ".ssa",
+    ".vtt",
+    ".sub",
+    ".idx",
+    ".sup",
+  ]);
+
+  // Validate a path: must have an allowed extension and must resolve to a
+  // real absolute path (prevents path-traversal tricks like "../../bin/sh").
+  const validateMediaPath = (p, allowedExts) => {
+    if (typeof p !== "string" || !p) return null;
+    const ext = path.extname(p).toLowerCase();
+    if (!allowedExts.has(ext)) return null;
+    try {
+      // fs.realpathSync throws if the file doesn't exist
+      const real = fs.realpathSync(p);
+      // Re-check extension after resolving symlinks
+      if (!allowedExts.has(path.extname(real).toLowerCase())) return null;
+      return real;
+    } catch {
+      return null;
+    }
+  };
+
   ipcMain.handle(
     "open-path-at-time",
     (_, { filePath, seconds, subtitlePaths }) => {
+      // ── Validate filePath ─────────────────────────────────────────────────
+      const safeFilePath = validateMediaPath(
+        filePath,
+        ALLOWED_MEDIA_EXTENSIONS,
+      );
+      if (!safeFilePath) return; // silently drop invalid paths
+
       const sec = Math.floor(seconds || 0);
       const platform = process.platform;
 
@@ -101,10 +150,13 @@ function register(getMainWindow, { writeSecretMigration }) {
             ? ["/opt/homebrew/bin/mpv", "/usr/local/bin/mpv", "mpv"]
             : ["/usr/bin/mpv", "/usr/local/bin/mpv", "/snap/bin/mpv", "mpv"];
 
+      // ── Validate subtitle paths ───────────────────────────────────────────
+      // Each subtitle path is independently validated
       const subFilePaths = Array.isArray(subtitlePaths)
         ? subtitlePaths
             .map((sp) => (typeof sp === "string" ? sp : sp?.path))
-            .filter((p) => p && fs.existsSync(p))
+            .map((sp) => validateMediaPath(sp, ALLOWED_SUBTITLE_EXTENSIONS))
+            .filter(Boolean)
         : [];
       const mpvSubArgs = subFilePaths.map((p) => `--sub-file=${p}`);
       const vlcSubArgs =
@@ -112,23 +164,24 @@ function register(getMainWindow, { writeSecretMigration }) {
 
       if (sec > 0) {
         for (const mpv of mpvPaths) {
-          if (tryLaunch(mpv, [`--start=${sec}`, ...mpvSubArgs, filePath]))
+          if (tryLaunch(mpv, [`--start=${sec}`, ...mpvSubArgs, safeFilePath]))
             return;
         }
         for (const vlc of vlcPaths) {
-          if (tryLaunch(vlc, [`--start-time=${sec}`, ...vlcSubArgs, filePath]))
+          if (
+            tryLaunch(vlc, [`--start-time=${sec}`, ...vlcSubArgs, safeFilePath])
+          )
             return;
         }
       } else if (mpvSubArgs.length > 0) {
         for (const mpv of mpvPaths) {
-          if (tryLaunch(mpv, [...mpvSubArgs, filePath])) return;
+          if (tryLaunch(mpv, [...mpvSubArgs, safeFilePath])) return;
         }
         for (const vlc of vlcPaths) {
-          if (tryLaunch(vlc, [...vlcSubArgs, filePath])) return;
+          if (tryLaunch(vlc, [...vlcSubArgs, safeFilePath])) return;
         }
       }
-
-      shell.openPath(filePath);
+      shell.openPath(safeFilePath);
     },
   );
 
