@@ -691,6 +691,449 @@ function register(getMainWindow, { writeSecretMigration }) {
       return null;
     }
   });
+
+  // ── Set subtitle delay/offset timing via textTracks cue manipulation ──────
+  ipcMain.handle("set-subtitle-offset", async (_, { webContentsId, offsetSeconds, showOsd }) => {
+    try {
+      const { webContents } = require("electron");
+      const wc = webContents.fromId(webContentsId);
+      if (!wc || wc.isDestroyed()) return { ok: false };
+
+      const allFrames = [];
+      const collect = (frame) => {
+        allFrames.push(frame);
+        for (const child of frame.frames || []) collect(child);
+      };
+      collect(wc.mainFrame);
+
+      const JS = `
+        (() => {
+          const offset = parseFloat(${offsetSeconds});
+          window.__subtitleOffset = offset;
+          
+          const v = document.querySelector('video');
+          if (!v || !v.textTracks) return false;
+          
+          if (!v._originalCues) {
+            v._originalCues = new Map();
+          }
+          
+          let modified = false;
+          
+          for (let i = 0; i < v.textTracks.length; i++) {
+            const track = v.textTracks[i];
+            const originalMode = track.mode;
+            if (originalMode === 'disabled') {
+              track.mode = 'hidden';
+            }
+            
+            if (track.cues) {
+              if (!v._originalCues.has(track)) {
+                v._originalCues.set(track, []);
+              }
+              const originals = v._originalCues.get(track);
+              const knownCues = new Set(originals.map(o => o.cue));
+              
+              for (let j = 0; j < track.cues.length; j++) {
+                const c = track.cues[j];
+                if (!knownCues.has(c)) {
+                  originals.push({
+                    cue: c,
+                    startTime: c.startTime,
+                    endTime: c.endTime
+                  });
+                }
+              }
+              
+              for (const entry of originals) {
+                entry.cue.startTime = entry.startTime + offset;
+                entry.cue.endTime = entry.endTime + offset;
+              }
+              modified = true;
+            }
+            
+            if (originalMode === 'disabled') {
+              track.mode = 'disabled';
+            } else {
+              if (!track._redrawTimeout) {
+                track._redrawTimeout = setTimeout(() => {
+                  const currentMode = track.mode;
+                  track.mode = 'disabled';
+                  track.mode = currentMode;
+                  track._redrawTimeout = null;
+                }, 80);
+              }
+            }
+          }
+          function findElementDeep(selector, root = document.body || document.documentElement) {
+            if (!root) return null;
+            try {
+              const el = root.querySelector(selector);
+              if (el) return el;
+            } catch (e) {}
+            if (root.children) {
+              for (let j = 0; j < root.children.length; j++) {
+                const found = findElementDeep(selector, root.children[j]);
+                if (found) return found;
+              }
+            }
+            if (root.shadowRoot) {
+              const found = findElementDeep(selector, root.shadowRoot);
+              if (found) return found;
+            }
+            return null;
+          }
+
+          const card = findElementDeep('#__subtitle-delay-card');
+          if (card) {
+            const slider = card.querySelector('input[type="range"]') || card.querySelector('.streambert-slider');
+            if (slider) slider.value = offset;
+            const textInput = card.querySelector('.streambert-text-input');
+            if (textInput) textInput.value = Math.round(offset * 1000);
+            let labelEl = null;
+            const labels = card.querySelectorAll('*');
+            for (const el of labels) {
+              if (el.textContent.trim().includes('ms')) {
+                labelEl = el;
+                break;
+              }
+            }
+            if (labelEl) {
+              const ms = Math.round(offset * 1000);
+              labelEl.textContent = (ms > 0 ? "+" : "") + ms + " ms";
+            }
+          }
+          if (${!!showOsd}) {
+            const parent = document.fullscreenElement || v.parentElement || document.body;
+            let osd = document.getElementById('__streambert-osd');
+            if (!osd) {
+              osd = document.createElement('div');
+              osd.id = '__streambert-osd';
+              osd.style.cssText = 'position: absolute; top: 28px; right: 28px; z-index: 2147483647; color: #ffffff; font-family: system-ui, -apple-system, sans-serif; font-size: 24px; font-weight: 800; text-shadow: 2px 2px 0px #000000, -1px -1px 0px #000000, 1px -1px 0px #000000, -1px 1px 0px #000000, 1px 1px 0px #000000; pointer-events: none; letter-spacing: 0.5px; opacity: 0; transition: opacity 0.15s ease;';
+            }
+            if (osd.parentElement !== parent) {
+              parent.appendChild(osd);
+            }
+            const ms = Math.round(offset * 1000);
+            osd.textContent = "Subtitle delay: " + (ms > 0 ? "+" : "") + ms + " ms";
+            osd.style.opacity = '1';
+            if (window.__osdTimeout) clearTimeout(window.__osdTimeout);
+            window.__osdTimeout = setTimeout(() => {
+              osd.style.opacity = '0';
+            }, 2000);
+          }
+          return modified;
+        })()
+      `;
+
+      for (const frame of allFrames) {
+        try {
+          const result = await frame.executeJavaScript(JS);
+          if (result) return { ok: true };
+        } catch {}
+      }
+      return { ok: false, reason: "No video player or active text tracks found in any frame" };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle("inject-subtitle-menu", async (_, webContentsId) => {
+    try {
+      const { webContents } = require("electron");
+      const wc = webContents.fromId(webContentsId);
+      if (!wc || wc.isDestroyed()) return { ok: false };
+
+      const allFrames = [];
+      const collect = (frame) => {
+        allFrames.push(frame);
+        for (const child of frame.frames || []) collect(child);
+      };
+      collect(wc.mainFrame);
+
+      const JS = `
+        (function() {
+          if (window.__subtitleDelayControlsInjected) return;
+
+          function findTextNodeDeep(text, root = document.body || document.documentElement) {
+            if (!root) return null;
+            if (root.nodeType === Node.TEXT_NODE && root.nodeValue.trim() === text) {
+              return root;
+            }
+            if (root.childNodes) {
+              for (const child of root.childNodes) {
+                const found = findTextNodeDeep(text, child);
+                if (found) return found;
+              }
+            }
+            if (root.shadowRoot) {
+              const found = findTextNodeDeep(text, root.shadowRoot);
+              if (found) return found;
+            }
+            return null;
+          }
+
+          function findBlockContainer(text) {
+            const node = findTextNodeDeep(text);
+            if (!node) return null;
+            
+            let parent = node.parentElement;
+            while (parent && parent.parentNode && parent.parentNode.tagName !== 'BODY') {
+              const parentNode = parent.parentNode;
+              const siblings = parentNode.children ? Array.from(parentNode.children) : [];
+              const hasOther = siblings.some(sib => sib !== parent && (sib.textContent.includes("Subtitle Size") || sib.textContent.includes("Subtitle Position")));
+              if (hasOther) {
+                return parent;
+              }
+              if (parentNode.nodeType === Node.DOCUMENT_FRAGMENT_NODE && parentNode.host) {
+                parent = parentNode.host;
+              } else {
+                parent = parentNode;
+              }
+            }
+            return node.parentElement;
+          }
+
+          function runInjection() {
+            const posCard = findBlockContainer("Subtitle Position");
+            const sizeCard = findBlockContainer("Subtitle Size");
+            if (!posCard || !sizeCard) return;
+
+            if (document.getElementById('__subtitle-delay-card')) return;
+
+            // Inject custom slider styling into the card's containing ShadowRoot or document
+            const rootNode = posCard.getRootNode();
+            const styleContainer = (rootNode && rootNode !== document) ? rootNode : (document.head || document.documentElement);
+            if (!styleContainer.querySelector('#__streambert-slider-styles')) {
+              const style = document.createElement('style');
+              style.id = '__streambert-slider-styles';
+              style.textContent = '#__subtitle-delay-card * { overflow: visible !important; } #__subtitle-delay-card input.streambert-text-input { -webkit-appearance: none !important; appearance: none !important; width: 100% !important; height: 36px !important; background: rgba(255, 255, 255, 0.08) !important; color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 6px !important; outline: none !important; padding: 0 12px !important; font-family: inherit !important; font-size: 14px !important; font-weight: 500 !important; margin: 8px 0 !important; box-sizing: border-box !important; text-align: center !important; } #__subtitle-delay-card input.streambert-text-input:focus { border-color: var(--accent, #e50914) !important; background: rgba(255, 255, 255, 0.12) !important; } #__subtitle-delay-card input.streambert-text-input::-webkit-outer-spin-button, #__subtitle-delay-card input.streambert-text-input::-webkit-inner-spin-button { -webkit-appearance: none !important; margin: 0 !important; } #__subtitle-delay-card input.streambert-text-input[type=number] { -moz-appearance: textfield !important; }';
+              styleContainer.appendChild(style);
+            }
+
+            const delayCard = posCard.cloneNode(true);
+            delayCard.id = '__subtitle-delay-card';
+
+            const walker = document.createTreeWalker(delayCard, NodeFilter.SHOW_TEXT, null, false);
+            let node;
+            while (node = walker.nextNode()) {
+              if (node.nodeValue.trim() === "Subtitle Position") {
+                node.nodeValue = "Subtitle Delay";
+                break;
+              }
+            }
+
+            const iconSvg = delayCard.querySelector('svg');
+            if (iconSvg) {
+              iconSvg.outerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex-shrink:0;margin-right:2px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+            }
+
+            let labelEl = null;
+            const labels = delayCard.querySelectorAll('*');
+            for (const el of labels) {
+              const txt = el.textContent.trim();
+              if (txt.includes('%') || (txt.length > 0 && !isNaN(parseInt(txt)))) {
+                labelEl = el;
+                break;
+              }
+            }
+
+            if (labelEl) {
+              labelEl.style.color = 'var(--accent, var(--red))';
+              labelEl.style.fontWeight = '700';
+            }
+
+            function updateLabel(val) {
+              if (labelEl) {
+                const ms = Math.round(val * 1000);
+                labelEl.textContent = (ms > 0 ? "+" : "") + ms + " ms";
+              }
+            }
+
+            function findSliderParallel(orig, clone) {
+              if (!orig || !clone) return null;
+              const tag = orig.tagName.toLowerCase();
+              if (orig !== posCard) {
+                if (
+                  orig.shadowRoot ||
+                  tag.includes('-') ||
+                  tag.includes('slider') ||
+                  tag.includes('range') ||
+                  orig.getAttribute('role') === 'slider' ||
+                  (orig.className && typeof orig.className === 'string' && (orig.className.includes('slider') || orig.className.includes('track')))
+                ) {
+                  return clone;
+                }
+              }
+              for (let i = 0; i < orig.children.length; i++) {
+                const found = findSliderParallel(orig.children[i], clone.children[i]);
+                if (found) return found;
+              }
+              return null;
+            }
+
+            let inputEl = null;
+            const targetSlider = findSliderParallel(posCard, delayCard);
+            if (targetSlider) {
+              inputEl = document.createElement('input');
+              inputEl.type = 'number';
+              inputEl.className = 'streambert-text-input';
+              inputEl.placeholder = '0';
+              targetSlider.parentNode.replaceChild(inputEl, targetSlider);
+            } else {
+              inputEl = document.createElement('input');
+              inputEl.type = 'number';
+              inputEl.className = 'streambert-text-input';
+              inputEl.placeholder = '0';
+              delayCard.appendChild(inputEl);
+            }
+
+            inputEl.value = Math.round((window.__subtitleOffset || 0) * 1000);
+            updateLabel(window.__subtitleOffset || 0);
+
+            function applyDelay(val) {
+              window.__subtitleOffset = val;
+              const v = document.querySelector('video');
+              if (v && v.textTracks) {
+                if (!v._originalCues) {
+                  v._originalCues = new Map();
+                }
+                const offset = parseFloat(val);
+                for (let i = 0; i < v.textTracks.length; i++) {
+                  const track = v.textTracks[i];
+                  const originalMode = track.mode;
+                  if (originalMode === 'disabled') {
+                    track.mode = 'hidden';
+                  }
+                  if (track.cues) {
+                    if (!v._originalCues.has(track)) {
+                      v._originalCues.set(track, []);
+                    }
+                    const originals = v._originalCues.get(track);
+                    const knownCues = new Set(originals.map(o => o.cue));
+                    for (let j = 0; j < track.cues.length; j++) {
+                      const c = track.cues[j];
+                      if (!knownCues.has(c)) {
+                        originals.push({
+                          cue: c,
+                          startTime: c.startTime,
+                          endTime: c.endTime
+                        });
+                      }
+                    }
+                    for (const entry of originals) {
+                      entry.cue.startTime = entry.startTime + offset;
+                      entry.cue.endTime = entry.endTime + offset;
+                    }
+                  }
+                  
+                  if (originalMode === 'disabled') {
+                    track.mode = 'disabled';
+                  } else {
+                    if (!track._redrawTimeout) {
+                      track._redrawTimeout = setTimeout(() => {
+                        const currentMode = track.mode;
+                        track.mode = 'disabled';
+                        track.mode = currentMode;
+                        track._redrawTimeout = null;
+                      }, 80);
+                    }
+                  }
+                }
+              }
+              // Show VLC-style OSD inside this frame
+              if (v) {
+                const parentElement = document.fullscreenElement || v.parentElement || document.body;
+                let osd = document.getElementById('__streambert-osd');
+                if (!osd) {
+                  osd = document.createElement('div');
+                  osd.id = '__streambert-osd';
+                  osd.style.cssText = 'position: absolute; top: 28px; right: 28px; z-index: 2147483647; color: #ffffff; font-family: system-ui, -apple-system, sans-serif; font-size: 24px; font-weight: 800; text-shadow: 2px 2px 0px #000000, -1px -1px 0px #000000, 1px -1px 0px #000000, -1px 1px 0px #000000, 1px 1px 0px #000000; pointer-events: none; letter-spacing: 0.5px; opacity: 0; transition: opacity 0.15s ease;';
+                }
+                if (osd.parentElement !== parentElement) {
+                  parentElement.appendChild(osd);
+                }
+                const ms = Math.round(val * 1000);
+                osd.textContent = "Subtitle delay: " + (ms > 0 ? "+" : "") + ms + " ms";
+                osd.style.opacity = '1';
+                if (window.__osdTimeout) clearTimeout(window.__osdTimeout);
+                window.__osdTimeout = setTimeout(() => {
+                  osd.style.opacity = '0';
+                }, 2000);
+              }
+              console.log('streambert:sub-offset-changed:' + val);
+            }
+
+            inputEl.addEventListener('input', (e) => {
+              let valMs = parseFloat(e.target.value);
+              if (isNaN(valMs)) valMs = 0;
+              const valSec = valMs / 1000;
+              updateLabel(valSec);
+              applyDelay(valSec);
+            });
+
+            const buttonContainerTemplate = sizeCard.querySelector('button')?.parentElement;
+            if (buttonContainerTemplate) {
+              const btnContainer = buttonContainerTemplate.cloneNode(true);
+              const btns = btnContainer.querySelectorAll('button');
+              if (btns.length >= 3) {
+                btns[0].textContent = "-50ms";
+                const newBtn0 = btns[0].cloneNode(true);
+                newBtn0.addEventListener('click', () => {
+                  let currentValMs = parseFloat(inputEl.value);
+                  if (isNaN(currentValMs)) currentValMs = 0;
+                  const valMs = Math.max(-10000, currentValMs - 50);
+                  inputEl.value = valMs;
+                  const valSec = valMs / 1000;
+                  updateLabel(valSec);
+                  applyDelay(valSec);
+                });
+                btns[0].parentNode.replaceChild(newBtn0, btns[0]);
+
+                btns[1].textContent = "Reset";
+                const newBtn1 = btns[1].cloneNode(true);
+                newBtn1.style.fontWeight = '600';
+                newBtn1.addEventListener('click', () => {
+                  inputEl.value = 0;
+                  updateLabel(0);
+                  applyDelay(0);
+                });
+                btns[1].parentNode.replaceChild(newBtn1, btns[1]);
+
+                btns[2].textContent = "+50ms";
+                const newBtn2 = btns[2].cloneNode(true);
+                newBtn2.addEventListener('click', () => {
+                  let currentValMs = parseFloat(inputEl.value);
+                  if (isNaN(currentValMs)) currentValMs = 0;
+                  const valMs = Math.min(10000, currentValMs + 50);
+                  inputEl.value = valMs;
+                  const valSec = valMs / 1000;
+                  updateLabel(valSec);
+                  applyDelay(valSec);
+                });
+                btns[2].parentNode.replaceChild(newBtn2, btns[2]);
+              }
+              delayCard.appendChild(btnContainer);
+            }
+
+            posCard.parentNode.insertBefore(delayCard, posCard.nextSibling);
+          }
+
+          setInterval(runInjection, 150);
+          window.__subtitleDelayControlsInjected = true;
+        })();
+      `;
+
+      for (const frame of allFrames) {
+        try {
+          frame.executeJavaScript(JS);
+        } catch {}
+      }
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
 }
 
 // ── Central audio-device-change recovery (macOS HDMI/TV fix) ─────────────────

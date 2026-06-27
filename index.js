@@ -271,6 +271,14 @@ function createWindow() {
     wc.on("leave-html-full-screen", () =>
       mainWindow.webContents.send("webview-leave-fullscreen"),
     );
+    wc.on("before-input-event", (event, input) => {
+      if (input.type === "keyDown") {
+        const key = input.key.toLowerCase();
+        if (key === "g" || key === "h") {
+          mainWindow.webContents.send("player-shortcut-key", key);
+        }
+      }
+    });
   });
 
   mainWindow.loadFile(path.join(__dirname, "dist/index.html"));
