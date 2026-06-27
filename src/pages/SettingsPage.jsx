@@ -2089,14 +2089,14 @@ function SubtitleSettingsSection() {
                   display: "inline",
                   padding: 0,
                   fontSize: 12,
-                  color: "var(--accent)",
+                  color: "var(--red)",
                   background: "none",
                   border: "none",
                   cursor: "pointer",
                 }}
                 onClick={() =>
                   window.electron?.openExternal(
-                    "https://github.com/truelockmc/streambert/wyzie-tutorial.md",
+                    "https://codeberg.org/truelockmc/streambert/src/branch/main/wyzie-tutorial.md",
                   )
                 }
               >
