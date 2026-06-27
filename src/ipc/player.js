@@ -151,7 +151,7 @@ function register(getMainWindow, { writeSecretMigration }) {
             : ["/usr/bin/mpv", "/usr/local/bin/mpv", "/snap/bin/mpv", "mpv"];
 
       // ── Validate subtitle paths ───────────────────────────────────────────
-      // Each subtitle path is independently validated
+      // Each subtitle path is independently validated.
       const subFilePaths = Array.isArray(subtitlePaths)
         ? subtitlePaths
             .map((sp) => (typeof sp === "string" ? sp : sp?.path))
@@ -325,6 +325,7 @@ function register(getMainWindow, { writeSecretMigration }) {
       }
 
       // Same check for every trusted source (GitHub, Codeberg, ...)
+      // see TRUSTED_UPDATE_SOURCES above.
       const trustedSource = findTrustedUpdateSource(parsed);
       if (!trustedSource) {
         return { ok: false, error: "Unauthorized update source" };
@@ -568,6 +569,7 @@ function register(getMainWindow, { writeSecretMigration }) {
   // ── Proxy release-note images through the main process ───────────────────
   // Codeberg (and GitHub) release images are blocked by Electron's renderer
   // CSP. Fetch them here in the main process and return a base64 data-URI.
+
   const ALLOWED_IMAGE_HOSTS = new Set([
     "codeberg.org",
     "github.com",
@@ -691,4 +693,61 @@ function register(getMainWindow, { writeSecretMigration }) {
   });
 }
 
-module.exports = { register };
+// ── Central audio-device-change recovery (macOS HDMI/TV fix) ─────────────────
+// When the user switches audio output (e.g. Speakers → HDMI TV), Chromium
+// suspends every AudioContext in every session.
+
+function registerAudioDeviceRecovery() {
+  if (process.platform !== "darwin") return; // only needed on macOS
+
+  const { session, webContents, ipcMain: ipc } = require("electron");
+
+  const RECOVERY_JS = `
+    (() => {
+      async function recoverAudio() {
+        const ctxs = window.__audioContexts || [];
+        for (const ctx of ctxs) {
+          try { if (ctx.state === 'suspended') await ctx.resume(); } catch {}
+        }
+        const v = document.querySelector('video');
+        if (!v || v.paused) return;
+        const t = v.currentTime;
+        try {
+          v.pause();
+          await new Promise(r => setTimeout(r, 80));
+          v.currentTime = t;
+          await v.play();
+        } catch {}
+      }
+      recoverAudio();
+    })()
+  `;
+
+  const recoverAllWebContents = () => {
+    for (const wc of webContents.getAllWebContents()) {
+      if (wc.isDestroyed()) continue;
+      wc.executeJavaScript(RECOVERY_JS).catch(() => {});
+      try {
+        for (const frame of wc.mainFrame?.framesInSubtree ?? []) {
+          try {
+            frame.executeJavaScript(RECOVERY_JS);
+          } catch {}
+        }
+      } catch {}
+    }
+  };
+
+  // Hook 1: Chromium's built-in device-selection event
+  session.defaultSession.on(
+    "select-audio-device",
+    (event, details, callback) => {
+      callback(""); // let Chromium pick the default, don't block
+      setTimeout(recoverAllWebContents, 150);
+    },
+  );
+
+  // Hook 2: renderer sends this when navigator.mediaDevices fires "devicechange"
+  ipc.on("audio-device-changed", () => setTimeout(recoverAllWebContents, 150));
+}
+
+module.exports = { register, registerAudioDeviceRecovery };

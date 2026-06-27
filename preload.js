@@ -184,4 +184,13 @@ contextBridge.exposeInMainWorld("electron", {
   },
   offScheduledBackupRequested: (h) =>
     ipcRenderer.removeListener("scheduled-backup-requested", h),
+
+  fetchReleaseImage: (url) =>
+    ipcRenderer.invoke("fetch-release-image", { url }),
 });
+
+if (process.platform === "darwin") {
+  navigator.mediaDevices?.addEventListener("devicechange", () => {
+    ipcRenderer.send("audio-device-changed");
+  });
+}
