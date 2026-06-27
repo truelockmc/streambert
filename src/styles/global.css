@@ -1024,6 +1024,20 @@ body.no-anim *::after {
     display: none !important;
 }
 
+/* Fix window-dragging on MacOS */
+.window-titlebar {
+    -webkit-app-region: drag;
+    cursor: move;
+}
+
+/* Ensure titlebar buttons are clickable and not part of drag region */
+.window-titlebar button,
+.window-titlebar .titlebar-btn {
+    -webkit-app-region: no-drag;
+    pointer-events: auto;
+    cursor: default;
+}
+
 /* Hide the custom window titlebar on player fullscreen */
 [data-player-fullscreen] .window-titlebar {
     display: none !important;
