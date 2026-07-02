@@ -706,12 +706,45 @@ function getPlayerServer() {
           res.end();
           return;
         }
+        // Restrict the proxy to the host of the video that has actually been
+        // set via set-player-video. Without this, the /proxy endpoint is a
+        // localhost open-proxy (CWE-918 SSRF): any process — or any web page
+        // that can discover the port — could use it to reach cloud metadata
+        // (169.254.169.254), intranet services, or arbitrary third-party
+        // hosts, with the response served back under
+        // Access-Control-Allow-Origin: *.
+        let targetUrl;
         try {
-          const targetUrl = new URL(target);
+          targetUrl = new URL(target);
+        } catch {
+          res.writeHead(400);
+          res.end();
+          return;
+        }
+        if (targetUrl.protocol !== "http:" && targetUrl.protocol !== "https:") {
+          res.writeHead(400);
+          res.end();
+          return;
+        }
+        let allowedHost = null;
+        try {
+          if (_currentVideoUrl) {
+            allowedHost = new URL(_currentVideoUrl).hostname.toLowerCase();
+          }
+        } catch {
+          allowedHost = null;
+        }
+        if (!allowedHost || targetUrl.hostname.toLowerCase() !== allowedHost) {
+          res.writeHead(403);
+          res.end();
+          return;
+        }
+        try {
           const lib = targetUrl.protocol === "https:" ? https : http;
           const proxyReq = lib.request(
             {
               hostname: targetUrl.hostname,
+              port: targetUrl.port || undefined,
               path: targetUrl.pathname + targetUrl.search,
               method: req.method || "GET",
               headers: {
