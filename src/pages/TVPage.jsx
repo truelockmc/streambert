@@ -372,6 +372,7 @@ export default function TVPage({
   onMarkUnwatched,
   downloads,
   onGoToDownloads,
+  onEpisodeChange,
 }) {
   const [details, setDetails] = useState(null);
   const [seasonData, setSeasonData] = useState(null);
@@ -472,6 +473,20 @@ export default function TVPage({
   const ratingCountry = useMemo(() => getRatingCountry(storage), []);
   const restricted = isRestricted(rating.minAge, ageLimitSetting);
   const [seasonMenu, setSeasonMenu] = useState(null); // { x, y, seasonNum }
+
+  // Report the currently selected episode up to App.jsx for Discord RPC
+  useEffect(() => {
+    if (!onEpisodeChange) return;
+    if (!selectedEp) {
+      onEpisodeChange(null);
+      return;
+    }
+    onEpisodeChange({
+      season: selectedSeason,
+      episode: selectedEp.episode_number,
+      episodeName: selectedEp.name || null,
+    });
+  }, [onEpisodeChange, selectedSeason, selectedEp?.episode_number]);
 
   const resetAutoplayRef = useRef(() => {});
   const triggerAutoplayRef = useRef(() => {});

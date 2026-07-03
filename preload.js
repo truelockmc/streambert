@@ -187,6 +187,12 @@ contextBridge.exposeInMainWorld("electron", {
 
   fetchReleaseImage: (url) =>
     ipcRenderer.invoke("fetch-release-image", { url }),
+
+  // Discord Rich Presence (off by default, toggled in Settings)
+  discordRpcSetEnabled: (enabled) =>
+    ipcRenderer.invoke("discord-rpc-set-enabled", enabled),
+  discordRpcUpdateActivity: (activity) =>
+    ipcRenderer.invoke("discord-rpc-update-activity", activity),
 });
 
 if (process.platform === "darwin") {

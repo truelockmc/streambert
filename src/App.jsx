@@ -17,8 +17,15 @@ import {
   ACCENT_PRESETS,
 } from "./utils/appearance";
 import { collectBackupData } from "./utils/backup";
-import { tmdbFetch, setApiErrorHandlers } from "./utils/api";
+import { tmdbFetch, setApiErrorHandlers, imgUrl } from "./utils/api";
 import { clearAppCaches } from "./utils/storage";
+import {
+  readDiscordRpcSettings,
+  applyDiscordRpcEnabled,
+  sendWatchingActivity,
+  sendIdleActivity,
+  clearActivity as clearDiscordActivity,
+} from "./utils/discordPresence";
 
 import Sidebar from "./components/Sidebar";
 import SearchModal from "./components/SearchModal";
@@ -90,6 +97,16 @@ export default function App() {
     return { accentColor: accentHex, subtitleLang };
   };
   const [playerSettings, setPlayerSettings] = useState(readPlayerSettings);
+
+  // ── Discord Rich Presence ──────────────────────────────────────────────────
+  // Off by default. `watchingEpisode` is filled in by TVPage (season/episode
+  // of whatever is currently open) via onEpisodeChange; MoviePage needs no
+  // extra data since title/poster already live on `selected`.
+  const [discordSettings, setDiscordSettings] = useState(
+    readDiscordRpcSettings,
+  );
+  const [watchingEpisode, setWatchingEpisode] = useState(null);
+  const watchStartRef = useRef(null);
 
   // ── Scheduled backup: run on startup if due ─────────────────────────────────
   useEffect(() => {
@@ -556,6 +573,51 @@ export default function App() {
     return () =>
       window.removeEventListener("streambert:player-settings-changed", handler);
   }, []);
+
+  // ── Discord Rich Presence: sync settings + connect/disconnect ─────────────
+  useEffect(() => {
+    applyDiscordRpcEnabled(discordSettings.enabled);
+    if (!discordSettings.enabled) clearDiscordActivity();
+  }, [discordSettings.enabled]);
+
+  useEffect(() => {
+    const handler = () => setDiscordSettings(readDiscordRpcSettings());
+    window.addEventListener("streambert:discord-rpc-settings-changed", handler);
+    return () =>
+      window.removeEventListener(
+        "streambert:discord-rpc-settings-changed",
+        handler,
+      );
+  }, []);
+
+  // Reset episode info + elapsed-time anchor whenever the open title changes
+  useEffect(() => {
+    setWatchingEpisode(null);
+    watchStartRef.current = Date.now();
+  }, [selected?.id, selected?.media_type]);
+
+  // Push the current activity to Discord whenever what's on screen changes
+  useEffect(() => {
+    if (!discordSettings.enabled) return;
+    if ((page === "movie" || page === "tv") && selected) {
+      const title = selected.title || selected.name || "";
+      let subtitle = page === "movie" ? "Movie" : "Series";
+      if (page === "tv" && watchingEpisode) {
+        subtitle = `S${watchingEpisode.season} · E${watchingEpisode.episode}`;
+      }
+      sendWatchingActivity(
+        {
+          title,
+          subtitle,
+          posterUrl: imgUrl(selected.poster_path, "w500"),
+          startedAt: watchStartRef.current,
+        },
+        discordSettings,
+      );
+    } else {
+      sendIdleActivity(discordSettings);
+    }
+  }, [page, selected, watchingEpisode, discordSettings]);
   useEffect(() => {
     // Accent colour
     const accent = storage.get(STORAGE_KEYS.ACCENT_COLOR) || "red";
@@ -1017,6 +1079,7 @@ export default function App() {
                 onMarkUnwatched={markUnwatched}
                 downloads={downloads}
                 onGoToDownloads={handleGoToDownloads}
+                onEpisodeChange={setWatchingEpisode}
               />
             )}
             {page === "history" && (

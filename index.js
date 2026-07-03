@@ -42,6 +42,7 @@ const downloadsIpc = require("./src/ipc/downloads");
 const subtitlesIpc = require("./src/ipc/subtitles");
 const allmangaIpc = require("./src/ipc/allmanga");
 const playerIpc = require("./src/ipc/player");
+const discordRpc = require("./src/ipc/discordRpc");
 
 // -- Ad/tracker block list -----------------------------------------------------
 const BLOCKED_HOSTS = [
@@ -323,6 +324,7 @@ playerIpc.register(getMainWindow, {
   writeSecretMigration: storageIpc.writeSecretMigration,
 });
 blockStats.init(getMainWindow);
+discordRpc.register(ipcMain);
 
 // get-block-stats lives with its data
 ipcMain.handle("get-block-stats", () => blockStats.getBlockStats());
@@ -503,6 +505,7 @@ if (!gotTheLock) {
     createWindow();
   });
   app.on("window-all-closed", () => app.quit());
+  app.on("before-quit", () => discordRpc.shutdown());
   app.on("activate", () => {
     if (mainWindow === null) createWindow();
   });

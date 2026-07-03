@@ -2345,6 +2345,131 @@ function NotificationsSection() {
 }
 
 // ── Section Group Header ──────────────────────────────────────────────────────
+function DiscordRpcSection() {
+  const [enabled, setEnabledState] = useState(
+    () => !!storage.get(STORAGE_KEYS.DISCORD_RPC_ENABLED),
+  );
+  const [showCover, setShowCover] = useState(
+    () => storage.get(STORAGE_KEYS.DISCORD_RPC_SHOW_COVER) !== false,
+  );
+  const [showTimestamp, setShowTimestamp] = useState(
+    () => storage.get(STORAGE_KEYS.DISCORD_RPC_SHOW_TIMESTAMP) !== false,
+  );
+  const [showButton, setShowButton] = useState(
+    () => storage.get(STORAGE_KEYS.DISCORD_RPC_SHOW_BUTTON) !== false,
+  );
+  const [saved, setSaved] = useState(false);
+
+  const saveSettings = () => {
+    storage.set(STORAGE_KEYS.DISCORD_RPC_ENABLED, enabled);
+    storage.set(STORAGE_KEYS.DISCORD_RPC_SHOW_COVER, showCover);
+    storage.set(STORAGE_KEYS.DISCORD_RPC_SHOW_TIMESTAMP, showTimestamp);
+    storage.set(STORAGE_KEYS.DISCORD_RPC_SHOW_BUTTON, showButton);
+    window.dispatchEvent(
+      new CustomEvent("streambert:discord-rpc-settings-changed"),
+    );
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const ToggleRow = ({ label, description, value, onChange, disabled }) => (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 14,
+        padding: "16px 0",
+        borderBottom: "1px solid var(--border)",
+        opacity: disabled ? 0.45 : 1,
+        pointerEvents: disabled ? "none" : "auto",
+      }}
+    >
+      <Toggle value={value} onChange={onChange} />
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>
+          {label}
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            color: "var(--text3)",
+            marginTop: 3,
+            lineHeight: 1.5,
+          }}
+        >
+          {description}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">Discord Rich Presence</div>
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--text3)",
+          marginBottom: 16,
+          lineHeight: 1.6,
+        }}
+      >
+        Shows what you're currently watching on your Discord profile (title +
+        cover, or "Idling" when nothing is open). Off by default. Requires
+        the Discord desktop client to be running.
+      </div>
+
+      <div
+        style={{
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: 10,
+          padding: "0 16px",
+          marginBottom: 20,
+        }}
+      >
+        <ToggleRow
+          label="Enable Discord Rich Presence"
+          description="Connects to your local Discord client and updates your status automatically."
+          value={enabled}
+          onChange={setEnabledState}
+        />
+        <ToggleRow
+          label="Show cover art"
+          description="Uses the movie/show poster as the large image. When off, only the Streambert icon is shown."
+          value={showCover}
+          onChange={setShowCover}
+          disabled={!enabled}
+        />
+        <ToggleRow
+          label="Show elapsed time"
+          description="Displays how long you've been on the current title's page."
+          value={showTimestamp}
+          onChange={setShowTimestamp}
+          disabled={!enabled}
+        />
+        <ToggleRow
+          label="Show GitHub button"
+          description="Adds a button linking to the Streambert GitHub repository."
+          value={showButton}
+          onChange={setShowButton}
+          disabled={!enabled}
+        />
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button className="btn btn-primary" onClick={saveSettings}>
+          Save
+        </button>
+        {saved && (
+          <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Section Group Header ─────────────────────────────────────────────────────
 function SectionGroupHeader({ title, subtitle }) {
   return (
     <div style={{ marginBottom: 32, marginTop: 4 }}>
@@ -2496,6 +2621,21 @@ const SECTION_NAV = [
       "watchlist",
       "new episode",
       "release",
+    ],
+  },
+  {
+    id: "discordRpc",
+    label: "Discord Rich Presence",
+    icon: "🎮",
+    keywords: [
+      "discord",
+      "rich presence",
+      "rpc",
+      "status",
+      "activity",
+      "watching",
+      "idling",
+      "presence",
     ],
   },
   {
@@ -3210,6 +3350,7 @@ export default function SettingsPage({
   const secSubtitles = useRef(null);
   const secDownloads = useRef(null);
   const secNotifications = useRef(null);
+  const secDiscordRpc = useRef(null);
   const secInterface = useRef(null);
   const secLibrary = useRef(null);
   const secBackup = useRef(null);
@@ -3222,6 +3363,7 @@ export default function SettingsPage({
     subtitles: secSubtitles,
     downloads: secDownloads,
     notifications: secNotifications,
+    discordRpc: secDiscordRpc,
     interface: secInterface,
     library: secLibrary,
     backup: secBackup,
@@ -4127,6 +4269,17 @@ export default function SettingsPage({
             subtitle="Desktop alerts for downloads and new episode releases"
           />
           <NotificationsSection />
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* GROUP: DISCORD RICH PRESENCE                                       */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <div ref={secDiscordRpc} style={{ scrollMarginTop: 80 }}>
+          <SectionGroupHeader
+            title="Discord Rich Presence"
+            subtitle="Show what you're watching on your Discord profile"
+          />
+          <DiscordRpcSection />
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
