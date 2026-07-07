@@ -118,6 +118,17 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("download-subtitles-for-file", args),
   deleteSubtitleFile: (args) =>
     ipcRenderer.invoke("delete-subtitle-file", args),
+  setSubtitleOffset: (webContentsId, offsetSeconds, showOsd) =>
+    ipcRenderer.invoke("set-subtitle-offset", { webContentsId, offsetSeconds, showOsd }),
+  injectSubtitleMenu: (webContentsId) =>
+    ipcRenderer.invoke("inject-subtitle-menu", webContentsId),
+  onPlayerShortcutKey: (cb) => {
+    const h = (_, key) => cb(key);
+    ipcRenderer.on("player-shortcut-key", h);
+    return h;
+  },
+  offPlayerShortcutKey: (h) =>
+    ipcRenderer.removeListener("player-shortcut-key", h),
   // Wyzie API key redemption
   wyzieOpenRedeem: () => ipcRenderer.invoke("wyzie-open-redeem"),
   wyzieValidateKey: (key) => ipcRenderer.invoke("wyzie-validate-key", key),
