@@ -834,6 +834,7 @@ export default function TVPage({
   const d = details || item;
   const title = d.name || d.title;
   const year = (d.first_air_date || "").slice(0, 4);
+  const status = d.status;
 
   // ── Season list: prefer episode-group > AniList > TMDB ──────────────────
   // tmdbSeasons excludes specials (season 0) (only for AniList)
@@ -1635,6 +1636,7 @@ export default function TVPage({
                       {displayEpisodeCount !== 1 ? "s" : ""}
                     </span>
                   )}
+                  <span>{status}</span>
                 </div>
                 {rating.cert && (
                   <div
