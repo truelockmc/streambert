@@ -5,11 +5,17 @@ import { EyeIcon } from "../components/Icons";
 import { useRatings, getRatingForItem } from "../utils/useRatings";
 import { isRestricted } from "../utils/ageRating";
 
+// "Classics" isn't a real TMDB genre — it's a synthetic category built from
+// an older release-date cutoff plus rating/vote thresholds, so it cuts
+// across genres instead of filtering by with_genres like the rest of the list.
+const CLASSICS_CUTOFF = "1999-12-31";
+
 // Genre catalogue: TMDB uses separate id spaces for /discover/movie and
 // /discover/tv, and a few genres only exist on one side (e.g. Horror has no
 // TV equivalent, Kids/Reality are TV-only). null means "not available for
 // that media type".
 const GENRES = [
+  { label: "Classics", classics: true },
   { label: "Action", movieId: 28, tvId: 10759 },
   { label: "Adventure", movieId: 12, tvId: 10759 },
   { label: "Animation", movieId: 16, tvId: 16 },
@@ -46,37 +52,57 @@ const SORT_OPTIONS = [
 
 // A genre chip is only clickable for a given type filter if it maps to at
 // least one id on that side (or "all", which just needs either side).
+// Classics isn't genre-id based, so it's always available for both.
 function genreSupportsType(genre, typeFilter) {
+  if (genre.classics) return true;
   if (typeFilter === "movie") return !!genre.movieId;
   if (typeFilter === "tv") return !!genre.tvId;
   return !!(genre.movieId || genre.tvId);
 }
 
-// Build the sort_by (+ supporting filter) query params for a given sort
-// option and media type. "Top Rated" requires a vote_count floor so a movie
-// with a single 10/10 vote doesn't outrank genuinely acclaimed titles.
-// "Newest" excludes unreleased/undated titles so the list isn't dominated by
-// festival-only or straight-to-video entries with no real release yet.
-function buildSortParams(sortId, mediaType) {
+// Build the /discover query params for a given genre + sort option + media
+// type. "Top Rated" requires a vote_count floor so a title with a single
+// 10/10 vote doesn't outrank genuinely acclaimed titles. "Newest" excludes
+// unreleased/undated titles so the list isn't dominated by festival-only or
+// straight-to-video entries with no real release yet. "Classics" applies its
+// own cutoff/rating thresholds up front, which the sort branches below only
+// tighten, never loosen.
+function buildDiscoverParams(genre, mediaType, sortId, pageNum) {
+  const params = new URLSearchParams({ page: String(pageNum) });
+  const dateField =
+    mediaType === "tv" ? "first_air_date" : "primary_release_date";
+
+  if (genre.classics) {
+    params.set(`${dateField}.lte`, CLASSICS_CUTOFF);
+    params.set("vote_count.gte", mediaType === "tv" ? "100" : "500");
+    params.set("vote_average.gte", "7");
+  } else {
+    params.set("with_genres", String(mediaType === "tv" ? genre.tvId : genre.movieId));
+  }
+
   if (sortId === "rating") {
-    return "sort_by=vote_average.desc&vote_count.gte=200";
+    params.set("sort_by", "vote_average.desc");
+    const floor = Number(params.get("vote_count.gte") || 0);
+    if (floor < 200) params.set("vote_count.gte", "200");
+  } else if (sortId === "newest") {
+    params.set("sort_by", `${dateField}.desc`);
+    if (!genre.classics) {
+      params.set(`${dateField}.lte`, new Date().toISOString().slice(0, 10));
+      if (!params.has("vote_count.gte")) params.set("vote_count.gte", "1");
+    }
+  } else {
+    params.set("sort_by", "popularity.desc");
   }
-  if (sortId === "newest") {
-    const today = new Date().toISOString().slice(0, 10);
-    const dateField = mediaType === "tv" ? "first_air_date" : "primary_release_date";
-    return `sort_by=${dateField}.desc&${dateField}.lte=${today}&vote_count.gte=1`;
-  }
-  return "sort_by=popularity.desc";
+
+  return params;
 }
 
 async function fetchGenrePage(genre, typeFilter, sortId, pageNum, apiKey) {
   const requests = [];
-  if ((typeFilter === "all" || typeFilter === "movie") && genre.movieId) {
+  if ((typeFilter === "all" || typeFilter === "movie") && (genre.movieId || genre.classics)) {
+    const params = buildDiscoverParams(genre, "movie", sortId, pageNum);
     requests.push(
-      tmdbFetch(
-        `/discover/movie?with_genres=${genre.movieId}&${buildSortParams(sortId, "movie")}&page=${pageNum}`,
-        apiKey,
-      )
+      tmdbFetch(`/discover/movie?${params.toString()}`, apiKey)
         .then((d) => ({
           results: (d.results || []).map((i) => ({
             ...i,
@@ -87,12 +113,10 @@ async function fetchGenrePage(genre, typeFilter, sortId, pageNum, apiKey) {
         .catch(() => ({ results: [], totalPages: 0 })),
     );
   }
-  if ((typeFilter === "all" || typeFilter === "tv") && genre.tvId) {
+  if ((typeFilter === "all" || typeFilter === "tv") && (genre.tvId || genre.classics)) {
+    const params = buildDiscoverParams(genre, "tv", sortId, pageNum);
     requests.push(
-      tmdbFetch(
-        `/discover/tv?with_genres=${genre.tvId}&${buildSortParams(sortId, "tv")}&page=${pageNum}`,
-        apiKey,
-      )
+      tmdbFetch(`/discover/tv?${params.toString()}`, apiKey)
         .then((d) => ({
           results: (d.results || []).map((i) => ({ ...i, media_type: "tv" })),
           totalPages: d.total_pages || 1,
