@@ -30,6 +30,66 @@ app.commandLine.appendSwitch("enable-features", "NetworkServiceInProcess2");
 app.commandLine.appendSwitch("disk-cache-size", String(80 * 1024 * 1024));
 app.commandLine.appendSwitch("renderer-process-limit", "3");
 
+// -- GPU fallback: cross-platform rendering recovery ---------------------------
+// Some GPU/driver combinations (e.g. NVIDIA with the open-source `nouveau`
+// driver on Linux) start Chromium's GPU process but never produce a frame: the
+// window stays blank instead of crashing. Detect that in two ways and relaunch
+// with progressively more conservative rendering flags:
+//
+//   level 1: --disable-gpu             CPU rasterization, no GPU process
+//   level 2: --use-angle=swiftshader   software WebGL via SwiftShader
+//
+// The current level is derived from the process arguments (no persisted
+// state). GPU flags the user passed explicitly are always respected, and the
+// ladder never escalates past the highest level.
+const GPU_FALLBACK_FLAGS = ["--disable-gpu", "--use-angle=swiftshader"];
+const GPU_WATCHDOG_MS = 20000;
+
+const gpuFallbackLevel = () => {
+  const idx = GPU_FALLBACK_FLAGS.findIndex((flag) =>
+    process.argv.includes(flag),
+  );
+  return idx === -1 ? 0 : idx + 1;
+};
+
+const userSetGpuFlag = () =>
+  process.argv.some(
+    (arg) => arg.startsWith("--disable-gpu") || arg.startsWith("--use-angle"),
+  );
+
+function escalateGpuFallback() {
+  if (userSetGpuFlag()) return false;
+  const next = gpuFallbackLevel() + 1;
+  if (next > GPU_FALLBACK_FLAGS.length) return false;
+  const flag = GPU_FALLBACK_FLAGS[next - 1];
+  const args = process.argv
+    .slice(1)
+    .filter((arg) => !GPU_FALLBACK_FLAGS.includes(arg))
+    .concat(flag);
+  console.log(
+    `[gpu] rendering issue detected, relaunching with ${flag} (level ${next}/${GPU_FALLBACK_FLAGS.length})`,
+  );
+  app.relaunch({ args });
+  app.exit(0);
+  return true;
+}
+
+// Relaunch if the GPU child process crashes or fails to start
+app.on("child-process-gone", (_event, details) => {
+  if (details.type !== "GPU") return;
+  const crashLike = [
+    "crashed",
+    "launch-failed",
+    "oom",
+    "abnormal-exit",
+    "integrity-failure",
+    "memory-eviction",
+  ];
+  if (!crashLike.includes(details.reason)) return;
+  console.log(`[gpu] GPU process gone (${details.reason})`);
+  escalateGpuFallback();
+});
+
 // -- Startup benchmark ---------------------------------------------------------
 const _t0 = Date.now();
 const _bench = (label) =>
@@ -273,6 +333,18 @@ function createWindow() {
       mainWindow.webContents.send("webview-leave-fullscreen"),
     );
   });
+
+  // If no frame is painted within the timeout, assume the GPU stack hung
+  // (a hang, not a crash) and relaunch with the next fallback level.
+  if (!userSetGpuFlag()) {
+    const gpuWatchdog = setTimeout(() => {
+      console.log(
+        "[gpu] main window produced no frame, escalating renderer fallback",
+      );
+      escalateGpuFallback();
+    }, GPU_WATCHDOG_MS);
+    mainWindow.webContents.once("paint", () => clearTimeout(gpuWatchdog));
+  }
 
   mainWindow.loadFile(path.join(__dirname, "dist/index.html"));
 
