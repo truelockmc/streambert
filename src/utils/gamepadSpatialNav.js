@@ -36,21 +36,25 @@ function isVisible(el) {
 }
 
 // A lot of this app's clickable UI (carousel slides, search results, recent
-// search entries, ...) is a plain <div onClick> rather than a real button,
-// so the semantic selector above misses them entirely. What they all share
-// is `cursor: pointer`. We scan for that and keep only the outermost
-// element in each "pointer chain" (cursor is inherited, so a clickable
-// card's children report pointer too — without this we'd get 4-5 duplicate
-// candidates stacked on top of each other for a single click target).
+// search entries, sidebar "saved" thumbnails, ...) is a plain <div onClick>
+// rather than a real button, so the semantic selector above misses them
+// entirely. What they share is a pointer-ish cursor (`pointer`, or `grab`
+// for the draggable sidebar thumbnails). We scan for that and keep only the
+// outermost element in each "cursor chain" (cursor is inherited, so a
+// clickable card's children report the same cursor — without this we'd get
+// several duplicate candidates stacked on top of each other per target).
+const CLICKABLE_CURSORS = new Set(["pointer", "grab"]);
+
 function collectPointerRoots(root) {
   const nodes = root.querySelectorAll(
     "div, span, li, article, section, figure",
   );
   const out = [];
   for (const el of nodes) {
-    if (getComputedStyle(el).cursor !== "pointer") continue;
+    if (!CLICKABLE_CURSORS.has(getComputedStyle(el).cursor)) continue;
     const parent = el.parentElement;
-    if (parent && getComputedStyle(parent).cursor === "pointer") continue;
+    if (parent && CLICKABLE_CURSORS.has(getComputedStyle(parent).cursor))
+      continue;
     if (!isVisible(el)) continue;
     out.push(el);
   }
@@ -58,13 +62,28 @@ function collectPointerRoots(root) {
 }
 
 // Modals/overlays in this codebase all use a class name containing
-// "overlay" (modal-overlay, trailer-overlay, blocked-modal-overlay, ...).
-// When one is open, scope navigation to the topmost one so D-pad can't
-// "reach through" the dimmed background.
+// "overlay", but so do several purely decorative, non-modal elements (e.g.
+// MediaCard's hover gradient `.card-overlay`, the carousel's
+// `.carousel-unreleased-overlay`) — matching on class name alone was
+// picking one of those and scoping ALL navigation to it, which made
+// everything (including the sidebar) unreachable on pages with a lot of
+// cards. Real modals are always `position: fixed` and cover the viewport;
+// decorative overlays are `position: absolute` inside a card. That's a much
+// more reliable signal than the class name.
+function isModalRoot(el) {
+  if (!(el instanceof HTMLElement)) return false;
+  const style = getComputedStyle(el);
+  if (style.position !== "fixed") return false;
+  const rect = el.getBoundingClientRect();
+  // Must cover (most of) the viewport, not just be a small fixed element.
+  return rect.width >= window.innerWidth * 0.6 &&
+    rect.height >= window.innerHeight * 0.6;
+}
+
 function getScopeRoot() {
   const overlays = Array.from(
     document.querySelectorAll('[class*="overlay"]'),
-  ).filter(isVisible);
+  ).filter((el) => isVisible(el) && isModalRoot(el));
   if (overlays.length === 0) return document;
   return overlays[overlays.length - 1];
 }
