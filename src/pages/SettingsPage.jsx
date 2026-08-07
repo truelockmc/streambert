@@ -1265,6 +1265,9 @@ function AppearanceSection() {
   const [noAnim, setNoAnim] = useState(
     () => !!storage.get(STORAGE_KEYS.REDUCE_ANIMATIONS),
   );
+  const [gamepadEnabled, setGamepadEnabled] = useState(
+    () => storage.get(STORAGE_KEYS.GAMEPAD_ENABLED) !== false,
+  );
   const [accentInPlayer, setAccentInPlayer] = useState(
     () => storage.get(STORAGE_KEYS.ACCENT_IN_PLAYER) !== false,
   );
@@ -1321,6 +1324,8 @@ function AppearanceSection() {
     storage.set(STORAGE_KEYS.FONT_SIZE, fontSize);
     storage.set(STORAGE_KEYS.COMPACT_MODE, compact ? 1 : 0);
     storage.set(STORAGE_KEYS.REDUCE_ANIMATIONS, noAnim ? 1 : 0);
+    storage.set(STORAGE_KEYS.GAMEPAD_ENABLED, gamepadEnabled);
+    window.dispatchEvent(new CustomEvent("streambert:gamepad-settings-changed"));
     storage.set(STORAGE_KEYS.THEME, theme);
     if (theme === "custom") {
       storage.set(STORAGE_KEYS.CUSTOM_THEME_VARS, customVars);
@@ -1654,6 +1659,21 @@ function AppearanceSection() {
             </div>
             <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
               Disables transitions and hover effects throughout the app.
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Toggle value={gamepadEnabled} onChange={setGamepadEnabled} />
+          <div>
+            <div
+              style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}
+            >
+              Controller support
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
+              Navigate menus with a D-pad/stick and use A/B to select and go
+              back. In the player: A play/pause, D-pad seek/volume, LB/RB
+              skip ±15s, Y fullscreen, B exit.
             </div>
           </div>
         </div>

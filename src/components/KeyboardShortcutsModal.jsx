@@ -123,6 +123,82 @@ export default function KeyboardShortcutsModal({ onClose }) {
           ))}
         </div>
 
+        {/* Controller support */}
+        <div
+          style={{
+            marginTop: 24,
+            marginBottom: 4,
+            fontSize: 13,
+            fontWeight: 600,
+            letterSpacing: 0.5,
+            color: "var(--text3)",
+            textTransform: "uppercase",
+          }}
+        >
+          Controller
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            marginTop: 12,
+          }}
+        >
+          {[
+            { keys: ["D-Pad"], desc: "Navigate menus" },
+            { keys: ["A"], desc: "Select / Confirm" },
+            { keys: ["B"], desc: "Back / Close" },
+            { keys: ["Start"], desc: "Open search" },
+            {
+              keys: ["A / D-Pad / LB / RB"],
+              desc: "In player: play-pause, seek, volume, skip ±15s",
+            },
+          ].map(({ keys, desc }, i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+                padding: "10px 14px",
+                background: "var(--surface2)",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+              }}
+            >
+              <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                {desc}
+              </span>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                {keys.map((k, j) => (
+                  <kbd
+                    key={j}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "3px 9px",
+                      background: "var(--surface)",
+                      border: "1px solid var(--border)",
+                      borderBottom: "2px solid rgba(255,255,255,0.12)",
+                      borderRadius: 5,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "var(--text)",
+                      fontFamily: "monospace",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {k}
+                  </kbd>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
         {/* GitHub support link */}
         <div
           style={{

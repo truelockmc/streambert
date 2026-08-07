@@ -2232,6 +2232,18 @@ kbd {
     border-radius: 4px;
 }
 
+/* Controller navigation focus ring — added/removed by gamepadSpatialNav.js */
+.gamepad-focused {
+    outline: 3px solid var(--accent, #e50914) !important;
+    outline-offset: 3px;
+    border-radius: var(--radius, 6px);
+    transition: outline-offset 0.12s ease;
+}
+.card.gamepad-focused {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: var(--red-glow);
+}
+
 .saved-thumb[draggable="true"]:active {
     cursor: grabbing;
 }

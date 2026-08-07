@@ -32,6 +32,7 @@ import SearchModal from "./components/SearchModal";
 import SetupScreen from "./components/SetupScreen";
 import CloseConfirmModal from "./components/CloseConfirmModal";
 import UpdateModal from "./components/UpdateModal";
+import { useGamepadNav } from "./utils/useGamepadNav";
 
 // Lazy-loaded pages: each chunk is only downloaded when the user first visits
 const HomePage = lazy(() => import("./pages/HomePage"));
@@ -724,6 +725,38 @@ export default function App() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [navigateBack]);
+
+  // ── Controller / gamepad navigation ─────────────────────────────────────
+  const [gamepadEnabled, setGamepadEnabled] = useState(
+    () => storage.get(STORAGE_KEYS.GAMEPAD_ENABLED) !== false, // default on
+  );
+  useEffect(() => {
+    const handler = () =>
+      setGamepadEnabled(storage.get(STORAGE_KEYS.GAMEPAD_ENABLED) !== false);
+    window.addEventListener("streambert:gamepad-settings-changed", handler);
+    return () =>
+      window.removeEventListener(
+        "streambert:gamepad-settings-changed",
+        handler,
+      );
+  }, []);
+  const gamepadToastedRef = useRef(false);
+  const { connected: gamepadConnected } = useGamepadNav({
+    enabled: gamepadEnabled,
+    onBack: navigateBack,
+    onOpenSearch: () => setShowSearch(true),
+  });
+  useEffect(() => {
+    if (!gamepadEnabled) return;
+    if (gamepadConnected && !gamepadToastedRef.current) {
+      gamepadToastedRef.current = true;
+      // showToast is defined further below in this component; effects only
+      // run after the full render, so it's already initialized by then.
+      showToast("Controller connected");
+    }
+    if (!gamepadConnected) gamepadToastedRef.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gamepadConnected, gamepadEnabled]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const toastTimerRef = useRef(null);
