@@ -2524,6 +2524,23 @@ const _todayForEpisodes = (() => {
   return d;
 })();
 
+function getDaysUntilRelease(airDate) {
+  if (!airDate) return "";
+
+  const target = new Date(airDate);
+  target.setHours(0, 0, 0, 0);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const diffMs = target - today;
+  const days = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+  if (days <= 0) return "Releasing today";
+  if (days === 1) return "1 day left";
+  return `${days} days left`;
+}
+
 const EpisodeCard = memo(function EpisodeCard({
   ep,
   itemId,
@@ -2587,6 +2604,7 @@ const EpisodeCard = memo(function EpisodeCard({
         ) : epUnreleased ? (
           <div className="episode-restricted-overlay">
             🔒<span>Unreleased</span>
+            <span>{getDaysUntilRelease(ep.air_date)}</span>
           </div>
         ) : isPlaying ? (
           <div className="episode-playing-badge">
