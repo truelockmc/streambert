@@ -45,6 +45,7 @@ import {
   SourceIcon,
   ShieldBlockIcon,
   PopOutIcon,
+  CastIcon,
 } from "../components/Icons";
 import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
@@ -65,6 +66,7 @@ import {
   getAgeLimitSetting,
   getRatingCountry,
 } from "../utils/ageRating";
+import CastModal from "../components/CastModal";
 
 // ── Partial-circle progress icon (cached per pct tier) ───────────────────────
 // Uses a single SVG arc. Three instances (25/50/75)
@@ -387,6 +389,8 @@ export default function TVPage({
   const [showDownload, setShowDownload] = useState(false);
   const [trailerKey, setTrailerKey] = useState(null);
   const [showTrailer, setShowTrailer] = useState(false);
+  const [credits, setCredits] = useState({ cast: [], crew: [] });
+  const [showCast, setShowCast] = useState(false);
   const [m3u8Url, setM3u8Url] = useState(null);
   const [interceptedSubs, setInterceptedSubs] = useState([]);
   const [playerSource, setPlayerSource] = useState(
@@ -579,6 +583,20 @@ export default function TVPage({
         if (trailer) setTrailerKey(trailer.key);
       })
       .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [item.id, apiKey]);
+
+  useEffect(() => {
+    let mounted = true;
+    tmdbFetch(`/tv/${item.id}/aggregate_credits`, apiKey)
+      .then((data) => {
+        if (!mounted) return;
+        setCredits({ cast: data.cast || [], crew: data.crew || [] });
+      })
+      .catch(() => setCast([]));
+
     return () => {
       mounted = false;
     };
@@ -1674,6 +1692,12 @@ export default function TVPage({
                         <TrailerIcon /> Trailer
                       </button>
                     ))}
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setShowCast(true)}
+                  >
+                    <CastIcon /> Cast
+                  </button>
                   <button className="btn btn-secondary" onClick={onSave}>
                     {isSaved ? <BookmarkFillIcon /> : <BookmarkIcon />}
                     {isSaved ? "Saved" : "Save"}
@@ -2449,6 +2473,15 @@ export default function TVPage({
           trailerKey={trailerKey}
           title={title}
           onClose={() => setShowTrailer(false)}
+        />
+      )}
+
+      {showCast && (
+        <CastModal
+          cast={credits.cast}
+          crew={credits.crew}
+          title={title}
+          onClose={() => setShowCast(false)}
         />
       )}
 
