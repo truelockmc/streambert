@@ -126,7 +126,7 @@ export default function CastModal({ onClose, cast, crew, title }) {
             <div className="cast-section">
               <div className="cast-section-title">Cast</div>
               <div className="cast-grid">
-                {cast.slice(0, 20).map((person) => (
+                {normalizedCast.slice(0, 20).map((person) => (
                   <PersonCard
                     key={person.credit_id ?? person.id}
                     person={person}
