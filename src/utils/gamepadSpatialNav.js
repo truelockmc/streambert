@@ -1,5 +1,5 @@
 // Generic spatial navigation over whatever's currently in the DOM. Works
-// without touching individual pages/components — it just looks at real
+// without touching individual pages/components. It just looks at real
 // interactive elements (cards, buttons, links, inputs) and moves a virtual
 // "gamepad focus" between them based on on-screen geometry.
 //
@@ -35,14 +35,6 @@ function isVisible(el) {
   return rect.bottom > -80 && rect.top < window.innerHeight + 80;
 }
 
-// A lot of this app's clickable UI (carousel slides, search results, recent
-// search entries, sidebar "saved" thumbnails, ...) is a plain <div onClick>
-// rather than a real button, so the semantic selector above misses them
-// entirely. What they share is a pointer-ish cursor (`pointer`, or `grab`
-// for the draggable sidebar thumbnails). We scan for that and keep only the
-// outermost element in each "cursor chain" (cursor is inherited, so a
-// clickable card's children report the same cursor — without this we'd get
-// several duplicate candidates stacked on top of each other per target).
 const CLICKABLE_CURSORS = new Set(["pointer", "grab"]);
 
 function collectPointerRoots(root) {
@@ -61,15 +53,6 @@ function collectPointerRoots(root) {
   return out;
 }
 
-// Modals/overlays in this codebase all use a class name containing
-// "overlay", but so do several purely decorative, non-modal elements (e.g.
-// MediaCard's hover gradient `.card-overlay`, the carousel's
-// `.carousel-unreleased-overlay`) — matching on class name alone was
-// picking one of those and scoping ALL navigation to it, which made
-// everything (including the sidebar) unreachable on pages with a lot of
-// cards. Real modals are always `position: fixed` and cover the viewport;
-// decorative overlays are `position: absolute` inside a card. That's a much
-// more reliable signal than the class name.
 function isModalRoot(el) {
   if (!(el instanceof HTMLElement)) return false;
   const style = getComputedStyle(el);

@@ -1,17 +1,10 @@
-// Script injected into the player <webview> via executeJavaScript, mirroring
-// the existing INJECT_SKIP_CONTROLS keyboard handler (see TVPage.jsx) but
-// for a gamepad. It runs entirely inside the webview's own guest document —
-// during playback that's usually the frame holding input focus, so this is
-// self-sufficient rather than relying on the host window to see the pad.
-//
 //   A / Cross          play / pause
 //   D-pad Left/Right    seek -10s / +10s (repeats while held)
 //   D-pad Up/Down       volume down / up (repeats while held)
 //   LB / RB             skip -15s / +15s
 //   Y / Triangle        toggle fullscreen
 //   B / Circle          exit fullscreen, or request the host navigate back
-//                        (sets window.__gamepadExitRequested, polled by the
-//                        host — see GAMEPAD_EXIT_CHECK_JS below)
+//                        (sets window.__gamepadExitRequested)
 export const GAMEPAD_PLAYER_SCRIPT = `
 (function() {
   if (window.__gamepadControlsInjected) return;

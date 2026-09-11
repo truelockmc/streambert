@@ -1,5 +1,3 @@
-// Thin, dependency-free wrapper around the browser Gamepad API.
-//
 // Used by:
 //  - useGamepadNav.js        → app-wide D-pad/stick menu navigation
 //  - the gamepad script injected into the <webview> player (see
