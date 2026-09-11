@@ -38,6 +38,7 @@ import {
   SourceIcon,
   ShieldBlockIcon,
   PopOutIcon,
+  CastIcon,
 } from "../components/Icons";
 import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
@@ -57,6 +58,7 @@ import {
   getAgeLimitSetting,
   getRatingCountry,
 } from "../utils/ageRating";
+import CastModal from "../components/CastModal";
 
 export default function MoviePage({
   item,
@@ -82,6 +84,9 @@ export default function MoviePage({
   const [showDownload, setShowDownload] = useState(false);
   const [trailerKey, setTrailerKey] = useState(null);
   const [showTrailer, setShowTrailer] = useState(false);
+  const [showCast, setShowCast] = useState(false);
+
+  const [credits, setCredits] = useState({ cast: [], crew: [] });
   const [m3u8Url, setM3u8Url] = useState(null);
   const [interceptedSubs, setInterceptedSubs] = useState([]);
   const [playerSource, setPlayerSource] = useState(
@@ -236,6 +241,20 @@ export default function MoviePage({
         if (trailer) setTrailerKey(trailer.key);
       })
       .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [item.id, apiKey]);
+
+  useEffect(() => {
+    let mounted = true;
+    tmdbFetch(`/movie/${item.id}/credits`, apiKey)
+      .then((data) => {
+        if (!mounted) return;
+        setCredits({ cast: data.cast || [], crew: data.crew || [] });
+      })
+      .catch(() => setCast([]));
+
     return () => {
       mounted = false;
     };
@@ -809,6 +828,12 @@ export default function MoviePage({
                     <TrailerIcon /> Trailer
                   </button>
                 ))}
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowCast(true)}
+              >
+                <CastIcon /> Cast
+              </button>
               <button className="btn btn-secondary" onClick={onSave}>
                 {isSaved ? <BookmarkFillIcon /> : <BookmarkIcon />}
                 {isSaved ? "Saved" : "Save"}
@@ -1224,6 +1249,15 @@ export default function MoviePage({
           trailerKey={trailerKey}
           title={title}
           onClose={() => setShowTrailer(false)}
+        />
+      )}
+
+      {showCast && (
+        <CastModal
+          cast={credits.cast}
+          crew={credits.crew}
+          title={title}
+          onClose={() => setShowCast(false)}
         />
       )}
 

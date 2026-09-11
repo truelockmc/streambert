@@ -2323,6 +2323,155 @@ kbd {
     background: #000;
 }
 
+.cast-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+    backdrop-filter: blur(4px);
+} 
+
+.cast-modal {
+    width: 90vw;
+    max-width: 960px;
+    background: var(--surface);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    box-shadow: 0 24px 60px color-mix(in srgb, var(--bg) 70%, transparent);
+    animation: slideUp 0.25s ease;
+}
+
+.cast-section {
+    margin-bottom: 24px;
+}
+
+.cast-section:last-child {
+    margin-bottom: 0;
+}
+
+.cast-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.cast-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+}
+
+.cast-modal-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cast-close-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    transition:
+        background 0.15s,
+        color 0.15s;
+}
+
+.cast-close-btn:hover {
+    background: color-mix(in srgb, var(--text) 10%, transparent);
+    color: var(--text);
+}
+
+.cast-modal-body {
+    padding: 20px 22px 24px;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.cast-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 16px 12px;
+}
+
+.cast-person {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.cast-person-photo {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    margin-bottom: 8px;
+}
+
+.cast-person-photo--fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 28px;
+    color: var(--text3);
+}
+
+.cast-person-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.cast-person-character {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.cast-empty {
+    padding: 40px 0;
+    text-align: center;
+    color: var(--text3);
+    font-size: 14px;
+}
+
 @keyframes slideUp {
     from {
         transform: translateY(30px);
