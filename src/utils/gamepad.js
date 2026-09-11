@@ -125,14 +125,17 @@ export function startGamepadLoop(handlers, isActive) {
 /**
  * React hook wrapper around startGamepadLoop. Handlers/isActive are read
  * from refs each frame so callers don't need to memoize them.
+ *
+ * @param {boolean} [enabled=true]
  */
-export function useGamepadLoop(handlers, isActive) {
+export function useGamepadLoop(handlers, isActive, enabled = true) {
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
   const isActiveRef = useRef(isActive);
   isActiveRef.current = isActive;
 
   useEffect(() => {
+    if (!enabled) return;
     const stop = startGamepadLoop(
       {
         onButtonDown: (i) => handlersRef.current.onButtonDown?.(i),
@@ -144,5 +147,5 @@ export function useGamepadLoop(handlers, isActive) {
       () => (isActiveRef.current ? isActiveRef.current() : true),
     );
     return stop;
-  }, []);
+  }, [enabled]);
 }

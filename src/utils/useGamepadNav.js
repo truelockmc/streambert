@@ -18,7 +18,9 @@ import { isPlayerGamepadActive } from "./gamepadPlayerState";
  *  Start                → open search
  *
  * Automatically no-ops whenever a video is playing, since the webview
- * takes over gamepad input for playback controls at that point.
+ * takes over gamepad input for playback controls at that point. When
+ * `enabled` is false (the "controller support" setting is off), no
+ * requestAnimationFrame poll loop runs at all.
  */
 export function useGamepadNav({ enabled, onBack, onOpenSearch }) {
   const [connected, setConnected] = useState(false);
@@ -46,11 +48,15 @@ export function useGamepadNav({ enabled, onBack, onOpenSearch }) {
         }
       },
     },
-    () => enabled && !isPlayerGamepadActive(),
+    () => !isPlayerGamepadActive(),
+    enabled, // gate the whole requestAnimationFrame poll loop, not just dispatch
   );
 
   useEffect(() => {
-    if (!enabled) clearGamepadFocus();
+    if (!enabled) {
+      clearGamepadFocus();
+      setConnected(false);
+    }
   }, [enabled]);
 
   return { connected };

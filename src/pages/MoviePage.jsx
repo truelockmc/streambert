@@ -483,14 +483,29 @@ export default function MoviePage({
   }, []);
 
   // ── Controller support: play/pause, seek, volume, fullscreen ─────────────
+  // Only active while the "controller support" setting is on.
+  const [gamepadEnabled, setGamepadEnabled] = useState(
+    () => storage.get(STORAGE_KEYS.GAMEPAD_ENABLED) !== false, // default on
+  );
   useEffect(() => {
-    setPlayerGamepadActive(playing);
+    const handler = () =>
+      setGamepadEnabled(storage.get(STORAGE_KEYS.GAMEPAD_ENABLED) !== false);
+    window.addEventListener("streambert:gamepad-settings-changed", handler);
+    return () =>
+      window.removeEventListener(
+        "streambert:gamepad-settings-changed",
+        handler,
+      );
+  }, []);
+
+  useEffect(() => {
+    setPlayerGamepadActive(gamepadEnabled && playing);
     return () => setPlayerGamepadActive(false);
-  }, [playing]);
+  }, [playing, gamepadEnabled]);
 
   useEffect(() => {
     const wv = webviewRef.current;
-    if (!wv || !playing) return;
+    if (!wv || !playing || !gamepadEnabled) return;
 
     const inject = () => {
       wv.executeJavaScript(GAMEPAD_PLAYER_SCRIPT).catch(() => {});
@@ -518,7 +533,7 @@ export default function MoviePage({
         wv.executeJavaScript(GAMEPAD_CLEANUP_JS);
       } catch {}
     };
-  }, [playing]);
+  }, [playing, gamepadEnabled]);
 
   // Attach webview load events so we know when the new source has painted
   useEffect(() => {
