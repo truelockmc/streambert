@@ -2276,7 +2276,19 @@ kbd {
     overflow: hidden;
     text-overflow: ellipsis;
 }
-
+.trailer-openbrowser-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
 .trailer-close-btn {
     background: none;
     border: none;
