@@ -29,20 +29,26 @@ export default function KeyboardShortcutsModal({ onClose }) {
           background: "var(--surface)",
           border: "1px solid var(--border)",
           borderRadius: 14,
-          padding: "36px 40px",
           minWidth: 380,
           maxWidth: 480,
           width: "90%",
+          // Fixed height cap
+          maxHeight: "85vh",
+          display: "flex",
+          flexDirection: "column",
           boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
+          overflow: "hidden",
         }}
       >
-        {/* Header */}
+        {/* Header (fixed, does not scroll) */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: 28,
+            flexShrink: 0,
+            padding: "28px 40px 20px",
+            borderBottom: "1px solid var(--border)",
           }}
         >
           <div
@@ -76,6 +82,14 @@ export default function KeyboardShortcutsModal({ onClose }) {
           </button>
         </div>
 
+        {/* Scrollable body */}
+        <div
+          style={{
+            overflowY: "auto",
+            minHeight: 0,
+            padding: "24px 40px 32px",
+          }}
+        >
         {/* Shortcut rows */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {shortcuts.map(({ keys, desc }, i) => (
@@ -292,6 +306,7 @@ export default function KeyboardShortcutsModal({ onClose }) {
             Esc
           </kbd>{" "}
           to close
+        </div>
         </div>
       </div>
     </div>
