@@ -2192,7 +2192,7 @@ export default function TVPage({
                         : getSourceUrl(
                             playerSource,
                             "tv",
-                            srcId.id,
+                            item.id,
                             playerEp.season,
                             playerEp.episode,
                             {},
