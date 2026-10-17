@@ -362,6 +362,40 @@ const INJECT_SKIP_CONTROLS = `
 })();
 `;
 
+// ── Release-date helpers ─────────────────────────────────────────────────────
+// Parses "YYYY-MM-DD" as LOCAL midnight (new Date("YYYY-MM-DD") would be UTC
+// midnight and shift the release day depending on the user's timezone).
+function parseAirDate(airDate) {
+  if (!airDate) return null;
+  const [y, m, d] = String(airDate).slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
+// Recompute on every call so the value never goes stale when the app stays
+// open past midnight.
+function startOfToday() {
+  const t = new Date();
+  t.setHours(0, 0, 0, 0);
+  return t;
+}
+
+// True only if the air date lies strictly in the future. Episodes without a
+// known air date are treated as released.
+function isUnreleased(airDate) {
+  const target = parseAirDate(airDate);
+  return !!target && target > startOfToday();
+}
+
+function getDaysUntilRelease(airDate) {
+  const target = parseAirDate(airDate);
+  if (!target) return "";
+  const days = Math.round((target - startOfToday()) / 86400000);
+  if (days <= 0) return "Releasing today";
+  if (days === 1) return "1 day left";
+  return `${days} days left`;
+}
+
 export default function TVPage({
   item,
   apiKey,
@@ -1083,12 +1117,10 @@ export default function TVPage({
       const episodes =
         seasonNum === selectedSeason ? currentSeasonEpisodes : null;
       const count = episodes?.length || seasonInfo?.episode_count || 0;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
       for (let i = 1; i <= count; i++) {
         if (episodes) {
           const ep = episodes.find((e) => e.episode_number === i);
-          if (ep?.air_date && new Date(ep.air_date) > today) continue;
+          if (ep && isUnreleased(ep.air_date)) continue;
         }
         onMarkWatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
       }
@@ -1545,7 +1577,9 @@ export default function TVPage({
       (e) => e.episode_number === selectedEp.episode_number,
     );
     if (idx >= 0 && idx < currentSeasonEpisodes.length - 1) {
-      return currentSeasonEpisodes[idx + 1];
+      const candidate = currentSeasonEpisodes[idx + 1];
+      // Never autoplay an episode that has not aired yet
+      return isUnreleased(candidate.air_date) ? null : candidate;
     }
     return null;
   }, [selectedEp, currentSeasonEpisodes]);
@@ -2070,7 +2104,7 @@ export default function TVPage({
                             {},
                             playerAccentColor,
                             playerSubLang,
-                          )
+                          ) || "about:blank"
                   }
                   partition="persist:player"
                   allowpopups="false"
@@ -2158,7 +2192,7 @@ export default function TVPage({
                         : getSourceUrl(
                             playerSource,
                             "tv",
-                            item.id,
+                            srcId.id,
                             playerEp.season,
                             playerEp.episode,
                             {},
@@ -2581,28 +2615,6 @@ export default function TVPage({
 // ── EpisodeCard ────────────────────────────────────────────────────────────
 // Isolated memo'd component so progress-bar updates (every 5s) only re-render
 // the one currently-playing card, not all 24+ cards in the grid.
-const _todayForEpisodes = (() => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-})();
-
-function getDaysUntilRelease(airDate) {
-  if (!airDate) return "";
-
-  const target = new Date(airDate);
-  target.setHours(0, 0, 0, 0);
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const diffMs = target - today;
-  const days = Math.round(diffMs / (1000 * 60 * 60 * 24));
-
-  if (days <= 0) return "Releasing today";
-  if (days === 1) return "1 day left";
-  return `${days} days left`;
-}
 
 const EpisodeCard = memo(function EpisodeCard({
   ep,
@@ -2620,9 +2632,7 @@ const EpisodeCard = memo(function EpisodeCard({
 }) {
   const pk = `tv_${itemId}_s${selectedSeason}e${ep.episode_number}`;
   const isPlaying = playing && selectedEpNumber === ep.episode_number;
-  const epUnreleased = ep.air_date
-    ? new Date(ep.air_date) > _todayForEpisodes
-    : false;
+  const epUnreleased = isUnreleased(ep.air_date);
   const epDownload =
     downloadsByEpisodeKey.get(`s${selectedSeason}e${ep.episode_number}`) ??
     null;
