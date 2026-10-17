@@ -18,6 +18,7 @@ import {
   PLAYER_SOURCES,
   getSourceUrl,
   sourceSupportsProgress,
+  sourceSkipsResetGuard,
   sourceProgressViaFrames,
   sourceIsAsync,
   fetchAnilistData,
@@ -71,6 +72,7 @@ import {
   GAMEPAD_EXIT_RESET_JS,
   GAMEPAD_CLEANUP_JS,
 } from "../utils/playerGamepadScript";
+import { useSourceId } from "../utils/useSourceId";
 import { setPlayerGamepadActive } from "../utils/gamepadPlayerState";
 
 // ── Partial-circle progress icon (cached per pct tier) ───────────────────────
@@ -465,6 +467,14 @@ export default function TVPage({
   const [episodeGroupMap, setEpisodeGroupMap] = useState(null); // Map built from TMDB episode group
   // Webview loading overlay
   const [webviewLoading, setWebviewLoading] = useState(false);
+
+  // ID the selected source expects (TMDB id, or converted IMDb id)
+  const srcId = useSourceId(playerSource, "tv", item.id, apiKey);
+  // Re-show the loading overlay once a resolved IMDb id swaps in the real URL
+  useEffect(() => {
+    if (srcId.id && playing) setWebviewLoading(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [srcId.id]);
   const [playerFullscreen, setPlayerFullscreen] = useState(false);
   const [pipOpen, setPipOpen] = useState(false);
   const pipUrlRef = useRef(null);
@@ -1198,9 +1208,10 @@ export default function TVPage({
     wv.addEventListener("did-finish-load", done);
     wv.addEventListener("did-fail-load", done);
 
-    // Poll up to 30s for video duration (metadata may load after buffering starts)
+    // Poll up to 30s for video duration (metadata may load after buffering starts).
+    // Only needed for AniSkip markers on async (anime) sources.
     let attempts = 0;
-    const pollDuration = setInterval(async () => {
+    const pollDuration = !isAsync ? null : setInterval(async () => {
       if (durationRef.current > 0 || attempts++ > 30) {
         clearInterval(pollDuration);
         return;
@@ -1223,7 +1234,7 @@ export default function TVPage({
       wv.removeEventListener("did-fail-load", done);
       clearInterval(pollDuration);
     };
-  }, [playing, playerSource, item.id, selectedEp?.episode_number]);
+  }, [playing, playerSource, isAsync, item.id, selectedEp?.episode_number]);
 
   // ── AniSkip: fetch timings when episode changes ───────────────────────────
   useEffect(() => {
@@ -1378,6 +1389,7 @@ export default function TVPage({
             // - the user did NOT manually seek in the last 6s
             const now = Date.now();
             if (
+              !sourceSkipsResetGuard(playerSource) &&
               lastKnownTimeRef.current > 30 &&
               ct <= 5 &&
               !result.recentUserSeek
@@ -1873,7 +1885,32 @@ export default function TVPage({
                     </span>
                   </div>
                 )}
-                {/* Pop-out active: main stream paused, pop-out has real player */}
+                {/* IMDb-ID conversion failed (sources that need an IMDb ID) */}
+            {srcId.error && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 11,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "rgba(0,0,0,0.85)",
+                  gap: 10,
+                  borderRadius: "inherit",
+                }}
+              >
+                <span style={{ fontSize: 28 }}>⚠️</span>
+                <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                  Could not get an IMDb ID for this title
+                </span>
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                  {srcId.error}. Try a different source.
+                </span>
+              </div>
+            )}
+            {/* Pop-out active: main stream paused, pop-out has real player */}
                 {pipOpen && (
                   <div
                     style={{
@@ -2098,7 +2135,7 @@ export default function TVPage({
                         : getSourceUrl(
                             playerSource,
                             "tv",
-                            item.id,
+                            srcId.id,
                             playerEp.season,
                             playerEp.episode,
                             {},
@@ -2192,7 +2229,7 @@ export default function TVPage({
                         : getSourceUrl(
                             playerSource,
                             "tv",
-                            item.id,
+                            srcId.id,
                             playerEp.season,
                             playerEp.episode,
                             {},

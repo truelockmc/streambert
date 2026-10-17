@@ -37,7 +37,7 @@ A cross-platform Electron Desktop App to stream and download any Movie, TV Serie
 [![Stargazers](https://reporoster.com/stars/dark/truelockmc/streambert)](https://github.com/truelockmc/streambert/stargazers)
 ---
 ## Streaming
-The Application mainly gets Video Streams from VidSrc (you can also Stream from videasy and vidking). <br></br>
+The Application gets video streams from different hosters/aggregators, see [PLAYER_SOURCES](src/utils/api.js). <br></br>
 It fetches Information for Images, Info Texts, Search and Homepage from [tmdb](https://www.themoviedb.org/).
 
 ---

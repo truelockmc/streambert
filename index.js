@@ -13,22 +13,24 @@ const {
 const path = require("path");
 
 // -- RAM / performance flags ---------------------------------------------------
-app.commandLine.appendSwitch(
-  "js-flags",
-  "--max-old-space-size=256 --expose-gc",
-);
-app.commandLine.appendSwitch(
-  "disable-features",
-  "HardwareMediaKeyHandling,MediaSessionService,UseSandboxedXdgPortal",
-);
-// Run the network stack in the browser process → one less utility process
-app.commandLine.appendSwitch("enable-features", "NetworkServiceInProcess2");
-// NOTE: enable-low-end-device-mode removed, it cuts the GPU texture tile budget
-// and causes visible seams/stripes/dots on large images.
-
-// Cap disk cache and limit renderer processes (prevents RAM growth on multi-page navigation)
-app.commandLine.appendSwitch("disk-cache-size", String(80 * 1024 * 1024));
-app.commandLine.appendSwitch("renderer-process-limit", "3");
+// Low-RAM mode is ON by default. Disable it with STREAMBERT_LOW_RAM=0.
+if (process.env.STREAMBERT_LOW_RAM === undefined) {
+  process.env.STREAMBERT_LOW_RAM = "1";
+}
+if (process.env.STREAMBERT_LOW_RAM === "1") {
+  app.commandLine.appendSwitch(
+    "js-flags",
+    "--max-old-space-size=256 --expose-gc",
+  );
+  console.log("STREAMBERT_LOW_RAM mode on");
+  // Run the network stack in the browser process → one less utility process
+  app.commandLine.appendSwitch("enable-features", "NetworkServiceInProcess2");
+  // Cap disk cache and limit renderer processes
+  app.commandLine.appendSwitch("disk-cache-size", String(80 * 1024 * 1024));
+  app.commandLine.appendSwitch("renderer-process-limit", "3");
+} else {
+  console.log("STREAMBERT_LOW_RAM mode off");
+}
 
 // -- Startup benchmark ---------------------------------------------------------
 const _t0 = Date.now();
@@ -69,7 +71,6 @@ const BLOCKED_HOSTS = [
   "*://mc.yandex.ru/*",
   "*://bvtpk.com/*",
   "*://my.rtmark.net/*",
-  "*://bvtpk.com/*",
   "*://b7510.com/*",
   "*://gt.unbrownunflat.com/*",
   "*://im.malocacomals.com/*",
@@ -83,7 +84,8 @@ const BLOCKED_HOSTS = [
   "*://protrafficinspector.com/*",
   "*://s10.histats.com/*",
   "*://weirdopt.com/*",
-  "*://static.cloudflareinsights.com/*",
+  "*://cloudflareinsights.com/*",
+  "*://*.cloudflareinsights.com/*",
   "*://kettledroopingcontinuation.com/*",
   "*://wayfarerorthodox.com/*",
   "*://woxaglasuy.net/*",
@@ -97,6 +99,25 @@ const BLOCKED_HOSTS = [
   "*://rzjzjnavztycv.online/*",
   "*://tmstr4.cloudnestra.com/*",
   "*://tmstr4.neonhorizonworkshops.com/*",
+  "*://hameltnoummos.com/*",
+  "*://ancillammmm.com/*",
+  "*://*.ancillammmm.com/*",
+  "*://hubeamily.com/*",
+  "*://*.hubeamily.com/*",
+  "*://llvpn.com/*",
+  "*://americanacademyofthermology.org/*",
+  "*://d2pf0ys5xus6n.cloudfront.net/*",
+  "*://gillyspencie.com/*",
+  "*://soakysecrets.com/*",
+  "*://*.soakysecrets.com/*",
+  "*://mdstats.info/*",
+  "*://ads-twitter.com/*",
+  "*://*.ads-twitter.com/*",
+  "*://connatix.com/*",
+  "*://*.connatix.com/*",
+  "*://imasdk.googleapis.com/*",
+  "*://jwpltx.com/*",
+  "*://*.jwpltx.com/*",
 ];
 
 // -- Module-level state --------------------------------------------------------
@@ -105,6 +126,31 @@ const getMainWindow = () => mainWindow;
 
 const playerWcIds = new Set();
 let sessionsConfigured = false;
+
+// Returns the default Chromium user agent without Electron/app identifiers.
+function buildCleanUserAgent() {
+  return app.userAgentFallback
+    .replace(/\s?Electron\/\S+/i, "")
+    .replace(/\s?streambert\/\S+/i, "")
+    .trim();
+}
+
+// Sets the YouTube consent cookie (suppresses the consent gate) in a session.
+function setYoutubeConsentCookies(sess) {
+  const ytCookie = {
+    url: "https://www.youtube.com",
+    name: "SOCS",
+    value: "CAI",
+    path: "/",
+    secure: true,
+    httpOnly: false,
+    sameSite: "no_restriction",
+    expirationDate: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365 * 2,
+  };
+  for (const domain of [".youtube.com", ".youtube-nocookie.com"]) {
+    sess.cookies.set({ ...ytCookie, domain }).catch(() => {});
+  }
+}
 
 function setupSession(playerSession, trailerSession) {
   const stripHeaders = (details, callback) => {
@@ -117,10 +163,14 @@ function setupSession(playerSession, trailerSession) {
     callback({ responseHeaders: headers });
   };
 
-  const UA =
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-  playerSession.setUserAgent(UA);
-  trailerSession.setUserAgent(UA);
+  // Use the REAL Chromium UA of this Electron build, only without the
+  // "Electron/x.y.z" and app-name tokens.
+  const UA = buildCleanUserAgent();
+  // The player session keeps Electron's untouched default UA: setUserAgent() is
+  // applied only after the first <webview> already started loading, so the first
+  // player used the default UA and passed cloudflare Turnstile, while every later player
+  // used the modified UA and failed with error 600010.
+  // playerSession.setUserAgent(UA); <--- removed on purpose
 
   playerSession.webRequest.onHeadersReceived(
     { urls: ["*://*/*"] },
@@ -185,22 +235,8 @@ function setupSession(playerSession, trailerSession) {
     },
   );
 
-  // YouTube consent cookie → suppress consent gate in both sessions
-  const ytCookie = {
-    url: "https://www.youtube.com",
-    name: "SOCS",
-    value: "CAI",
-    path: "/",
-    secure: true,
-    httpOnly: false,
-    sameSite: "no_restriction",
-    expirationDate: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365 * 2,
-  };
-  for (const domain of [".youtube.com", ".youtube-nocookie.com"]) {
-    const cookie = { ...ytCookie, domain };
-    trailerSession.cookies.set(cookie).catch(() => {});
-    playerSession.cookies.set(cookie).catch(() => {});
-  }
+  // YouTube consent cookie → suppress consent gate (trailer session only)
+  setYoutubeConsentCookies(trailerSession);
 }
 
 function createWindow() {
@@ -228,7 +264,10 @@ function createWindow() {
       backgroundThrottling: true,
       spellcheck: false,
       // Caps the renderer's V8 heap + exposes gc() for manual GC hints after navigation
-      additionalArguments: ["--js-flags=--max-old-space-size=256 --expose-gc"],
+      additionalArguments:
+        process.env.STREAMBERT_LOW_RAM === "1"
+          ? ["--js-flags=--max-old-space-size=256 --expose-gc"]
+          : [],
     },
   });
 
@@ -331,9 +370,12 @@ ipcMain.handle("get-block-stats", () => blockStats.getBlockStats());
 
 // -- Player memory cleanup ---------------------------------------------
 // Called by MoviePage / TVPage on component unmount.
-// Destroys the player webview WebContents by tracked ID, then flushes caches and GCs.
+// Mutes the tracked player webview WebContents and triggers GC hints.
+// The <webview> teardown itself is left to Electron (no manual destroy).
 ipcMain.on("player-stopped", () => {
-  // Step 1: Mute + destroy all tracked player WebContents by ID.
+  // Step 1: Only mute the tracked player WebContents. They must NOT be destroyed
+  // manually with wc.destroy(): the <webview> element removal in the renderer
+  // already tears the guest down cleanly.
   for (const id of playerWcIds) {
     try {
       const wc = webContents.fromId(id);
@@ -341,20 +383,13 @@ ipcMain.on("player-stopped", () => {
         try {
           wc.setAudioMuted(true);
         } catch {}
-        wc.destroy();
       }
     } catch {}
   }
   playerWcIds.clear();
 
-  // Step 2: Flush HTTP + shader caches from the player session.
-  try {
-    const ps = session.fromPartition("persist:player");
-    ps.clearCache().catch(() => {});
-    ps.clearStorageData({ storages: ["shadercache", "cachestorage"] }).catch(
-      () => {},
-    );
-  } catch {}
+  // Step 2: HTTP/shader cache flushing of the player session was removed on
+  // purpose.
 
   // Step 3: GC hints
   if (typeof global.gc === "function") global.gc();

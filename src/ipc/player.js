@@ -662,6 +662,20 @@ function register(getMainWindow, { writeSecretMigration }) {
 
       const JS = `
         (() => {
+          // DeVideoSrc exposes window.meinecloudPlayer (sync getters). Prefer it,
+          // fall back to the plain <video> lookup if it is missing / async.
+          const P = window.meinecloudPlayer;
+          if (P && typeof P.getCurrentTime === 'function') {
+            try {
+              const t = P.getCurrentTime();
+              const d = P.getDuration();
+              const paused = P.getPaused();
+              if (typeof t === 'number' && typeof d === 'number' && typeof paused === 'boolean') {
+                if (!(d > 0) || d === Infinity || paused) return null;
+                return { currentTime: t, duration: d, recentUserSeek: false, lastUserSeekTo: null };
+              }
+            } catch (e) {}
+          }
           const v = document.querySelector('video');
           if (!v || !v.duration || v.duration === Infinity || v.paused) return null;
           if (!v._seekTracked) {

@@ -124,21 +124,6 @@ export const tmdbFetch = async (path, apiKey) => {
 // supportsProgress: true = executeJavaScript tracking works for this source
 export const PLAYER_SOURCES = [
   {
-    id: "videasy",
-    label: "Videasy",
-    tag: null,
-    note: null,
-    supportsProgress: true,
-    colorParam: "color", // hex without # → e.g. "e50914"
-    langParam: null, // no subtitle lang param
-    params: {
-      overlay: "true",
-    },
-    movieUrl: (id) => `https://player.videasy.to/movie/${id}`,
-    tvUrl: (id, season, ep) =>
-      `https://player.videasy.to/tv/${id}/${season}/${ep}`,
-  },
-  {
     id: "vidsrc",
     label: "VidSrc",
     tag: null,
@@ -147,25 +132,83 @@ export const PLAYER_SOURCES = [
     progressViaFrames: true, // video is in a nested iframe, needs main-process frame query
     colorParam: null, // vidsrc doesn't support color param
     langParam: "ds_lang", // ISO 639-1 language code
-    params: {},
+    params: {
+      autoplay: "1"
+    },
     movieUrl: (id) => `https://vsembed.su/embed/movie/${id}`,
     tvUrl: (id, season, ep) =>
       `https://vsembed.su/embed/tv/${id}/${season}/${ep}`,
   },
   {
-    id: "vidking",
-    label: "Vidking",
+    id: "peachify",
+    label: "Peachify",
+    tag: null,
+    note: "Movies only",
+    supportsProgress: true,
+    colorParam: "accent", // hex without # → e.g. "e50914"
+    langParam: "sub",
+    params: {
+      autoPlay: "true",
+      pip: "hide",
+      cast: "hide",
+    },
+    movieUrl: (id) => `https://peachify.top/embed/movie/${id}`,
+    tvUrl: (id, season, ep) =>
+      `https://peachify.top/embed/tv/${id}/${season}/${ep}`,
+  },
+  {
+    id: "vidfast",
+    label: "Vidfast",
     tag: null,
     note: null,
     supportsProgress: true,
-    colorParam: "color", // hex without # → e.g. "e50914"
-    langParam: null,
+    colorParam: "theme", // hex without # → e.g. "e50914"
+    langParam: "sub",
     params: {
       autoPlay: "true",
+      poster: "true",
+      title: "true",
+      pip: "hide",
     },
-    movieUrl: (id) => `https://www.vidking.net/embed/movie/${id}`,
+    movieUrl: (id) => `https://vidfast.vc/movie/${id}`,
     tvUrl: (id, season, ep) =>
-      `https://www.vidking.net/embed/tv/${id}/${season}/${ep}`,
+      `https://vidfast.vc/tv/${id}/${season}/${ep}`,
+  },
+  {
+    id: "vidrift",
+    label: "Vidrift",
+    tag: null,
+    note: "Multi Lang",
+    supportsProgress: true,
+    colorParam: "brandColor",
+    langParam: "sub",
+    params: {
+      title: "true",
+      hide: "next,episodes,cast",
+    },
+    movieUrl: (id) => `https://embed.vidrift.net/embed/movie/${id}`,
+    tvUrl: (id, season, ep) =>
+      `https://embed.vidrift.net/embed/tv/${id}/${season}/${ep}`,
+  },
+  {
+    id: "devideosrc",
+    label: "DeVideoSrc",
+    tag: null,
+    note: "🇩🇪",
+    supportsProgress: true,
+    progressViaFrames: true, // player may sit in a nested provider iframe -> main-process frame query
+    skipResetGuard: true, // no quality-change reset -> don't "seek back" after a manual rewind
+    idType: "imdb", // needs an IMDb ID (tt…) instead of the TMDB ID
+    colorParam: "color", // hex WITH # (URLSearchParams encodes it as %23)
+    colorWithHash: true,
+    langParam: null,
+    params: {
+      autoplay: "1",
+      muted: "0",
+    },
+    movieUrl: (id) => `https://devideosrc.co/custom/movie/${id}`,
+    tvUrl: (id, season, ep) =>
+      `https://devideosrc.co/custom/serial/${id}/${season}/${ep}`,
   },
   {
     id: "allmanga",
@@ -179,6 +222,10 @@ export const PLAYER_SOURCES = [
     tvUrl: (_id, _season, _ep) => "https://allmanga.to",
   },
 ];
+
+// Sources that require a transparent webRequest intercept to load properly
+export const NEEDS_INTERCEPT = ["vidsrc", "devideosrc"];
+
 export const getSourceUrl = (
   sourceId,
   type,
@@ -192,6 +239,8 @@ export const getSourceUrl = (
 ) => {
   const src =
     PLAYER_SOURCES.find((s) => s.id === sourceId) ?? PLAYER_SOURCES[0];
+  // No usable ID yet (e.g. IMDb ID still being resolved) -> no URL
+  if (!id) return null;
   const baseUrl =
     type === "movie" ? src.movieUrl(id) : src.tvUrl(id, season, ep);
   const url = new URL(baseUrl);
@@ -202,7 +251,8 @@ export const getSourceUrl = (
 
   // Inject accent color into the player if the source supports it
   if (accentColor && src.colorParam) {
-    url.searchParams.set(src.colorParam, accentColor.replace(/^#/, ""));
+    const hex = accentColor.replace(/^#/, "");
+    url.searchParams.set(src.colorParam, src.colorWithHash ? `#${hex}` : hex);
   }
 
   if (subtitleLang && src.langParam) {
@@ -218,11 +268,50 @@ export const getSourceUrl = (
   return url.toString();
 };
 
+export const sourceNeedsImdb = (sourceId) =>
+  PLAYER_SOURCES.find((s) => s.id === sourceId)?.idType === "imdb";
+
+// ── TMDB -> IMDb ID conversion ────────────────────────────────────────────────
+// IMDb IDs never change, so they are cached for the whole session (separately
+// from the 5 min tmdbFetch cache). In-flight requests are de-duplicated.
+const _imdbCache = new Map(); // "movie:123" -> "tt0123456"
+const _imdbPending = new Map(); // "movie:123" -> Promise<string>
+
+/**
+ * Resolve the IMDb ID for a TMDB movie / TV show.
+ * @param {"movie"|"tv"} type
+ * @param {number|string} tmdbId
+ * @param {string} apiKey
+ * @returns {Promise<string>} e.g. "tt0133093" (rejects if TMDB has none)
+ */
+export function fetchImdbId(type, tmdbId, apiKey) {
+  const kind = type === "movie" ? "movie" : "tv";
+  const key = `${kind}:${tmdbId}`;
+  if (_imdbCache.has(key)) return Promise.resolve(_imdbCache.get(key));
+  if (_imdbPending.has(key)) return _imdbPending.get(key);
+
+  const p = tmdbFetch(`/${kind}/${tmdbId}/external_ids`, apiKey)
+    .then((data) => {
+      const imdb = data?.imdb_id;
+      if (!imdb || !/^tt\d+$/.test(imdb)) {
+        throw new Error(`No IMDb ID found for TMDB ${kind} ${tmdbId}`);
+      }
+      _imdbCache.set(key, imdb);
+      return imdb;
+    })
+    .finally(() => _imdbPending.delete(key));
+  _imdbPending.set(key, p);
+  return p;
+}
+
 export const sourceSupportsProgress = (sourceId) =>
   PLAYER_SOURCES.find((s) => s.id === sourceId)?.supportsProgress ?? false;
 
 export const sourceProgressViaFrames = (sourceId) =>
   PLAYER_SOURCES.find((s) => s.id === sourceId)?.progressViaFrames ?? false;
+
+export const sourceSkipsResetGuard = (sourceId) =>
+  PLAYER_SOURCES.find((s) => s.id === sourceId)?.skipResetGuard ?? false;
 
 export const sourceIsAsync = (sourceId) =>
   PLAYER_SOURCES.find((s) => s.id === sourceId)?.async ?? false;
@@ -237,9 +326,6 @@ export const getNextNonAsyncSource = (currentId) => {
   if (idx < 0) return nonAsync[0].id;
   return nonAsync[(idx + 1) % nonAsync.length].id;
 };
-
-// Sources that require a transparent webRequest intercept to load properly
-export const NEEDS_INTERCEPT = ["vidsrc"];
 
 // ── AniList API (anime metadata) ──────────────────────────────────────────────
 const ANILIST_API = "https://graphql.anilist.co";
@@ -451,7 +537,7 @@ export const isAnimeContent = (item, details) => {
 
 // Default sources
 export const ANIME_DEFAULT_SOURCE = "allmanga";
-export const NON_ANIME_DEFAULT_SOURCE = "vidking";
+export const NON_ANIME_DEFAULT_SOURCE = "vidsrc";
 
 // ── Episode Group fetch (localStorage + in-memory cache, 7-day TTL) ─────────
 // Episode groups almost never change -> cache aggressively across sessions.
