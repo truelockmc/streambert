@@ -198,6 +198,23 @@ export const PLAYER_SOURCES = [
       `https://embed.vidrift.net/embed/tv/${id}/${season}/${ep}`,
   },
   {
+    id: "vidnest",
+    label: "Vidnest",
+    tag: null, // not anime-only -> works for movies/TV as well
+    note: "Anime ✓",
+    supportsProgress: true,
+    progressViaFrames: false,
+    supportsAnime: true, // has a dedicated anime route (AniList id + sub/dub)
+    colorParam: null, // no accent-colour query param documented
+    langParam: null,
+    params: {},
+    movieUrl: (id) => `https://vidnest.fun/movie/${id}`,
+    tvUrl: (id, season, ep) => `https://vidnest.fun/tv/${id}/${season}/${ep}`,
+    // Anime route: AniList id (not TMDB), episode number, "sub" | "dub"
+    animeUrl: (anilistId, ep, lang) =>
+      `https://vidnest.fun/anime/${anilistId}/${ep}/${lang}`,
+  },
+  {
     id: "devideosrc",
     label: "DeVideoSrc",
     tag: null,
@@ -216,23 +233,6 @@ export const PLAYER_SOURCES = [
     movieUrl: (id) => `https://devideosrc.co/custom/movie/${id}`,
     tvUrl: (id, season, ep) =>
       `https://devideosrc.co/custom/serial/${id}/${season}/${ep}`,
-  },
-  {
-    id: "vidnest",
-    label: "Vidnest",
-    tag: null, // not anime-only -> works for movies/TV as well
-    note: "Anime ✓",
-    supportsProgress: true,
-    progressViaFrames: false,
-    supportsAnime: true, // has a dedicated anime route (AniList id + sub/dub)
-    colorParam: null, // no accent-colour query param documented
-    langParam: null,
-    params: {},
-    movieUrl: (id) => `https://vidnest.fun/movie/${id}`,
-    tvUrl: (id, season, ep) => `https://vidnest.fun/tv/${id}/${season}/${ep}`,
-    // Anime route: AniList id (not TMDB), episode number, "sub" | "dub"
-    animeUrl: (anilistId, ep, lang) =>
-      `https://vidnest.fun/anime/${anilistId}/${ep}/${lang}`,
   },
   {
     id: "frembed",
