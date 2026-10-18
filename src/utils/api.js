@@ -119,6 +119,8 @@ export const tmdbFetch = async (path, apiKey) => {
 // https://vsembed.su/api/
 // https://peachify.top/
 // https://vidfast.vc
+// https://vidlove.cc/#embed
+// https://rentry.co/aetherdomains
 // https://vidrift.net/docs
 // https://vidnest.fun
 // https://devideosrc.co/docs
@@ -180,6 +182,25 @@ export const PLAYER_SOURCES = [
     movieUrl: (id) => `https://vidfast.vc/movie/${id}`,
     tvUrl: (id, season, ep) =>
       `https://vidfast.vc/tv/${id}/${season}/${ep}`,
+  },
+  {
+    id: "vidlove",
+    label: "Vidlove",
+    tag: null,
+    note: null,
+    supportsProgress: true,
+    colorParam: "primarycolor", // hex without # → e.g. "e50914"
+    params: {
+      autoplay: "true",
+      autonext: "false",
+      tour: "true",
+      showNextEpisode: "false",
+      hideautonext: "true",
+      hidenextbutton: "true",
+    },
+    movieUrl: (id) => `https://player.vidlove.cc/embed/movie/${id}`,
+    tvUrl: (id, season, ep) =>
+      `https://player.vidlove.cc/embed/tv/${id}/${season}/${ep}`,
   },
   {
     id: "aether",
