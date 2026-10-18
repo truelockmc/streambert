@@ -142,6 +142,8 @@ const BLOCKED_HOSTS = [
   "*://veselchaga.link/*",
   "*://webvisor.org/*",
   "*://*.webvisor.org/*",
+  "*://datariaarpent.com/*",
+  "*://*.datariaarpent.com/*",
 ];
 
 // -- Module-level state --------------------------------------------------------

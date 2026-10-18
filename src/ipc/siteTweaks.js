@@ -5,38 +5,63 @@
 // Add a new entry to SITE_RULES to tweak another site. `hosts` matches the
 // hostname itself and all its subdomains.
 
+// Builds the CSS that hides the whole page except `selector`, which then fills
+// the entire view on a black background.
+function onlyElementCss(selector) {
+  return `
+    html, body {
+      overflow: hidden !important;
+      background: #000 !important;
+    }
+    /* Hide everything ... */
+    body * {
+      visibility: hidden !important;
+    }
+    /* ... except the target element and its content */
+    ${selector},
+    ${selector} * {
+      visibility: visible !important;
+    }
+    /* Let the target fill the whole view */
+    ${selector} {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      max-width: none !important;
+      margin: 0 !important;
+      z-index: 2147483647 !important;
+      background: #000 !important;
+      overflow: auto !important;
+    }
+  `;
+}
+
+// Builds the CSS that simply hides the given selectors.
+function hideCss(...selectors) {
+  return `${selectors.join(",\n")} { display: none !important; }`;
+}
+
 const SITE_RULES = [
   {
-    // KinoHub: show only <section class="player_section"> (player picker +
-    // the player). Everything else (header, actors, sequels, ...) is hidden.
+    // KinoHub: player picker + player only
     hosts: ["on.kinohub.vip"],
-    css: `
-      html, body {
-        overflow: hidden !important;
-        background: #000 !important;
-      }
-      /* Hide everything ... */
-      body * {
-        visibility: hidden !important;
-      }
-      /* ... except the player section and its content */
-      .player_section,
-      .player_section * {
-        visibility: visible !important;
-      }
-      /* Let the player section fill the whole view */
-      .player_section {
-        position: fixed !important;
-        inset: 0 !important;
-        width: 100vw !important;
-        height: 100vh !important;
-        max-width: none !important;
-        margin: 0 !important;
-        z-index: 2147483647 !important;
-        background: #000 !important;
-        overflow: auto !important;
-      }
-    `,
+    css: onlyElementCss("section.player_section"),
+  },
+  {
+    hosts: ["aether.ist"],
+    css: hideCss(
+      "div:has(> .top-content)",
+      // top bar
+      ".top-content",
+      // Episode selector
+      '[id="__overlayRouter::episodes"]',
+      '[id="__overlayRouter::episodes"] + button',
+      // Back to home button
+      'a.tabbable[class*="cancelHover"]',
+      // Skip to next episode button
+      'button.tabbable.p-2.rounded-full:has(> span.text-xl > svg[width="18"][height="18"])',
+    ),
   },
 ];
 

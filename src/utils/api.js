@@ -182,6 +182,19 @@ export const PLAYER_SOURCES = [
       `https://vidfast.vc/tv/${id}/${season}/${ep}`,
   },
   {
+    id: "aether",
+    label: "Aether",
+    tag: null,
+    note: "Multi Lang", // Has multiple audio languages
+    supportsProgress: true,
+    colorParam: null,
+    langParam: null,
+    params: {},
+    movieUrl: (id) => `https://aether.ist/media/tmdb-movie-${id}`,
+    tvUrl: (id, season, ep) =>
+      `https://aether.ist/media/tmdb-tv-${id}/${season}/${ep}`,
+  },
+  {
     id: "vidrift",
     label: "Vidrift",
     tag: null,
