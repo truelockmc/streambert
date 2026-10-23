@@ -8,18 +8,86 @@
 //   6. master playlist is fetched with the embed origin as Referer
 //
 // Requests go through Electron's `net.fetch` (Chromium network stack, so the TLS
-// fingerprint looks like a real browser – the equivalent of ani-cli's
+// fingerprint looks like a real browser, the equivalent of ani-cli's
 // curl-impersonate). If it is unavailable we fall back to Node's https module.
 
-const { ipcMain, net } = require("electron");
+const { app, ipcMain, net } = require("electron");
 const https = require("https");
 const http = require("http");
+const fs = require("fs");
+const dns = require("dns").promises;
+const netMod = require("net");
+const crypto = require("crypto");
 
 const BASE_URL = "https://hianime.at";
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 const OBFUSCATION_KEY = Buffer.from("otaku-embed-v1", "utf8");
 const SERVER_NAME = "ZokoAnime";
+const MAX_TEXT_BYTES = 5 * 1024 * 1024; // scraped pages / playlists are never larger
+
+// Keep-alive pools: HLS playback issues hundreds of small requests to one host.
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 16 });
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 16 });
+
+// ── SSRF guard ────────────────────────────────────────────────────────────────
+// URLs come from a third-party site (embed url, stream url, subtitles) and are
+// requested from the main process / the local proxy, so they must never point
+// at loopback or private networks.
+
+function isPrivateIp(ip) {
+  if (netMod.isIPv4(ip)) {
+    const [a, b] = ip.split(".").map(Number);
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      a >= 224
+    );
+  }
+  if (netMod.isIPv6(ip)) {
+    const l = ip.toLowerCase();
+    const mapped = l.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (mapped) return isPrivateIp(mapped[1]);
+    return (
+      l === "::" ||
+      l === "::1" ||
+      l.startsWith("fc") ||
+      l.startsWith("fd") ||
+      /^fe[89ab]/.test(l)
+    );
+  }
+  return true;
+}
+
+async function assertPublicUrl(urlStr) {
+  let u;
+  try {
+    u = new URL(urlStr);
+  } catch {
+    throw new Error("Invalid url");
+  }
+  if (u.protocol !== "https:" && u.protocol !== "http:") {
+    throw new Error("Blocked protocol");
+  }
+  const host = u.hostname.replace(/^\[|\]$/g, "");
+  if (netMod.isIP(host)) {
+    if (isPrivateIp(host)) throw new Error("Blocked address");
+    return u;
+  }
+  if (host === "localhost" || host.endsWith(".localhost")) {
+    throw new Error("Blocked address");
+  }
+  const addrs = await dns.lookup(host, { all: true });
+  if (!addrs.length || addrs.some((a) => isPrivateIp(a.address))) {
+    throw new Error("Blocked address");
+  }
+  return u;
+}
 
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
 
@@ -39,6 +107,7 @@ function nodeGet(urlStr, headers, timeoutMs, hops = 0) {
         path: u.pathname + u.search,
         method: "GET",
         headers: { "Accept-Encoding": "identity", ...headers },
+        agent: lib === https ? httpsAgent : httpAgent,
       },
       (res) => {
         if (
@@ -49,10 +118,20 @@ function nodeGet(urlStr, headers, timeoutMs, hops = 0) {
         ) {
           res.resume();
           const loc = new URL(res.headers.location, urlStr).href;
-          return resolve(nodeGet(loc, headers, timeoutMs, hops + 1));
+          return assertPublicUrl(loc)
+            .then(() => resolve(nodeGet(loc, headers, timeoutMs, hops + 1)))
+            .catch(reject);
         }
         const chunks = [];
-        res.on("data", (c) => chunks.push(c));
+        let size = 0;
+        res.on("data", (c) => {
+          size += c.length;
+          if (size > MAX_TEXT_BYTES) {
+            req.destroy(new Error("response too large"));
+            return;
+          }
+          chunks.push(c);
+        });
         res.on("end", () =>
           resolve({
             status: res.statusCode,
@@ -72,6 +151,7 @@ function nodeGet(urlStr, headers, timeoutMs, hops = 0) {
 
 // Fetches a URL as text. `referer` is optional. Returns { status, body }.
 async function hianimeGet(urlStr, { referer, accept } = {}) {
+  await assertPublicUrl(urlStr);
   const headers = {
     "User-Agent": USER_AGENT,
     Accept: accept || "*/*",
@@ -89,7 +169,13 @@ async function hianimeGet(urlStr, { referer, accept } = {}) {
         init.referrerPolicy = "unsafe-url";
       }
       const res = await net.fetch(urlStr, init);
-      return { status: res.status, body: await res.text() };
+      // the redirect target is only known afterwards → reject private hosts
+      if (res.url && res.url !== urlStr) await assertPublicUrl(res.url);
+      const len = parseInt(res.headers.get("content-length") || "0", 10);
+      if (len > MAX_TEXT_BYTES) throw new Error("response too large");
+      const body = await res.text();
+      if (body.length > MAX_TEXT_BYTES) throw new Error("response too large");
+      return { status: res.status, body };
     } catch (e) {
       if (e?.name === "AbortError") throw new Error("timeout");
       throw e;
@@ -193,6 +279,7 @@ async function hianimeSearch(query) {
 // Returns [{ epId, number }] for a show slug such as "one-piece-100"
 async function hianimeEpisodes(showId) {
   const numericId = showId.slice(showId.lastIndexOf("-") + 1);
+  if (!/^\d+$/.test(numericId)) throw new Error("Invalid show id");
   const body = await hianimeCurl(
     `${BASE_URL}/api/theme/episode/list/${numericId}`,
     { referer: BASE_URL + "/" },
@@ -282,18 +369,8 @@ async function hianimeStream(epId, mode) {
   masterUrl = masterUrl.replace(/\\\//g, "/");
   if (subtitle) subtitle = subtitle.replace(/\\\//g, "/");
 
-  // best available resolution, for display only (hls.js picks the levels itself)
-  let resolution = "?";
-  try {
-    const playlist = await hianimeCurl(masterUrl, { referer });
-    let best = 0;
-    for (const m of playlist.matchAll(/RESOLUTION=\d+x(\d+)/g)) {
-      best = Math.max(best, parseInt(m[1], 10));
-    }
-    if (best) resolution = best + "p";
-  } catch {
-    // master playlist unreachable – the player will report the real error
-  }
+  // hls.js reads the master playlist itself and picks the levels
+  const resolution = "auto";
 
   return { masterUrl, referer, malId, subtitle, resolution };
 }
@@ -421,15 +498,36 @@ async function cachedEpisodes(showId) {
 // All media requests go through /proxy so the stream host always sees the right
 // Referer. HLS playlists are rewritten so every sub-playlist, segment, key and
 // audio rendition is proxied too.
+//
+// Hardening: the server only listens on 127.0.0.1, every route needs a random
+// per-session token (so other local processes / web pages cannot use it as an
+// open proxy), the Host header must match (DNS-rebinding), proxied targets must
+// be public http(s) hosts, and the player page runs under a strict CSP.
 
 let _playerServer = null;
+let _serverToken = crypto.randomBytes(24).toString("hex");
 let _currentVideoUrl = null;
 let _currentVideoReferer = BASE_URL + "/";
 let _currentVideoSubtitle = null;
 let _currentVideoStartTime = 0;
 
 function proxied(u) {
-  return "/proxy?url=" + encodeURIComponent(u);
+  return `/proxy?t=${_serverToken}&url=${encodeURIComponent(u)}`;
+}
+
+function escapeHtmlAttr(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// JSON that is safe inside an inline <script>
+function jsonForScript(v) {
+  return JSON.stringify(v)
+    .replace(/</g, "\\u003c")
+    .replace(new RegExp("[\\u2028\\u2029]", "g"), "");
 }
 
 function rewritePlaylist(text, playlistUrl) {
@@ -440,31 +538,31 @@ function rewritePlaylist(text, playlistUrl) {
       const t = line.trim();
       if (!t) return line;
       if (t.startsWith("#")) {
-        return line.replace(/URI="([^"]+)"/g, (_, u) => `URI="${proxied(abs(u))}"`);
+        return line.replace(
+          /URI="([^"]+)"/g,
+          (_, u) => `URI="${proxied(abs(u))}"`,
+        );
       }
       return proxied(abs(t));
     })
     .join("\n");
 }
 
-function buildPlayerHtml(videoUrl, startTime, subtitleUrl) {
-  const isM3u8 = /\.m3u8/i.test(videoUrl);
+function buildPlayerHtml(videoUrl, startTime, subtitleUrl, nonce) {
   const track = subtitleUrl
-    ? `<track kind="subtitles" src="${proxied(subtitleUrl)}" srclang="en" label="Subtitles" default>`
+    ? `<track kind="subtitles" src="${escapeHtmlAttr(proxied(subtitleUrl))}" srclang="en" label="Subtitles" default>`
     : "";
+  const start = Number.isFinite(Number(startTime)) ? Number(startTime) : 0;
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#000;overflow:hidden}video{width:100%;height:100%;object-fit:contain;display:block}</style>
 </head><body>
-<video id="v" ${isM3u8 ? "" : `src="${proxied(videoUrl)}"`} autoplay controls playsinline crossorigin="anonymous">${track}</video>
-${
-  isM3u8
-    ? `
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
-<script>
+<video id="v" controls playsinline autoplay>${track}</video>
+<script nonce="${nonce}" src="/hls.js?t=${_serverToken}"></script>
+<script nonce="${nonce}">
   const video=document.getElementById('v');
-  const src=${JSON.stringify(proxied(videoUrl))};
-  const startTime=${Number(startTime) || 0};
+  const src=${jsonForScript(proxied(videoUrl))};
+  const startTime=${start};
   if(window.Hls&&Hls.isSupported()){
     const hls=new Hls({autoStartLoad:false});
     hls.loadSource(src);hls.attachMedia(video);
@@ -478,23 +576,16 @@ ${
     video.src=src;
     if(startTime>0)video.addEventListener('loadedmetadata',()=>{video.currentTime=startTime;},{once:true});
   }
-</script>`
-    : startTime > 0
-      ? `<script>
-  const v=document.getElementById('v');
-  v.addEventListener('loadedmetadata',()=>{v.currentTime=${Number(startTime) || 0};},{once:true});
-</script>`
-      : ""
-}
+</script>
 </body></html>`;
 }
 
-function proxyRequest(target, req, res, hops = 0) {
+async function proxyRequest(target, req, res, hops = 0) {
   let targetUrl;
   try {
-    targetUrl = new URL(target);
+    targetUrl = await assertPublicUrl(target);
   } catch {
-    res.writeHead(400);
+    res.writeHead(403);
     res.end();
     return;
   }
@@ -514,6 +605,7 @@ function proxyRequest(target, req, res, hops = 0) {
       path: targetUrl.pathname + targetUrl.search,
       method: "GET",
       headers,
+      agent: lib === https ? httpsAgent : httpAgent,
     },
     (proxyRes) => {
       const status = proxyRes.statusCode || 502;
@@ -540,21 +632,41 @@ function proxyRequest(target, req, res, hops = 0) {
 
       if (isPlaylist && status === 200) {
         const chunks = [];
-        proxyRes.on("data", (c) => chunks.push(c));
+        let size = 0;
+        proxyRes.on("data", (c) => {
+          size += c.length;
+          if (size > MAX_TEXT_BYTES) {
+            proxyReq.destroy();
+            return;
+          }
+          chunks.push(c);
+        });
         proxyRes.on("end", () => {
+          if (size > MAX_TEXT_BYTES) {
+            res.writeHead(502);
+            res.end();
+            return;
+          }
           const text = Buffer.concat(chunks).toString("utf8");
-          const out = text.trimStart().startsWith("#EXTM3U")
-            ? rewritePlaylist(text, target)
-            : text;
+          let out = text;
+          try {
+            if (text.trimStart().startsWith("#EXTM3U")) {
+              out = rewritePlaylist(text, target);
+            }
+          } catch {
+            res.writeHead(502);
+            res.end();
+            return;
+          }
           res.writeHead(200, {
             "Content-Type": "application/vnd.apple.mpegurl",
-            "Access-Control-Allow-Origin": "*",
             "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
           });
           res.end(out);
         });
         proxyRes.on("error", () => {
-          res.writeHead(502);
+          if (!res.headersSent) res.writeHead(502);
           res.end();
         });
         return;
@@ -571,8 +683,8 @@ function proxyRequest(target, req, res, hops = 0) {
       ]) {
         if (proxyRes.headers[h]) passHeaders[h] = proxyRes.headers[h];
       }
-      passHeaders["Access-Control-Allow-Origin"] = "*";
       passHeaders["Cache-Control"] = "no-store";
+      passHeaders["X-Content-Type-Options"] = "nosniff";
       res.writeHead(status, passHeaders);
       proxyRes.pipe(res);
     },
@@ -586,24 +698,80 @@ function proxyRequest(target, req, res, hops = 0) {
   proxyReq.end();
 }
 
+let _hlsJs = null;
+function loadHlsJs() {
+  if (_hlsJs) return _hlsJs;
+  _hlsJs = fs.readFileSync(require.resolve("hls.js/dist/hls.min.js"));
+  return _hlsJs;
+}
+
 function getPlayerServer() {
   if (_playerServer) return Promise.resolve(_playerServer);
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
-      const url = new URL(req.url, "http://localhost");
+      // DNS-rebinding guard + token check
+      const port = server.address()?.port;
+      if (req.method !== "GET" || req.headers.host !== `127.0.0.1:${port}`) {
+        res.writeHead(403);
+        res.end();
+        return;
+      }
+      const url = new URL(req.url, "http://127.0.0.1");
+      const given = Buffer.from(url.searchParams.get("t") || "");
+      const want = Buffer.from(_serverToken);
+      if (
+        given.length !== want.length ||
+        !crypto.timingSafeEqual(given, want)
+      ) {
+        res.writeHead(403);
+        res.end();
+        return;
+      }
 
-      if (url.pathname === "/player" || url.pathname === "/") {
+      if (url.pathname === "/player") {
+        const nonce = crypto.randomBytes(16).toString("base64");
         res.writeHead(200, {
-          "Content-Type": "text/html",
+          "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+          "Referrer-Policy": "no-referrer",
+          "Content-Security-Policy":
+            `default-src 'none'; script-src 'self' 'nonce-${nonce}'; ` +
+            "style-src 'unsafe-inline'; media-src 'self' blob:; " +
+            "connect-src 'self'; worker-src blob:; img-src 'self' data:",
         });
         res.end(
           buildPlayerHtml(
             _currentVideoUrl || "",
             _currentVideoStartTime || 0,
             _currentVideoSubtitle,
+            nonce,
           ),
         );
+        return;
+      }
+
+      if (url.pathname === "/hls.js") {
+        // load first: if hls.js is missing (npm install not run) nothing has
+        // been written yet, so the error response below is still possible
+        let script;
+        try {
+          script = loadHlsJs();
+        } catch (e) {
+          console.error(
+            "[hianime] hls.js not found:",
+            e.message,
+          );
+          res.writeHead(500, { "Content-Type": "text/plain" });
+          res.end("hls.js missing");
+          return;
+        }
+        res.writeHead(200, {
+          "Content-Type": "application/javascript",
+          "Cache-Control": "private, max-age=86400",
+          "X-Content-Type-Options": "nosniff",
+        });
+        res.end(script);
         return;
       }
 
@@ -632,12 +800,27 @@ function getPlayerServer() {
 
 // ── Show / episode resolution ────────────────────────────────────────────────
 
+const SHOW_LOOKUP_TTL = 30 * 60 * 1000;
+const _showCache = new Map(); // normalized candidates -> { ts, show }
+
 // Finds the HiAnime show for the given title candidates. Prefers an exact
-// (normalized) title match over the first search hit.
+// (normalized) title match over the first search hit. Candidates that normalize
+// to the same string are searched only once; results are cached.
 async function findShow(candidates) {
-  const wanted = new Set(candidates.map(normalizeTitle));
+  const seen = new Set();
+  const unique = candidates.filter((c) => {
+    const n = normalizeTitle(c);
+    if (!n || seen.has(n)) return false;
+    seen.add(n);
+    return true;
+  });
+  const cacheKey = [...seen].join("|");
+  const hit = _showCache.get(cacheKey);
+  if (hit && Date.now() - hit.ts < SHOW_LOOKUP_TTL) return hit.show;
+
   let fallback = null;
-  for (const candidate of candidates) {
+  let found = null;
+  for (const candidate of unique) {
     let results;
     try {
       results = await hianimeSearch(candidate);
@@ -648,123 +831,163 @@ async function findShow(candidates) {
     if (!results.length) continue;
     const exact = results.find(
       (r) =>
-        wanted.has(normalizeTitle(r.title)) ||
-        (r.jname && wanted.has(normalizeTitle(r.jname))),
+        seen.has(normalizeTitle(r.title)) ||
+        (r.jname && seen.has(normalizeTitle(r.jname))),
     );
-    if (exact) return exact;
+    if (exact) {
+      found = exact;
+      break;
+    }
     if (!fallback) fallback = results[0];
   }
-  return fallback;
+  const show = found || fallback;
+  if (show) {
+    if (_showCache.size > 200)
+      _showCache.delete(_showCache.keys().next().value);
+    _showCache.set(cacheKey, { ts: Date.now(), show });
+  }
+  return show;
 }
+
+// ── IPC input validation ──────────────────────────────────────────────────────
+
+const asString = (v, max = 300) =>
+  typeof v === "string" ? v.slice(0, max) : "";
+const asPosInt = (v, fallback) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 && n < 100000 ? n : fallback;
+};
 
 // ── IPC registration ──────────────────────────────────────────────────────────
 
 function register() {
-  ipcMain.handle(
-    "set-player-video",
-    async (_, { url, referer, startTime, subtitle }) => {
-      _currentVideoUrl = url;
-      _currentVideoReferer = referer || BASE_URL + "/";
-      _currentVideoSubtitle = subtitle || null;
-      _currentVideoStartTime = startTime || 0;
-      const server = await getPlayerServer();
-      return { playerUrl: `http://127.0.0.1:${server.address().port}/player` };
-    },
-  );
+  ipcMain.handle("set-player-video", async (_, args = {}) => {
+    const url = asString(args.url, 4096);
+    const referer = asString(args.referer, 2048) || BASE_URL + "/";
+    const subtitle = asString(args.subtitle, 4096) || null;
+    // only public http(s) targets may ever reach the local proxy
+    await assertPublicUrl(url);
+    await assertPublicUrl(referer);
+    if (subtitle) await assertPublicUrl(subtitle);
+    _currentVideoUrl = url;
+    _currentVideoReferer = referer;
+    _currentVideoSubtitle = subtitle;
+    _currentVideoStartTime = asPosInt(args.startTime, 0);
+    const server = await getPlayerServer();
+    return {
+      playerUrl: `http://127.0.0.1:${server.address().port}/player?t=${_serverToken}`,
+    };
+  });
 
-  ipcMain.handle(
-    "resolve-hianime",
-    async (
-      _,
-      { title, seasonNumber, episodeNumber, isMovie, translationType },
-    ) => {
+  ipcMain.handle("resolve-hianime", async (event, args = {}) => {
+    // progress events drive the loading screen in the renderer
+    const report = (stage) => {
       try {
-        const season = seasonNumber || 1;
-        const mode = translationType === "dub" ? "dub" : "sub";
-
-        // 1. AniList season title lookup (S2+ have their own HiAnime entry)
-        const anilistResult = isMovie
-          ? {
-              title,
-              romaji: null,
-              episodes: null,
-              nextTitle: null,
-              nextRomaji: null,
-            }
-          : await anilistSeasonTitle(title, season);
-
-        let searchTitle = anilistResult.title;
-        let adjustedEpisodeNumber = episodeNumber;
-
-        if (
-          !isMovie &&
-          anilistResult.episodes &&
-          episodeNumber > anilistResult.episodes &&
-          anilistResult.nextTitle
-        ) {
-          adjustedEpisodeNumber = episodeNumber - anilistResult.episodes;
-          searchTitle = anilistResult.nextTitle;
+        if (!event.sender.isDestroyed()) {
+          event.sender.send("hianime-progress", { stage });
         }
-
-        // 2. Build search candidate list
-        const candidates = [
-          ...new Set([
-            searchTitle,
-            sanitizeTitle(searchTitle),
-            ...(anilistResult.romaji && searchTitle === anilistResult.title
-              ? [anilistResult.romaji]
-              : []),
-            ...(anilistResult.nextRomaji &&
-            searchTitle === anilistResult.nextTitle
-              ? [anilistResult.nextRomaji]
-              : []),
-            title,
-            sanitizeTitle(title),
-          ]),
-        ].filter(Boolean);
-
-        // 3. Search HiAnime
-        const show = await findShow(candidates);
-        if (!show) return { ok: false, error: "No results for: " + searchTitle };
-
-        // 4. Episode list → episode id
-        const episodes = await cachedEpisodes(show.id);
-        if (!episodes.length) {
-          return { ok: false, error: "No episodes found for: " + show.title };
-        }
-        const wantedNumber = isMovie ? "1" : String(adjustedEpisodeNumber);
-        const episode =
-          episodes.find((e) => e.number === wantedNumber) ||
-          episodes.find((e) => parseFloat(e.number) === Number(wantedNumber)) ||
-          (isMovie ? episodes[0] : null);
-        if (!episode) {
-          return { ok: false, error: "Episode " + wantedNumber + " not found" };
-        }
-
-        // 5. Stream (embed → de-obfuscate → master playlist)
-        const stream = await hianimeStream(episode.epId, mode);
-        return {
-          ok: true,
-          url: stream.masterUrl,
-          resolution: stream.resolution,
-          sourceName: SERVER_NAME,
-          isDirectMp4: false,
-          referer: stream.referer,
-          subtitle: stream.subtitle,
-          malId: stream.malId,
-          searchTitle,
-          matchedTitle: show.title,
-        };
-      } catch (e) {
-        return { ok: false, error: e.message };
+      } catch {
+        // renderer went away, nothing to report to
       }
-    },
-  );
+    };
+    try {
+      const title = asString(args.title);
+      if (!title) return { ok: false, error: "Missing title" };
+      const isMovie = args.isMovie === true;
+      const season = asPosInt(args.seasonNumber, 1) || 1;
+      const episodeNumber = asPosInt(args.episodeNumber, 1) || 1;
+      const mode = args.translationType === "dub" ? "dub" : "sub";
+      report("search");
 
+      // 1. AniList season title lookup (S2+ have their own HiAnime entry)
+      const anilistResult = isMovie
+        ? {
+            title,
+            romaji: null,
+            episodes: null,
+            nextTitle: null,
+            nextRomaji: null,
+          }
+        : await anilistSeasonTitle(title, season);
+
+      let searchTitle = anilistResult.title;
+      let adjustedEpisodeNumber = episodeNumber;
+
+      if (
+        !isMovie &&
+        anilistResult.episodes &&
+        episodeNumber > anilistResult.episodes &&
+        anilistResult.nextTitle
+      ) {
+        adjustedEpisodeNumber = episodeNumber - anilistResult.episodes;
+        searchTitle = anilistResult.nextTitle;
+      }
+
+      // 2. Build search candidate list
+      const candidates = [
+        ...new Set([
+          searchTitle,
+          sanitizeTitle(searchTitle),
+          ...(anilistResult.romaji && searchTitle === anilistResult.title
+            ? [anilistResult.romaji]
+            : []),
+          ...(anilistResult.nextRomaji &&
+          searchTitle === anilistResult.nextTitle
+            ? [anilistResult.nextRomaji]
+            : []),
+          title,
+          sanitizeTitle(title),
+        ]),
+      ].filter(Boolean);
+
+      // 3. Search HiAnime (cached per title)
+      const show = await findShow(candidates);
+      if (!show) return { ok: false, error: "No results for: " + searchTitle };
+
+      // 4. Episode list → episode id
+      report("episodes");
+      const episodes = await cachedEpisodes(show.id);
+      if (!episodes.length) {
+        return { ok: false, error: "No episodes found for: " + show.title };
+      }
+      const wantedNumber = isMovie ? "1" : String(adjustedEpisodeNumber);
+      const episode =
+        episodes.find((e) => e.number === wantedNumber) ||
+        episodes.find((e) => parseFloat(e.number) === Number(wantedNumber)) ||
+        (isMovie ? episodes[0] : null);
+      if (!episode) {
+        return { ok: false, error: "Episode " + wantedNumber + " not found" };
+      }
+
+      // 5. Stream (servers → embed → de-obfuscate)
+      report("stream");
+      const stream = await hianimeStream(episode.epId, mode);
+      return {
+        ok: true,
+        url: stream.masterUrl,
+        resolution: stream.resolution,
+        sourceName: SERVER_NAME,
+        isDirectMp4: false,
+        referer: stream.referer,
+        subtitle: stream.subtitle,
+        malId: stream.malId,
+        searchTitle,
+        matchedTitle: show.title,
+      };
+    } catch (e) {
+      return { ok: false, error: String(e?.message || e).slice(0, 200) };
+    }
+  });
+
+  // Debug helper, only available in development builds
   ipcMain.handle("debug-hianime", async (_, args = {}) => {
+    if (app.isPackaged) return { error: "disabled in packaged builds" };
     try {
       if (args.epId) {
-        const stream = await hianimeStream(String(args.epId), args.mode || "sub");
+        const stream = await hianimeStream(
+          String(args.epId),
+          args.mode || "sub",
+        );
         return stream;
       }
       if (args.showId) {
@@ -784,5 +1007,10 @@ function register() {
 module.exports = {
   register,
   // exported for tests
-  _internal: { deobfuscateBlob, unwrapApiHtml, rewritePlaylist, normalizeTitle },
+  _internal: {
+    deobfuscateBlob,
+    unwrapApiHtml,
+    rewritePlaylist,
+    normalizeTitle,
+  },
 };

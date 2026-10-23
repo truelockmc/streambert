@@ -78,6 +78,7 @@ import {
 } from "../utils/playerGamepadScript";
 import { useSourceId } from "../utils/useSourceId";
 import { setPlayerGamepadActive } from "../utils/gamepadPlayerState";
+import HiAnimeLoader from "../components/HiAnimeLoader";
 
 // ── Partial-circle progress icon (cached per pct tier) ───────────────────────
 // Uses a single SVG arc. Three instances (25/50/75)
@@ -1238,23 +1239,25 @@ export default function TVPage({
     // Poll up to 30s for video duration (metadata may load after buffering starts).
     // Only needed for AniSkip markers on async (anime) sources.
     let attempts = 0;
-    const pollDuration = !isAsync ? null : setInterval(async () => {
-      if (durationRef.current > 0 || attempts++ > 30) {
-        clearInterval(pollDuration);
-        return;
-      }
-      try {
-        const dur = await wv.executeJavaScript(
-          `(() => { const v = document.querySelector('video'); return (v && v.duration > 0 && isFinite(v.duration)) ? v.duration : null; })()`,
-        );
-        if (dur) {
-          durationRef.current = dur;
-          // let markers re-render
-          setSkipTimings((t) => (t ? { ...t } : t));
-          clearInterval(pollDuration);
-        }
-      } catch {}
-    }, 1000);
+    const pollDuration = !isAsync
+      ? null
+      : setInterval(async () => {
+          if (durationRef.current > 0 || attempts++ > 30) {
+            clearInterval(pollDuration);
+            return;
+          }
+          try {
+            const dur = await wv.executeJavaScript(
+              `(() => { const v = document.querySelector('video'); return (v && v.duration > 0 && isFinite(v.duration)) ? v.duration : null; })()`,
+            );
+            if (dur) {
+              durationRef.current = dur;
+              // let markers re-render
+              setSkipTimings((t) => (t ? { ...t } : t));
+              clearInterval(pollDuration);
+            }
+          } catch {}
+        }, 1000);
 
     return () => {
       wv.removeEventListener("did-finish-load", done);
@@ -1874,12 +1877,19 @@ export default function TVPage({
                       borderRadius: "inherit",
                     }}
                   >
-                    <div className="spinner" />
-                    <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                      {resolvingUrl
-                        ? "Looking up episode on HiAnime…"
-                        : `Loading ${PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "source"}…`}
-                    </span>
+                    {sourceIsAsync(playerSource) ? (
+                      <HiAnimeLoader
+                        what="episode"
+                        playerStarting={!resolvingUrl && !!resolvedPlayerUrl}
+                      />
+                    ) : (
+                      <>
+                        <div className="spinner" />
+                        <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                          {`Loading ${PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "source"}…`}
+                        </span>
+                      </>
+                    )}
                   </div>
                 )}
                 {/* error if lookup failed */}
@@ -1911,31 +1921,31 @@ export default function TVPage({
                   </div>
                 )}
                 {/* ID conversion failed (sources that need an IMDb / Kinopoisk ID) */}
-            {srcId.error && (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  zIndex: 11,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "rgba(0,0,0,0.85)",
-                  gap: 10,
-                  borderRadius: "inherit",
-                }}
-              >
-                <span style={{ fontSize: 28 }}>⚠️</span>
-                <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                  Could not resolve the {srcId.idLabel} for this title
-                </span>
-                <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                  {srcId.error}. Try a different source.
-                </span>
-              </div>
-            )}
-            {/* Pop-out active: main stream paused, pop-out has real player */}
+                {srcId.error && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      zIndex: 11,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "rgba(0,0,0,0.85)",
+                      gap: 10,
+                      borderRadius: "inherit",
+                    }}
+                  >
+                    <span style={{ fontSize: 28 }}>⚠️</span>
+                    <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                      Could not resolve the {srcId.idLabel} for this title
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                      {srcId.error}. Try a different source.
+                    </span>
+                  </div>
+                )}
+                {/* Pop-out active: main stream paused, pop-out has real player */}
                 {pipOpen && (
                   <div
                     style={{
@@ -2196,7 +2206,8 @@ export default function TVPage({
                       "Source"}
                   </button>
                   {/* Sub/Dub toggle: HiAnime, and anime-capable sources (Vidnest) on anime titles */}
-                  {(isAsync || (isAnime && sourceSupportsAnime(playerSource))) && (
+                  {(isAsync ||
+                    (isAnime && sourceSupportsAnime(playerSource))) && (
                     <button
                       className="player-overlay-btn"
                       onClick={() => {
@@ -2264,48 +2275,50 @@ export default function TVPage({
                     style={{ top: menuPos.top, left: menuPos.left }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {PLAYER_SOURCES.filter((src) => !src.movieOnly).map((src) => (
-                      <button
-                        key={src.id}
-                        className={
-                          "source-dropdown__item" +
-                          (playerSource === src.id
-                            ? " source-dropdown__item--active"
-                            : "")
-                        }
-                        onClick={() => {
-                          setShowSourceMenu(false);
-                          if (src.id === playerSource) return;
-                          // Manual selection wins over auto-failover
-                          if (selectedEp) {
-                            clearFailoverSource(
-                              `tv_${item.id}_s${selectedSeason}_e${selectedEp.episode_number}_${dubMode}`,
-                            );
+                    {PLAYER_SOURCES.filter((src) => !src.movieOnly).map(
+                      (src) => (
+                        <button
+                          key={src.id}
+                          className={
+                            "source-dropdown__item" +
+                            (playerSource === src.id
+                              ? " source-dropdown__item--active"
+                              : "")
                           }
-                          setPlayerSource(src.id);
-                          storage.set(STORAGE_KEYS.PLAYER_SOURCE, src.id);
-                          setM3u8Url(null);
-                          setInterceptedSubs([]);
-                          resolvedPlayerUrlRef.current = null;
-                          setResolvedPlayerUrl(null);
-                          resolvingUrlRef.current = false;
-                          setResolvingUrl(false);
-                          setResolveError(null);
-                        }}
-                      >
-                        <span>{src.label}</span>
-                        {src.tag && (
-                          <span className="source-dropdown__tag">
-                            {src.tag}
-                          </span>
-                        )}
-                        {src.note && (
-                          <span className="source-dropdown__note">
-                            {src.note}
-                          </span>
-                        )}
-                      </button>
-                    ))}
+                          onClick={() => {
+                            setShowSourceMenu(false);
+                            if (src.id === playerSource) return;
+                            // Manual selection wins over auto-failover
+                            if (selectedEp) {
+                              clearFailoverSource(
+                                `tv_${item.id}_s${selectedSeason}_e${selectedEp.episode_number}_${dubMode}`,
+                              );
+                            }
+                            setPlayerSource(src.id);
+                            storage.set(STORAGE_KEYS.PLAYER_SOURCE, src.id);
+                            setM3u8Url(null);
+                            setInterceptedSubs([]);
+                            resolvedPlayerUrlRef.current = null;
+                            setResolvedPlayerUrl(null);
+                            resolvingUrlRef.current = false;
+                            setResolvingUrl(false);
+                            setResolveError(null);
+                          }}
+                        >
+                          <span>{src.label}</span>
+                          {src.tag && (
+                            <span className="source-dropdown__tag">
+                              {src.tag}
+                            </span>
+                          )}
+                          {src.note && (
+                            <span className="source-dropdown__note">
+                              {src.note}
+                            </span>
+                          )}
+                        </button>
+                      ),
+                    )}
                   </div>
                 )}
                 <button

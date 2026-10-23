@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "approve": "^0.0.12",
+    "hls.js": "1.5.17",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "scripts": "^0.1.0"

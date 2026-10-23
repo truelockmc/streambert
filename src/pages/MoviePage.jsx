@@ -69,6 +69,7 @@ import {
 } from "../utils/playerGamepadScript";
 import { useSourceId } from "../utils/useSourceId";
 import { setPlayerGamepadActive } from "../utils/gamepadPlayerState";
+import HiAnimeLoader from "../components/HiAnimeLoader";
 
 export default function MoviePage({
   item,
@@ -982,12 +983,19 @@ export default function MoviePage({
                   borderRadius: "inherit",
                 }}
               >
-                <div className="spinner" />
-                <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                  {resolvingUrl
-                    ? "Looking up movie on HiAnime…"
-                    : `Loading ${PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "source"}…`}
-                </span>
+                {sourceIsAsync(playerSource) ? (
+                  <HiAnimeLoader
+                    what="movie"
+                    playerStarting={!resolvingUrl && !!resolvedPlayerUrl}
+                  />
+                ) : (
+                  <>
+                    <div className="spinner" />
+                    <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                      {`Loading ${PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "source"}…`}
+                    </span>
+                  </>
+                )}
               </div>
             )}
             {/* HiAnime: error if lookup failed */}

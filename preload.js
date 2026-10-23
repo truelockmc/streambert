@@ -61,6 +61,13 @@ contextBridge.exposeInMainWorld("electron", {
   // anime episode resolver (main-process HTTP, bypasses CORS/bot-check)
   resolveHiAnime: (args) => ipcRenderer.invoke("resolve-hianime", args),
   setPlayerVideo: (args) => ipcRenderer.invoke("set-player-video", args),
+  // progress of the HiAnime lookup (stage: "search" | "episodes" | "stream");
+  // returns an unsubscribe function
+  onHiAnimeProgress: (cb) => {
+    const h = (_, data) => cb(data?.stage);
+    ipcRenderer.on("hianime-progress", h);
+    return () => ipcRenderer.removeListener("hianime-progress", h);
+  },
   debugHiAnime: (args) => ipcRenderer.invoke("debug-hianime", args),
 
   // App version (from package.json via Electron)
