@@ -5,8 +5,14 @@ const PREFIX = "streambert_";
 export const storage = {
   get(key) {
     try {
-      const raw = localStorage.getItem(PREFIX + key);
-      return raw ? JSON.parse(raw) : null;
+      let raw = localStorage.getItem(PREFIX + key);
+      // Legacy AllManga → HiAnime migration (settings saved by older versions)
+      if (!raw && key === "hianimeDubMode") {
+        raw = localStorage.getItem(PREFIX + "allmangaDubMode");
+      }
+      const value = raw ? JSON.parse(raw) : null;
+      if (key === "playerSource" && value === "allmanga") return "hianime";
+      return value;
     } catch {
       return null;
     }
@@ -36,7 +42,7 @@ export const STORAGE_KEYS = {
   API_KEY: "apikey",
   UPDATE_SOURCE: "updateSource",
   PLAYER_SOURCE: "playerSource",
-  ALLMANGA_DUB_MODE: "allmangaDubMode",
+  HIANIME_DUB_MODE: "hianimeDubMode",
   WATCH_PROGRESS: "progress",
   WATCHED: "watched",
   HISTORY: "history",
@@ -75,7 +81,7 @@ export const STORAGE_KEYS = {
   NOTIFY_NEW_EPISODE: "notifyNewEpisode",
   // TMDB metadata lang (BCP-47 locale, e.g. "de-DE")
   TMDB_LANG: "tmdbLang",
-  // Intro skip (anime only, allmanga source)
+  // Intro skip (anime only, HiAnime source)
   // Values: "off" | "auto" | "manual"
   INTRO_SKIP_MODE: "introSkipMode",
   // Autoplay next preferences
@@ -88,7 +94,7 @@ export const STORAGE_KEYS = {
   DL_SHOW_UNTRACKED: "dlShowUntracked",
   // Cache for new-episode startup check
   EPISODE_RELEASE_CACHE: "episodeReleaseCache",
-  // Per-episode fallback source when the default (typically AllManga) lacks
+  // Per-episode fallback source when the default (typically HiAnime) lacks
   // the title. Shape: { [epKey]: sourceId }.
   SOURCE_FAILOVER_CACHE: "sourceFailoverCache",
   // Discord Rich Presence
@@ -103,7 +109,7 @@ export const STORAGE_KEYS = {
 export const getApiKey = () => storage.get(STORAGE_KEYS.API_KEY);
 
 // ── Source failover cache ────────────────────────────────────────────────────
-// AllManga doesn't always have every episode; rather than nag the user every
+// HiAnime doesn't always have every episode; rather than nag the user every
 // time, remember the working alternate source per (tmdbId, season, ep, dub).
 // Max 200 entries
 const FAILOVER_CACHE_MAX = 200;

@@ -421,7 +421,7 @@ export default function TVPage({
     [playerSource],
   );
   const [dubMode, setDubMode] = useState(
-    () => storage.get(STORAGE_KEYS.ALLMANGA_DUB_MODE) || "sub",
+    () => storage.get(STORAGE_KEYS.HIANIME_DUB_MODE) || "sub",
   );
   // async URL resolution
   const [resolvedPlayerUrl, setResolvedPlayerUrl] = useState(null);
@@ -726,13 +726,13 @@ export default function TVPage({
     }
   }, [playerSource]);
 
-  // Resolve allmanga episode URL via main-process IPC (GraphQL, no CORS)
+  // Resolve HiAnime episode URL via main-process IPC (scraping, no CORS)
   useEffect(() => {
     if (!playing || !selectedEp) return;
     const epNum = selectedEp.episode_number;
     const epKey = `tv_${item.id}_s${selectedSeason}_e${epNum}_${dubMode}`;
 
-    // Auto-failover: if a previous attempt taught us AllManga doesn't have
+    // Auto-failover: if a previous attempt taught us HiAnime doesn't have
     // this episode, skip straight to the cached fallback source.
     if (isAsync) {
       const cached = getFailoverSource(epKey);
@@ -759,7 +759,7 @@ export default function TVPage({
     const startTime = storage.get("dlTime_" + progressKey) || 0;
     let mounted = true;
     window.electron
-      .resolveAllManga({
+      .resolveHiAnime({
         title,
         seasonNumber: selectedSeason,
         episodeNumber: epNum,
@@ -773,7 +773,8 @@ export default function TVPage({
             window.electron
               .setPlayerVideo({
                 url: res.url,
-                referer: res.referer || "https://allmanga.to",
+                referer: res.referer || "https://hianime.at/",
+                subtitle: res.subtitle || null,
                 startTime,
               })
               .then((r) => {
@@ -791,7 +792,7 @@ export default function TVPage({
             setResolvedPlayerUrl(res.url);
           }
         } else {
-          // AllManga doesn't have this episode → switch to the next source
+          // HiAnime doesn't have this episode → switch to the next source
           // automatically and remember the choice for next time.
           const next = getNextNonAsyncSource(playerSource);
           if (next) {
@@ -803,7 +804,7 @@ export default function TVPage({
             setResolveError(null);
             setPlayerSource(next);
           } else {
-            setResolveError(res?.error || "Episode not found on AllManga");
+            setResolveError(res?.error || "Episode not found on HiAnime");
           }
         }
       })
@@ -873,7 +874,7 @@ export default function TVPage({
     [d.seasons],
   );
   // tmdbSeasonsWithSpecials includes season 0 for display purposes.
-  // Excluded for anime: AllManga
+  // Excluded for anime: HiAnime
   const tmdbSeasonsWithSpecials = useMemo(() => {
     if (isAnime) return tmdbSeasons;
     if (failedSeasons.has(0)) return tmdbSeasons;
@@ -1318,7 +1319,7 @@ export default function TVPage({
     return () => wv.removeEventListener("before-input-event", handler);
   }, [skipPrompt, handleManualSkip]);
 
-  // Unified progress/skip timing tick for Allmanga and other sources.
+  // Unified progress/skip timing tick for HiAnime and other sources.
   // Skip detection runs every tick, progress is saved every 5th tick (5s).
   useEffect(() => {
     const aniSkipActive =
@@ -1650,7 +1651,7 @@ export default function TVPage({
 
   // Intercept fullscreen requests from embedded players (vidsrc / 2embed use
   // the native Fullscreen API which would otherwise fullscreen the entire app).
-  // Videasy and AllManga handle fullscreen internally via CSS, skip those.
+  // Videasy and HiAnime handle fullscreen internally via CSS, skip those.
   useEffect(() => {
     if (!playing) return;
     if (!NEEDS_INTERCEPT.includes(playerSource)) return;
@@ -1876,7 +1877,7 @@ export default function TVPage({
                     <div className="spinner" />
                     <span style={{ fontSize: 14, color: "var(--text2)" }}>
                       {resolvingUrl
-                        ? "Looking up episode on AllManga…"
+                        ? "Looking up episode on HiAnime…"
                         : `Loading ${PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "source"}…`}
                     </span>
                   </div>
@@ -1899,7 +1900,7 @@ export default function TVPage({
                   >
                     <span style={{ fontSize: 28 }}>⚠️</span>
                     <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                      Episode not found on AllManga
+                      Episode not found on HiAnime
                     </span>
                     <span style={{ fontSize: 12, color: "var(--text3)" }}>
                       {resolveError}
@@ -2194,14 +2195,14 @@ export default function TVPage({
                     {PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ??
                       "Source"}
                   </button>
-                  {/* Sub/Dub toggle: AllManga, and anime-capable sources (Vidnest) on anime titles */}
+                  {/* Sub/Dub toggle: HiAnime, and anime-capable sources (Vidnest) on anime titles */}
                   {(isAsync || (isAnime && sourceSupportsAnime(playerSource))) && (
                     <button
                       className="player-overlay-btn"
                       onClick={() => {
                         const next = dubMode === "sub" ? "dub" : "sub";
                         setDubMode(next);
-                        storage.set(STORAGE_KEYS.ALLMANGA_DUB_MODE, next);
+                        storage.set(STORAGE_KEYS.HIANIME_DUB_MODE, next);
                         setM3u8Url(null);
                         setInterceptedSubs([]);
                         resolvedPlayerUrlRef.current = null;

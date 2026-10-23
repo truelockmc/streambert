@@ -110,7 +110,7 @@ export default function MoviePage({
   );
   const [showSourceMenu, setShowSourceMenu] = useState(false);
   const [dubMode, setDubMode] = useState(
-    () => storage.get(STORAGE_KEYS.ALLMANGA_DUB_MODE) || "sub",
+    () => storage.get(STORAGE_KEYS.HIANIME_DUB_MODE) || "sub",
   );
   const [anilistData, setAnilistData] = useState(null);
   const [menuPos, setMenuPos] = useState(null);
@@ -122,7 +122,7 @@ export default function MoviePage({
   saveProgressRef.current = saveProgress;
   const onMarkWatchedRef = useRef(onMarkWatched);
   onMarkWatchedRef.current = onMarkWatched;
-  // AllManga async URL resolution
+  // HiAnime async URL resolution
   const [resolvedPlayerUrl, setResolvedPlayerUrl] = useState(null);
   const [resolvingUrl, setResolvingUrl] = useState(false);
   const [resolveError, setResolveError] = useState(null);
@@ -362,12 +362,12 @@ export default function MoviePage({
     };
   }, [item.id, isAnime]);
 
-  // Resolve AllManga movie URL via main-process IPC
+  // Resolve HiAnime movie URL via main-process IPC (scraping, no CORS)
   useEffect(() => {
     if (!playing) return;
     const epKey = `movie_${item.id}_${dubMode}`;
 
-    // Auto-failover: if a previous attempt taught us AllManga doesn't have
+    // Auto-failover: if a previous attempt taught us HiAnime doesn't have
     // this title, skip straight to the cached fallback source.
     if (sourceIsAsync(playerSource)) {
       const cached = getFailoverSource(epKey);
@@ -393,7 +393,7 @@ export default function MoviePage({
     const startTime = storage.get("dlTime_" + progressKey) || 0;
     let mounted = true;
     window.electron
-      .resolveAllManga({
+      .resolveHiAnime({
         title,
         seasonNumber: 1,
         episodeNumber: 1,
@@ -408,7 +408,8 @@ export default function MoviePage({
             window.electron
               .setPlayerVideo({
                 url: res.url,
-                referer: res.referer || "https://allmanga.to",
+                referer: res.referer || "https://hianime.at/",
+                subtitle: res.subtitle || null,
                 startTime,
               })
               .then((r) => {
@@ -425,7 +426,7 @@ export default function MoviePage({
             setResolvedPlayerUrl(res.url);
           }
         } else {
-          // AllManga doesn't have this title → switch to the next source
+          // HiAnime doesn't have this title → switch to the next source
           // automatically and remember the choice for next time.
           const next = getNextNonAsyncSource(playerSource);
           if (next) {
@@ -437,7 +438,7 @@ export default function MoviePage({
             setResolveError(null);
             setPlayerSource(next);
           } else {
-            setResolveError(res?.error || "Movie not found on AllManga");
+            setResolveError(res?.error || "Movie not found on HiAnime");
           }
         }
       })
@@ -713,7 +714,7 @@ export default function MoviePage({
 
   // Intercept fullscreen requests from embedded players (vidsrc / 2embed use
   // the native Fullscreen API which would otherwise fullscreen the entire app).
-  // Videasy and AllManga handle fullscreen internally via CSS, skip those.
+  // Videasy and HiAnime handle fullscreen internally via CSS, skip those.
   useEffect(() => {
     if (!playing) return;
     if (!NEEDS_INTERCEPT.includes(playerSource)) return;
@@ -984,12 +985,12 @@ export default function MoviePage({
                 <div className="spinner" />
                 <span style={{ fontSize: 14, color: "var(--text2)" }}>
                   {resolvingUrl
-                    ? "Looking up movie on AllManga…"
+                    ? "Looking up movie on HiAnime…"
                     : `Loading ${PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "source"}…`}
                 </span>
               </div>
             )}
-            {/* AllManga: error if lookup failed */}
+            {/* HiAnime: error if lookup failed */}
             {sourceIsAsync(playerSource) && resolveError && !resolvingUrl && (
               <div
                 style={{
@@ -1007,7 +1008,7 @@ export default function MoviePage({
               >
                 <span style={{ fontSize: 28 }}>⚠️</span>
                 <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                  Movie not found on AllManga
+                  Movie not found on HiAnime
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text3)" }}>
                   {resolveError}
@@ -1129,7 +1130,7 @@ export default function MoviePage({
                 {PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ??
                   "Source"}
               </button>
-              {/* Sub/Dub toggle: AllManga, and anime-capable sources (Vidnest) on anime titles */}
+              {/* Sub/Dub toggle: HiAnime, and anime-capable sources (Vidnest) on anime titles */}
               {(sourceIsAsync(playerSource) ||
                 (isAnime && sourceSupportsAnime(playerSource))) && (
                 <button
@@ -1137,7 +1138,7 @@ export default function MoviePage({
                   onClick={() => {
                     const next = dubMode === "sub" ? "dub" : "sub";
                     setDubMode(next);
-                    storage.set(STORAGE_KEYS.ALLMANGA_DUB_MODE, next);
+                    storage.set(STORAGE_KEYS.HIANIME_DUB_MODE, next);
                     setM3u8Url(null);
                     setInterceptedSubs([]);
                     resolvedPlayerUrlRef.current = null;

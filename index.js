@@ -43,7 +43,7 @@ const siteTweaks = require("./src/ipc/siteTweaks");
 const storageIpc = require("./src/ipc/storage");
 const downloadsIpc = require("./src/ipc/downloads");
 const subtitlesIpc = require("./src/ipc/subtitles");
-const allmangaIpc = require("./src/ipc/allmanga");
+const hianimeIpc = require("./src/ipc/hianime");
 const playerIpc = require("./src/ipc/player");
 const discordRpc = require("./src/ipc/discordRpc");
 
@@ -397,7 +397,7 @@ subtitlesIpc.register({
   getDownloads: downloadsIpc.getDownloads,
   saveDownloads: downloadsIpc.saveDownloads,
 });
-allmangaIpc.register();
+hianimeIpc.register();
 playerIpc.register(getMainWindow, {
   writeSecretMigration: storageIpc.writeSecretMigration,
 });

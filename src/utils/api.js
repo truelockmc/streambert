@@ -298,15 +298,15 @@ export const PLAYER_SOURCES = [
     movieUrl: (id) => `https://on.kinohub.vip/movie/${id}`,
   },
   {
-    id: "allmanga",
-    label: "AllManga",
+    id: "hianime",
+    label: "HiAnime",
     tag: "ANIME",
     note: null,
     supportsProgress: true,
     async: true,
     params: {},
-    movieUrl: (_id) => "https://allmanga.to",
-    tvUrl: (_id, _season, _ep) => "https://allmanga.to",
+    movieUrl: (_id) => "https://hianime.at",
+    tvUrl: (_id, _season, _ep) => "https://hianime.at",
   },
 ];
 
@@ -514,7 +514,7 @@ export const getNextNonAsyncSource = (currentId) => {
   if (nonAsync.length === 0) return null;
   const idx = nonAsync.findIndex((s) => s.id === currentId);
   // If currentId is itself non-async, return the next one (wrap around).
-  // If currentId is async (e.g. AllManga), just return the first non-async.
+  // If currentId is async (e.g. HiAnime), just return the first non-async.
   if (idx < 0) return nonAsync[0].id;
   return nonAsync[(idx + 1) % nonAsync.length].id;
 };
@@ -728,7 +728,7 @@ export const isAnimeContent = (item, details) => {
 };
 
 // Default sources
-export const ANIME_DEFAULT_SOURCE = "allmanga";
+export const ANIME_DEFAULT_SOURCE = "hianime";
 export const NON_ANIME_DEFAULT_SOURCE = "vidsrc";
 
 // ── Episode Group fetch (localStorage + in-memory cache, 7-day TTL) ─────────
