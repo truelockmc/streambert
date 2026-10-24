@@ -151,24 +151,6 @@ export const PLAYER_SOURCES = [
       `https://vsembed.su/embed/tv/${id}/${season}/${ep}`,
   },
   {
-    id: "peachify",
-    label: "Peachify",
-    tag: null,
-    note: null,
-    supportsProgress: true,
-    movieOnly: true,
-    colorParam: "accent", // hex without # → e.g. "e50914"
-    langParam: "sub",
-    params: {
-      autoPlay: "true",
-      pip: "hide",
-      cast: "hide",
-    },
-    movieUrl: (id) => `https://peachify.top/embed/movie/${id}`,
-    tvUrl: (id, season, ep) =>
-      `https://peachify.top/embed/tv/${id}/${season}/${ep}`,
-  },
-  {
     id: "vidfast",
     label: "Vidfast",
     tag: null,
