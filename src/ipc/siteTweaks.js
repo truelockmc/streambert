@@ -63,6 +63,16 @@ const SITE_RULES = [
       'button.tabbable.p-2.rounded-full:has(> span.text-xl > svg[width="18"][height="18"])',
     ),
   },
+
+  // try to remove popup ads (doesnt really work)
+  {
+    hosts: ["vidnest.fun"],
+    css: hideCss(".popup-selector", "#overlay-id"),
+  },
+  {
+    hosts: ["frembed.bar"],
+    css: hideCss(".popup-selector"),
+  },
 ];
 
 function findRule(url) {

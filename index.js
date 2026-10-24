@@ -144,6 +144,75 @@ const BLOCKED_HOSTS = [
   "*://*.webvisor.org/*",
   "*://datariaarpent.com/*",
   "*://*.datariaarpent.com/*",
+  "*://gamesrevenue.com/*",
+  "*://*.gamesrevenue.com/*",
+  "*://73ed366d3137ec936bd60b1184467776.com/*",
+  "*://shankedunwindy.cyou/*",
+  "*://*.shankedunwindy.cyou/*",
+  "*://908df012d9bb72e6d26b41054588d758.com/*",
+  "*://asemquips.cfd/*",
+  "*://*.asemquips.cfd/*",
+  "*://epicgameshubham.com/*",
+  "*://tantrajoni.cfd/*",
+  "*://thatdisform.cyou/*",
+  "*://vdrk.site/*",
+  "*://*.vdrk.site/*",
+  "*://*.adsco.re/*",
+  "*://aarems.org/*",
+  "*://*.aarems.org/*",
+  "*://aerionvel.com/*",
+  "*://*.aerionvel.com/*",
+  "*://cdn4ads.com/*",
+  "*://*.cdn4ads.com/*",
+  "*://directyp.org/*",
+  "*://*.directyp.org/*",
+  "*://fakerstoterframing.qpon/*",
+  "*://*.fakerstoterframing.qpon/*",
+  "*://karthliunstagy.com/*",
+  "*://*.karthliunstagy.com/*",
+  "*://nresystems.com/*",
+  "*://*.nresystems.com/*",
+  "*://sainwertapr.com/*",
+  "*://*.sainwertapr.com/*",
+  "*://*.tantrajoni.cfd/*",
+  "*://*.thatdisform.cyou/*",
+  "*://pxltag.com/*",
+  "*://*.pxltag.com/*",
+  "*://runative-syndicate.com/*",
+  "*://*.runative-syndicate.com/*",
+  "*://saidairakas.com/*",
+  "*://*.saidairakas.com/*",
+  "*://coiffesreal.qpon/*",
+  "*://*.coiffesreal.qpon/*",
+  "*://solarcyclonesky.com/*",
+  "*://*.solarcyclonesky.com/*",
+  "*://bawrelcuttail.com/*",
+  "*://*.bawrelcuttail.com/*",
+  "*://tabaxirethnize.cyou/*",
+  "*://*.tabaxirethnize.cyou/*",
+  "*://thyriswh.cyou/*",
+  "*://*.thyriswh.cyou/*",
+  "*://ukankingwithea.com/*",
+  "*://*.ukankingwithea.com/*",
+  "*://uuidksinc.net/*",
+  "*://*.uuidksinc.net/*",
+  "*://blockadsnot.com/*",
+  "*://*.blockadsnot.com/*",
+  "*://canseealltheugline.org/*",
+  "*://*.canseealltheugline.org/*",
+  "*://eifitcannotke.org/*",
+  "*://*.eifitcannotke.org/*",
+  "*://embercascademaple.com/*",
+  "*://*.embercascademaple.com/*",
+  "*://bancadeltempoidea.org/*",
+  "*://*.bancadeltempoidea.org/*",
+  "*://1158060716.rsc.cdn77.org/*",
+  "*://facebook.com/*",
+  "*://tryedesign.com/*",
+  "*://*.tryedesign.com/*",
+  "*://ahacdn.me/*",
+  "*://*.ahacdn.me/*",
+  "*://autorepairworcester.com/*",
 ];
 
 // -- Module-level state --------------------------------------------------------
@@ -494,8 +563,7 @@ ipcMain.handle("open-pip-window", (_, { url, title, userAgent }) => {
       pipWindow.webContents.setUserAgent(app.userAgentFallback);
     }
     pipUaCustom = !!loadOpts.userAgent;
-    pipUaCustom = !!loadOpts.userAgent;
-  pipWindow.loadURL(url, loadOpts);
+    pipWindow.loadURL(url, loadOpts);
     pipWindow.focus();
     return { ok: true };
   }
@@ -529,6 +597,7 @@ ipcMain.handle("open-pip-window", (_, { url, title, userAgent }) => {
     wc.setWindowOpenHandler(() => ({ action: "deny" }));
   });
 
+  pipUaCustom = !!loadOpts.userAgent;
   pipWindow.loadURL(url, loadOpts);
 
   // Push maximize state into the popout renderer so the title bar icon updates
