@@ -265,9 +265,9 @@ export const PLAYER_SOURCES = [
     colorParam: null,
     langParam: null,
     params: {},
-    movieUrl: (id) => `https://frembed.bar/embed/movie/${id}`,
+    movieUrl: (id) => `https://frembed.uno/embed/movie/${id}`,
     tvUrl: (id, season, ep) =>
-      `https://frembed.bar/embed/serie/${id}?sa=${season}&epi=${ep}`,
+      `https://frembed.uno/embed/serie/${id}?sa=${season}&epi=${ep}`,
   },
   {
     id: "kinohub",

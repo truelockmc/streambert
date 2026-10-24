@@ -70,7 +70,7 @@ const SITE_RULES = [
     css: hideCss(".popup-selector", "#overlay-id"),
   },
   {
-    hosts: ["frembed.bar"],
+    hosts: ["frembed.uno"],
     css: hideCss(".popup-selector"),
   },
 ];
