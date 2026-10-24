@@ -236,6 +236,52 @@ ipcMain.on("get-clean-user-agent", (event) => {
   event.returnValue = buildCleanUserAgent();
 });
 
+// -- Popup handling ------------------------------------------------------------
+// Webview/pop-out popups are denied. Some players (e.g. Vidrift) test
+// window.open() on the first click and show "Remove sandboxing to enable
+// playback" when it returns null. For those hosts, hand out a real but
+// hidden, stopped window instead (window.open succeeds, nothing is shown).
+// Add a host here if another player shows the same message.
+const POPUP_STUB_HOSTS = ["vidrift.net", "vidrift.in"];
+
+function urlMatchesHosts(url, hosts) {
+  try {
+    const host = new URL(url).hostname;
+    return hosts.some((h) => host === h || host.endsWith("." + h));
+  } catch {
+    return false;
+  }
+}
+
+function installPopupHandler(wc) {
+  wc.setWindowOpenHandler(() => {
+    if (!urlMatchesHosts(wc.getURL(), POPUP_STUB_HOSTS)) {
+      return { action: "deny" };
+    }
+    return {
+      action: "allow",
+      overrideBrowserWindowOptions: {
+        show: false,
+        width: 1,
+        height: 1,
+        skipTaskbar: true,
+        webPreferences: { backgroundThrottling: true },
+      },
+    };
+  });
+  wc.on("did-create-window", (win) => {
+    try {
+      win.webContents.setAudioMuted(true);
+      // Don't load the popup target; keep the window object alive briefly so
+      // `popup.closed` stays false for the opener's check.
+      win.webContents.stop();
+      setTimeout(() => {
+        if (!win.isDestroyed()) win.destroy();
+      }, 5000);
+    } catch {}
+  });
+}
+
 // Sets the YouTube consent cookie (suppresses the consent gate) in a session.
 function setYoutubeConsentCookies(sess) {
   const ytCookie = {
@@ -418,7 +464,7 @@ function createWindow() {
       }
     } catch {}
 
-    wc.setWindowOpenHandler(() => ({ action: "deny" }));
+    installPopupHandler(wc);
     wc.on("enter-html-full-screen", () =>
       mainWindow.webContents.send("webview-enter-fullscreen"),
     );
@@ -589,7 +635,7 @@ ipcMain.handle("open-pip-window", (_, { url, title, userAgent }) => {
   });
 
   // Block all popup windows from the streaming site and any nested frames
-  pipWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  installPopupHandler(pipWindow.webContents);
   siteTweaks.attach(pipWindow.webContents);
 
   // If the site uses <webview> elements (unlikely but safe), block there too
