@@ -33,6 +33,8 @@ import {
   ANIME_DEFAULT_SOURCE,
   NON_ANIME_DEFAULT_SOURCE,
   NEEDS_INTERCEPT,
+  CLEAN_USER_AGENT,
+  sourceUsesCleanUa,
   getNextNonAsyncSource,
 } from "../utils/api";
 import {
@@ -1588,7 +1590,8 @@ export default function TVPage({
         wv.executeJavaScript(GAMEPAD_CLEANUP_JS);
       } catch {}
     };
-  }, [playing, gamepadEnabled]);
+    // playerSource: the webview is remounted when the UA mode changes
+  }, [playing, gamepadEnabled, playerSource]);
 
   const playEpisode = useCallback(
     (ep) => {
@@ -2162,6 +2165,16 @@ export default function TVPage({
                 )}
                 <webview
                   ref={webviewRef}
+                  // A fresh guest per UA mode: loadURL's userAgent override sticks
+                  // to the WebContents, so it can't be unset on a reused webview.
+                  key={
+                    sourceUsesCleanUa(playerSource) ? "ua-clean" : "ua-default"
+                  }
+                  useragent={
+                    sourceUsesCleanUa(playerSource)
+                      ? CLEAN_USER_AGENT
+                      : undefined
+                  }
                   src={
                     pipOpen
                       ? "about:blank"
@@ -2257,6 +2270,9 @@ export default function TVPage({
                       window.electron?.openPipWindow?.(
                         url,
                         item.name ?? item.title,
+                        sourceUsesCleanUa(playerSource)
+                          ? CLEAN_USER_AGENT
+                          : null,
                       );
                     }}
                     title={pipOpen ? "Close pop-out" : "Pop out player"}

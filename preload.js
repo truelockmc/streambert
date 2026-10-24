@@ -1,6 +1,9 @@
 const { contextBridge, ipcRenderer, webFrame } = require("electron");
 
 contextBridge.exposeInMainWorld("electron", {
+  // Cleaned Chromium UA (no Electron/app tokens)
+  cleanUserAgent: ipcRenderer.sendSync("get-clean-user-agent"),
+
   // m3u8 capture
   onM3u8Found: (cb) => {
     const h = (_, url) => cb(url);
@@ -134,8 +137,8 @@ contextBridge.exposeInMainWorld("electron", {
   secureSet: (key, value) =>
     ipcRenderer.invoke("secure-store-set", { key, value }),
   // Picture-in-Picture pop-out (full player UI, only one stream active at a time)
-  openPipWindow: (url, title) =>
-    ipcRenderer.invoke("open-pip-window", { url, title }),
+  openPipWindow: (url, title, userAgent = null) =>
+    ipcRenderer.invoke("open-pip-window", { url, title, userAgent }),
   closePipWindow: () => ipcRenderer.invoke("close-pip-window"),
   getPipWebContentsId: () => ipcRenderer.invoke("get-pip-webcontents-id"),
   onPipOpened: (cb) => {

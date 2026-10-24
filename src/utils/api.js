@@ -129,6 +129,9 @@ export const tmdbFetch = async (path, apiKey) => {
 
 // ── Player Sources ────────────────────────────────────────────────────────────
 // supportsProgress: true = executeJavaScript tracking works for this source
+// cleanUserAgent:   true = load this source with the cleaned Chromium UA
+//                   (default Electron UA minus the "Electron/x.y.z" and app
+//                   tokens). Omit/false = Electron's untouched default UA.
 //
 export const PLAYER_SOURCES = [
   {
@@ -171,6 +174,7 @@ export const PLAYER_SOURCES = [
     tag: null,
     note: null,
     supportsProgress: true,
+    cleanUserAgent: true,
     colorParam: "theme", // hex without # → e.g. "e50914"
     langParam: "sub",
     params: {
@@ -356,6 +360,15 @@ export const getSourceUrl = (
 
   return url.toString();
 };
+
+// ── Per-source user agent ─────────────────────────────────────────────────────
+// Provided by the main process (buildCleanUserAgent() in index.js) via preload.
+export const CLEAN_USER_AGENT =
+  (typeof window !== "undefined" && window.electron?.cleanUserAgent) || "";
+
+// Source should be loaded with the cleaned Chromium UA
+export const sourceUsesCleanUa = (sourceId) =>
+  PLAYER_SOURCES.find((s) => s.id === sourceId)?.cleanUserAgent ?? false;
 
 export const sourceNeedsImdb = (sourceId) =>
   PLAYER_SOURCES.find((s) => s.id === sourceId)?.idType === "imdb";

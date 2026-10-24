@@ -161,6 +161,12 @@ function buildCleanUserAgent() {
     .trim();
 }
 
+// Single source of truth for the cleaned UA; the renderer reads it synchronously
+// via preload (window.electron.cleanUserAgent) for per-source player UAs.
+ipcMain.on("get-clean-user-agent", (event) => {
+  event.returnValue = buildCleanUserAgent();
+});
+
 // Sets the YouTube consent cookie (suppresses the consent gate) in a session.
 function setYoutubeConsentCookies(sess) {
   const ytCookie = {
@@ -461,9 +467,10 @@ ipcMain.handle(
 // Opens the player URL in a small always-on-top BrowserWindow (full site UI,
 // with subtitles and controls). The Main Window closes the stream to avoid duplication.
 let pipWindow = null;
+let pipUaCustom = false;
 const getPipWindow = () => pipWindow;
 
-ipcMain.handle("open-pip-window", (_, { url, title }) => {
+ipcMain.handle("open-pip-window", (_, { url, title, userAgent }) => {
   if (!url || url === "about:blank") return { ok: false, reason: "no-url" };
 
   // Guarantee tracker/ad blocking is active in persist:player before any load
@@ -474,8 +481,21 @@ ipcMain.handle("open-pip-window", (_, { url, title }) => {
     setupSession(playerSession, trailerSession);
   }
 
+  // Per-source UA (null = Electron default). loadURL's userAgent sticks to the
+  // WebContents, so always pass the explicit value when reusing the window.
+  const loadOpts = {};
+  if (typeof userAgent === "string" && userAgent) {
+    loadOpts.userAgent = userAgent;
+  }
+
   if (pipWindow && !pipWindow.isDestroyed()) {
-    pipWindow.loadURL(url);
+    // Drop a previously applied custom UA when the new source uses the default
+    if (pipUaCustom && !loadOpts.userAgent) {
+      pipWindow.webContents.setUserAgent(app.userAgentFallback);
+    }
+    pipUaCustom = !!loadOpts.userAgent;
+    pipUaCustom = !!loadOpts.userAgent;
+  pipWindow.loadURL(url, loadOpts);
     pipWindow.focus();
     return { ok: true };
   }
@@ -509,7 +529,7 @@ ipcMain.handle("open-pip-window", (_, { url, title }) => {
     wc.setWindowOpenHandler(() => ({ action: "deny" }));
   });
 
-  pipWindow.loadURL(url);
+  pipWindow.loadURL(url, loadOpts);
 
   // Push maximize state into the popout renderer so the title bar icon updates
   pipWindow.on("maximize", () => {

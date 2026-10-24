@@ -25,6 +25,8 @@ import {
   ANIME_DEFAULT_SOURCE,
   NON_ANIME_DEFAULT_SOURCE,
   NEEDS_INTERCEPT,
+  CLEAN_USER_AGENT,
+  sourceUsesCleanUa,
   getNextNonAsyncSource,
 } from "../utils/api";
 import {
@@ -582,7 +584,8 @@ export default function MoviePage({
         wv.executeJavaScript(GAMEPAD_CLEANUP_JS);
       } catch {}
     };
-  }, [playing, gamepadEnabled]);
+    // playerSource: the webview is remounted when the UA mode changes
+  }, [playing, gamepadEnabled, playerSource]);
 
   // Attach webview load events so we know when the new source has painted
   useEffect(() => {
@@ -1098,6 +1101,12 @@ export default function MoviePage({
             )}
             <webview
               ref={webviewRef}
+              // A fresh guest per UA mode: loadURL's userAgent override sticks
+              // to the WebContents, so it can't be unset on a reused webview.
+              key={sourceUsesCleanUa(playerSource) ? "ua-clean" : "ua-default"}
+              useragent={
+                sourceUsesCleanUa(playerSource) ? CLEAN_USER_AGENT : undefined
+              }
               src={
                 pipOpen
                   ? "about:blank"
@@ -1187,7 +1196,11 @@ export default function MoviePage({
                     : playerDirectUrl;
                   if (!url) return;
                   pipUrlRef.current = url;
-                  window.electron?.openPipWindow?.(url, item.title);
+                  window.electron?.openPipWindow?.(
+                    url,
+                    item.title,
+                    sourceUsesCleanUa(playerSource) ? CLEAN_USER_AGENT : null,
+                  );
                 }}
                 title={pipOpen ? "Close pop-out" : "Pop out player"}
                 disabled={
