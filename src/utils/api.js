@@ -724,7 +724,7 @@ export const isAnimeContent = (item, details) => {
 
 // Default sources
 export const ANIME_DEFAULT_SOURCE = "hianime";
-export const NON_ANIME_DEFAULT_SOURCE = "vidsrc";
+export const NON_ANIME_DEFAULT_SOURCE = "vidrift";
 
 // ── Episode Group fetch (localStorage + in-memory cache, 7-day TTL) ─────────
 // Episode groups almost never change -> cache aggressively across sessions.
