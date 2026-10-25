@@ -319,6 +319,13 @@ function setupSession(playerSession, trailerSession) {
   // used the modified UA and failed with error 600010.
   // playerSession.setUserAgent(UA); <--- removed on purpose
 
+  // No browser downloads from player/trailer pages (also covers the pop-out,
+  // which uses the player partition). Video/subtitle downloads go exclusively
+  // through the app's own download manager, never through the webview.
+  const blockDownloads = (event) => event.preventDefault();
+  playerSession.on("will-download", blockDownloads);
+  trailerSession.on("will-download", blockDownloads);
+
   playerSession.webRequest.onHeadersReceived(
     { urls: ["*://*/*"] },
     stripHeaders,
