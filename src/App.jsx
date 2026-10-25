@@ -38,6 +38,7 @@ import { useGamepadNav } from "./utils/useGamepadNav";
 const HomePage = lazy(() => import("./pages/HomePage"));
 const MoviePage = lazy(() => import("./pages/MoviePage"));
 const TVPage = lazy(() => import("./pages/TVPage"));
+const GenresPage = lazy(() => import("./pages/GenresPage"));
 const LibraryPage = lazy(() => import("./pages/LibraryPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const DownloadsPage = lazy(() => import("./pages/DownloadsPage"));
@@ -1113,6 +1114,16 @@ export default function App() {
                 downloads={downloads}
                 onGoToDownloads={handleGoToDownloads}
                 onEpisodeChange={setWatchingEpisode}
+              />
+            )}
+            {page === "genres" && (
+              <GenresPage
+                apiKey={apiKey}
+                offline={offline}
+                onSelect={handleSelectResult}
+                watched={watched}
+                onMarkWatched={markWatched}
+                onMarkUnwatched={markUnwatched}
               />
             )}
             {page === "history" && (

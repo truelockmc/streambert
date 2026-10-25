@@ -18,6 +18,7 @@ const MediaCard = memo(function MediaCard({
   onMarkUnwatched,
   ageRating,
   restricted,
+  overview,
 }) {
   const title = item.title || item.name;
   const year = (item.release_date || item.first_air_date || "").slice(0, 4);
@@ -123,6 +124,7 @@ const MediaCard = memo(function MediaCard({
                 <PlayIcon />
               </div>
             )}
+            {overview && <div className="card-overview">{overview}</div>}
           </div>
           {!isUnreleased && progress > 0 && !isWatched && (
             <div className="card-progress">
