@@ -2232,6 +2232,18 @@ kbd {
     border-radius: 4px;
 }
 
+/* Controller navigation focus ring — added/removed by gamepadSpatialNav.js */
+.gamepad-focused {
+    outline: 3px solid var(--accent, #e50914) !important;
+    outline-offset: 3px;
+    border-radius: var(--radius, 6px);
+    transition: outline-offset 0.12s ease;
+}
+.card.gamepad-focused {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: var(--red-glow);
+}
+
 .saved-thumb[draggable="true"]:active {
     cursor: grabbing;
 }
@@ -2276,7 +2288,19 @@ kbd {
     overflow: hidden;
     text-overflow: ellipsis;
 }
-
+.trailer-openbrowser-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
 .trailer-close-btn {
     background: none;
     border: none;
@@ -2640,7 +2664,7 @@ kbd {
     align-items: center;
     justify-content: center;
     gap: 4px;
-    font-size: 18px;
+    font-size: 12px;
     border-radius: inherit;
 }
 

@@ -13,22 +13,24 @@ const {
 const path = require("path");
 
 // -- RAM / performance flags ---------------------------------------------------
-app.commandLine.appendSwitch(
-  "js-flags",
-  "--max-old-space-size=256 --expose-gc",
-);
-app.commandLine.appendSwitch(
-  "disable-features",
-  "HardwareMediaKeyHandling,MediaSessionService,UseSandboxedXdgPortal",
-);
-// Run the network stack in the browser process → one less utility process
-app.commandLine.appendSwitch("enable-features", "NetworkServiceInProcess2");
-// NOTE: enable-low-end-device-mode removed, it cuts the GPU texture tile budget
-// and causes visible seams/stripes/dots on large images.
-
-// Cap disk cache and limit renderer processes (prevents RAM growth on multi-page navigation)
-app.commandLine.appendSwitch("disk-cache-size", String(80 * 1024 * 1024));
-app.commandLine.appendSwitch("renderer-process-limit", "3");
+// Low-RAM mode is ON by default. Disable it with STREAMBERT_LOW_RAM=0.
+if (process.env.STREAMBERT_LOW_RAM === undefined) {
+  process.env.STREAMBERT_LOW_RAM = "1";
+}
+if (process.env.STREAMBERT_LOW_RAM === "1") {
+  app.commandLine.appendSwitch(
+    "js-flags",
+    "--max-old-space-size=256 --expose-gc",
+  );
+  console.log("STREAMBERT_LOW_RAM mode on");
+  // Run the network stack in the browser process → one less utility process
+  app.commandLine.appendSwitch("enable-features", "NetworkServiceInProcess2");
+  // Cap disk cache and limit renderer processes
+  app.commandLine.appendSwitch("disk-cache-size", String(80 * 1024 * 1024));
+  app.commandLine.appendSwitch("renderer-process-limit", "3");
+} else {
+  console.log("STREAMBERT_LOW_RAM mode off");
+}
 
 // -- Startup benchmark ---------------------------------------------------------
 const _t0 = Date.now();
@@ -37,10 +39,11 @@ const _bench = (label) =>
 
 // -- Sub-modules ---------------------------------------------------------------
 const blockStats = require("./src/ipc/blockStats");
+const siteTweaks = require("./src/ipc/siteTweaks");
 const storageIpc = require("./src/ipc/storage");
 const downloadsIpc = require("./src/ipc/downloads");
 const subtitlesIpc = require("./src/ipc/subtitles");
-const allmangaIpc = require("./src/ipc/allmanga");
+const hianimeIpc = require("./src/ipc/hianime");
 const playerIpc = require("./src/ipc/player");
 const discordRpc = require("./src/ipc/discordRpc");
 
@@ -69,7 +72,6 @@ const BLOCKED_HOSTS = [
   "*://mc.yandex.ru/*",
   "*://bvtpk.com/*",
   "*://my.rtmark.net/*",
-  "*://bvtpk.com/*",
   "*://b7510.com/*",
   "*://gt.unbrownunflat.com/*",
   "*://im.malocacomals.com/*",
@@ -83,7 +85,8 @@ const BLOCKED_HOSTS = [
   "*://protrafficinspector.com/*",
   "*://s10.histats.com/*",
   "*://weirdopt.com/*",
-  "*://static.cloudflareinsights.com/*",
+  "*://cloudflareinsights.com/*",
+  "*://*.cloudflareinsights.com/*",
   "*://kettledroopingcontinuation.com/*",
   "*://wayfarerorthodox.com/*",
   "*://woxaglasuy.net/*",
@@ -97,6 +100,182 @@ const BLOCKED_HOSTS = [
   "*://rzjzjnavztycv.online/*",
   "*://tmstr4.cloudnestra.com/*",
   "*://tmstr4.neonhorizonworkshops.com/*",
+  "*://hameltnoummos.com/*",
+  "*://ancillammmm.com/*",
+  "*://*.ancillammmm.com/*",
+  "*://hubeamily.com/*",
+  "*://*.hubeamily.com/*",
+  "*://llvpn.com/*",
+  "*://americanacademyofthermology.org/*",
+  "*://d2pf0ys5xus6n.cloudfront.net/*",
+  "*://gillyspencie.com/*",
+  "*://soakysecrets.com/*",
+  "*://*.soakysecrets.com/*",
+  "*://mdstats.info/*",
+  "*://ads-twitter.com/*",
+  "*://*.ads-twitter.com/*",
+  "*://connatix.com/*",
+  "*://*.connatix.com/*",
+  "*://imasdk.googleapis.com/*",
+  "*://jwpltx.com/*",
+  "*://*.jwpltx.com/*",
+  "*://improving.duckduckgo.com/*",
+  "*://openfpcdn.io/*",
+  "*://phruk.org/*",
+  "*://welcomingexpulsion.com/*",
+  "*://pgo99.com/*",
+  "*://todditehexarch.com/*",
+  "*://*.todditehexarch.com/*",
+  "*://uniolaicecaps.com/*",
+  "*://*.uniolaicecaps.com/*",
+  "*://alloha.tv/*",
+  "*://*.alloha.tv/*",
+  "*://pc.alloviewroll.com/*",
+  "*://yadro.ru/*",
+  "*://*.yadro.ru/*",
+  "*://getaim.org/*",
+  "*://*.getaim.org/*",
+  "*://myangular.life/*",
+  "*://*.myangular.life/*",
+  "*://rstprgapipt.com/*",
+  "*://*.rstprgapipt.com/*",
+  "*://veselchaga.link/*",
+  "*://webvisor.org/*",
+  "*://*.webvisor.org/*",
+  "*://datariaarpent.com/*",
+  "*://*.datariaarpent.com/*",
+  "*://gamesrevenue.com/*",
+  "*://*.gamesrevenue.com/*",
+  "*://73ed366d3137ec936bd60b1184467776.com/*",
+  "*://shankedunwindy.cyou/*",
+  "*://*.shankedunwindy.cyou/*",
+  "*://908df012d9bb72e6d26b41054588d758.com/*",
+  "*://asemquips.cfd/*",
+  "*://*.asemquips.cfd/*",
+  "*://epicgameshubham.com/*",
+  "*://tantrajoni.cfd/*",
+  "*://thatdisform.cyou/*",
+  "*://vdrk.site/*",
+  "*://*.vdrk.site/*",
+  "*://*.adsco.re/*",
+  "*://aarems.org/*",
+  "*://*.aarems.org/*",
+  "*://aerionvel.com/*",
+  "*://*.aerionvel.com/*",
+  "*://cdn4ads.com/*",
+  "*://*.cdn4ads.com/*",
+  "*://directyp.org/*",
+  "*://*.directyp.org/*",
+  "*://fakerstoterframing.qpon/*",
+  "*://*.fakerstoterframing.qpon/*",
+  "*://karthliunstagy.com/*",
+  "*://*.karthliunstagy.com/*",
+  "*://nresystems.com/*",
+  "*://*.nresystems.com/*",
+  "*://sainwertapr.com/*",
+  "*://*.sainwertapr.com/*",
+  "*://*.tantrajoni.cfd/*",
+  "*://*.thatdisform.cyou/*",
+  "*://pxltag.com/*",
+  "*://*.pxltag.com/*",
+  "*://runative-syndicate.com/*",
+  "*://*.runative-syndicate.com/*",
+  "*://saidairakas.com/*",
+  "*://*.saidairakas.com/*",
+  "*://coiffesreal.qpon/*",
+  "*://*.coiffesreal.qpon/*",
+  "*://solarcyclonesky.com/*",
+  "*://*.solarcyclonesky.com/*",
+  "*://bawrelcuttail.com/*",
+  "*://*.bawrelcuttail.com/*",
+  "*://tabaxirethnize.cyou/*",
+  "*://*.tabaxirethnize.cyou/*",
+  "*://thyriswh.cyou/*",
+  "*://*.thyriswh.cyou/*",
+  "*://ukankingwithea.com/*",
+  "*://*.ukankingwithea.com/*",
+  "*://uuidksinc.net/*",
+  "*://*.uuidksinc.net/*",
+  "*://blockadsnot.com/*",
+  "*://*.blockadsnot.com/*",
+  "*://canseealltheugline.org/*",
+  "*://*.canseealltheugline.org/*",
+  "*://eifitcannotke.org/*",
+  "*://*.eifitcannotke.org/*",
+  "*://embercascademaple.com/*",
+  "*://*.embercascademaple.com/*",
+  "*://bancadeltempoidea.org/*",
+  "*://*.bancadeltempoidea.org/*",
+  "*://1158060716.rsc.cdn77.org/*",
+  "*://facebook.com/*",
+  "*://tryedesign.com/*",
+  "*://*.tryedesign.com/*",
+  "*://ahacdn.me/*",
+  "*://*.ahacdn.me/*",
+  "*://autorepairworcester.com/*",
+  "*://aelwynvel.com/*",
+  "*://*.aelwynvel.com/*",
+  "*://cometslourdy.cfd/*",
+  "*://*.cometslourdy.cfd/*",
+  "*://pusleybrand.cyou/*",
+  "*://*.pusleybrand.cyou/*",
+  "*://luugy.com/*",
+  "*://*.luugy.com/*",
+  "*://nimbusgrovelodge.com/*",
+  "*://*.nimbusgrovelodge.com/*",
+  "*://brushetenglandagacant.qpon/*",
+  "*://*.brushetenglandagacant.qpon/*",
+  "*://hyaloidsatury.com/*",
+  "*://*.hyaloidsatury.com/*",
+  "*://*.google-analytics.com/*",
+  "*://stummelbeelbow.com/*",
+  "*://*.stummelbeelbow.com/*",
+  "*://mgid.com/*",
+  "*://*.mgid.com/*",
+  "*://deedwaifpleas.org/*",
+  "*://*.deedwaifpleas.org/*",
+  "*://pushaffiliate.net/*",
+  "*://*.pushaffiliate.net/*",
+  "*://imp-mintads.site/*",
+  "*://*.imp-mintads.site/*",
+  "*://oceanicdreamcove.com/*",
+  "*://*.oceanicdreamcove.com/*",
+  "*://xadsmart.com/*",
+  "*://*.xadsmart.com/*",
+  "*://srvqk3.com/*",
+  "*://*.srvqk3.com/*",
+  "*://1376341044.rsc.cdn77.org/*",
+  "*://adright.xml-v4.ak-is2.net/*",
+  "*://csp-reporting.cloudflare.com/*",
+  "*://*.facebook.com/*",
+  "*://cysyjucymudity.com/*",
+  "*://*.cysyjucymudity.com/*",
+  "*://pncloudfl.com/*",
+  "*://*.pncloudfl.com/*",
+  "*://cruzswim.org/*",
+  "*://*.cruzswim.org/*",
+  "*://darnobedienceupscale.com/*",
+  "*://*.darnobedienceupscale.com/*",
+  "*://derricknationtop.com/*",
+  "*://*.derricknationtop.com/*",
+  "*://e89d45b16370ee7e43daeaf6ce8d9547.com/*",
+  "*://*.e89d45b16370ee7e43daeaf6ce8d9547.com/*",
+  "*://tsyndicate.com/*",
+  "*://*.tsyndicate.com/*",
+  "*://rapidadexchange.com/*",
+  "*://*.rapidadexchange.com/*",
+  "*://cepesbritons.qpon/*",
+  "*://*.cepesbritons.qpon/*",
+  "*://sarplerlacunes.qpon/*",
+  "*://*.sarplerlacunes.qpon/*",
+  "*://usrpubtrck.com/*",
+  "*://*.usrpubtrck.com/*",
+  "*://ixiondartman.com/*",
+  "*://*.ixiondartman.com/*",
+  "*://varnishtala.cyou/*",
+  "*://*.varnishtala.cyou/*",
+  "*://1037973644.rsc.cdn77.org/*",
+  "*://cdn.pncloudfl.com.cdn.cloudflare.net/*",
 ];
 
 // -- Module-level state --------------------------------------------------------
@@ -105,6 +284,83 @@ const getMainWindow = () => mainWindow;
 
 const playerWcIds = new Set();
 let sessionsConfigured = false;
+
+// Returns the default Chromium user agent without Electron/app identifiers.
+function buildCleanUserAgent() {
+  return app.userAgentFallback
+    .replace(/\s?Electron\/\S+/i, "")
+    .replace(/\s?streambert\/\S+/i, "")
+    .trim();
+}
+
+// Single source of truth for the cleaned UA; the renderer reads it synchronously
+// via preload (window.electron.cleanUserAgent) for per-source player UAs.
+ipcMain.on("get-clean-user-agent", (event) => {
+  event.returnValue = buildCleanUserAgent();
+});
+
+// -- Popup handling ------------------------------------------------------------
+// Webview/pop-out popups are denied. Some players (e.g. Vidrift) test
+// window.open() on the first click and show "Remove sandboxing to enable
+// playback" when it returns null. For those hosts, hand out a real but
+// hidden, stopped window instead (window.open succeeds, nothing is shown).
+// Add a host here if another player shows the same message.
+const POPUP_STUB_HOSTS = ["vidrift.net", "vidrift.in"];
+
+function urlMatchesHosts(url, hosts) {
+  try {
+    const host = new URL(url).hostname;
+    return hosts.some((h) => host === h || host.endsWith("." + h));
+  } catch {
+    return false;
+  }
+}
+
+function installPopupHandler(wc) {
+  wc.setWindowOpenHandler(() => {
+    if (!urlMatchesHosts(wc.getURL(), POPUP_STUB_HOSTS)) {
+      return { action: "deny" };
+    }
+    return {
+      action: "allow",
+      overrideBrowserWindowOptions: {
+        show: false,
+        width: 1,
+        height: 1,
+        skipTaskbar: true,
+        webPreferences: { backgroundThrottling: true },
+      },
+    };
+  });
+  wc.on("did-create-window", (win) => {
+    try {
+      win.webContents.setAudioMuted(true);
+      // Don't load the popup target; keep the window object alive briefly so
+      // `popup.closed` stays false for the opener's check.
+      win.webContents.stop();
+      setTimeout(() => {
+        if (!win.isDestroyed()) win.destroy();
+      }, 5000);
+    } catch {}
+  });
+}
+
+// Sets the YouTube consent cookie (suppresses the consent gate) in a session.
+function setYoutubeConsentCookies(sess) {
+  const ytCookie = {
+    url: "https://www.youtube.com",
+    name: "SOCS",
+    value: "CAI",
+    path: "/",
+    secure: true,
+    httpOnly: false,
+    sameSite: "no_restriction",
+    expirationDate: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365 * 2,
+  };
+  for (const domain of [".youtube.com", ".youtube-nocookie.com"]) {
+    sess.cookies.set({ ...ytCookie, domain }).catch(() => {});
+  }
+}
 
 function setupSession(playerSession, trailerSession) {
   const stripHeaders = (details, callback) => {
@@ -117,10 +373,21 @@ function setupSession(playerSession, trailerSession) {
     callback({ responseHeaders: headers });
   };
 
-  const UA =
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-  playerSession.setUserAgent(UA);
-  trailerSession.setUserAgent(UA);
+  // Use the REAL Chromium UA of this Electron build, only without the
+  // "Electron/x.y.z" and app-name tokens.
+  const UA = buildCleanUserAgent();
+  // The player session keeps Electron's untouched default UA: setUserAgent() is
+  // applied only after the first <webview> already started loading, so the first
+  // player used the default UA and passed cloudflare Turnstile, while every later player
+  // used the modified UA and failed with error 600010.
+  // playerSession.setUserAgent(UA); <--- removed on purpose
+
+  // No browser downloads from player/trailer pages (also covers the pop-out,
+  // which uses the player partition). Video/subtitle downloads go exclusively
+  // through the app's own download manager, never through the webview.
+  const blockDownloads = (event) => event.preventDefault();
+  playerSession.on("will-download", blockDownloads);
+  trailerSession.on("will-download", blockDownloads);
 
   playerSession.webRequest.onHeadersReceived(
     { urls: ["*://*/*"] },
@@ -185,22 +452,8 @@ function setupSession(playerSession, trailerSession) {
     },
   );
 
-  // YouTube consent cookie → suppress consent gate in both sessions
-  const ytCookie = {
-    url: "https://www.youtube.com",
-    name: "SOCS",
-    value: "CAI",
-    path: "/",
-    secure: true,
-    httpOnly: false,
-    sameSite: "no_restriction",
-    expirationDate: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365 * 2,
-  };
-  for (const domain of [".youtube.com", ".youtube-nocookie.com"]) {
-    const cookie = { ...ytCookie, domain };
-    trailerSession.cookies.set(cookie).catch(() => {});
-    playerSession.cookies.set(cookie).catch(() => {});
-  }
+  // YouTube consent cookie → suppress consent gate (trailer session only)
+  setYoutubeConsentCookies(trailerSession);
 }
 
 function createWindow() {
@@ -228,7 +481,10 @@ function createWindow() {
       backgroundThrottling: true,
       spellcheck: false,
       // Caps the renderer's V8 heap + exposes gc() for manual GC hints after navigation
-      additionalArguments: ["--js-flags=--max-old-space-size=256 --expose-gc"],
+      additionalArguments:
+        process.env.STREAMBERT_LOW_RAM === "1"
+          ? ["--js-flags=--max-old-space-size=256 --expose-gc"]
+          : [],
     },
   });
 
@@ -248,6 +504,17 @@ function createWindow() {
   // Player/trailer sessions are configured on the first webview attach or
   // when the pop-out window opens, whichever comes first.
 
+  // Configure the player/trailer sessions BEFORE the guest is created, so the
+  // very first player load already has ad blocking + document-start guards.
+  mainWindow.webContents.on("will-attach-webview", () => {
+    if (sessionsConfigured) return;
+    sessionsConfigured = true;
+    setupSession(
+      session.fromPartition("persist:player"),
+      session.fromPartition("persist:trailer"),
+    );
+  });
+
   // Block popups from webviews, intercept fullscreen, lazy-init sessions
   mainWindow.webContents.on("did-attach-webview", (_, wc) => {
     if (!sessionsConfigured) {
@@ -262,10 +529,12 @@ function createWindow() {
       if (wc.session === session.fromPartition("persist:player")) {
         playerWcIds.add(wc.id);
         wc.once("destroyed", () => playerWcIds.delete(wc.id));
+        // Per-site CSS (e.g. show only the player on KinoHub)
+        siteTweaks.attach(wc);
       }
     } catch {}
 
-    wc.setWindowOpenHandler(() => ({ action: "deny" }));
+    installPopupHandler(wc);
     wc.on("enter-html-full-screen", () =>
       mainWindow.webContents.send("webview-enter-fullscreen"),
     );
@@ -319,7 +588,7 @@ subtitlesIpc.register({
   getDownloads: downloadsIpc.getDownloads,
   saveDownloads: downloadsIpc.saveDownloads,
 });
-allmangaIpc.register();
+hianimeIpc.register();
 playerIpc.register(getMainWindow, {
   writeSecretMigration: storageIpc.writeSecretMigration,
 });
@@ -331,9 +600,12 @@ ipcMain.handle("get-block-stats", () => blockStats.getBlockStats());
 
 // -- Player memory cleanup ---------------------------------------------
 // Called by MoviePage / TVPage on component unmount.
-// Destroys the player webview WebContents by tracked ID, then flushes caches and GCs.
+// Mutes the tracked player webview WebContents and triggers GC hints.
+// The <webview> teardown itself is left to Electron (no manual destroy).
 ipcMain.on("player-stopped", () => {
-  // Step 1: Mute + destroy all tracked player WebContents by ID.
+  // Step 1: Only mute the tracked player WebContents. They must NOT be destroyed
+  // manually with wc.destroy(): the <webview> element removal in the renderer
+  // already tears the guest down cleanly.
   for (const id of playerWcIds) {
     try {
       const wc = webContents.fromId(id);
@@ -341,20 +613,13 @@ ipcMain.on("player-stopped", () => {
         try {
           wc.setAudioMuted(true);
         } catch {}
-        wc.destroy();
       }
     } catch {}
   }
   playerWcIds.clear();
 
-  // Step 2: Flush HTTP + shader caches from the player session.
-  try {
-    const ps = session.fromPartition("persist:player");
-    ps.clearCache().catch(() => {});
-    ps.clearStorageData({ storages: ["shadercache", "cachestorage"] }).catch(
-      () => {},
-    );
-  } catch {}
+  // Step 2: HTTP/shader cache flushing of the player session was removed on
+  // purpose.
 
   // Step 3: GC hints
   if (typeof global.gc === "function") global.gc();
@@ -387,9 +652,10 @@ ipcMain.handle(
 // Opens the player URL in a small always-on-top BrowserWindow (full site UI,
 // with subtitles and controls). The Main Window closes the stream to avoid duplication.
 let pipWindow = null;
+let pipUaCustom = false;
 const getPipWindow = () => pipWindow;
 
-ipcMain.handle("open-pip-window", (_, { url, title }) => {
+ipcMain.handle("open-pip-window", (_, { url, title, userAgent }) => {
   if (!url || url === "about:blank") return { ok: false, reason: "no-url" };
 
   // Guarantee tracker/ad blocking is active in persist:player before any load
@@ -400,8 +666,20 @@ ipcMain.handle("open-pip-window", (_, { url, title }) => {
     setupSession(playerSession, trailerSession);
   }
 
+  // Per-source UA (null = Electron default). loadURL's userAgent sticks to the
+  // WebContents, so always pass the explicit value when reusing the window.
+  const loadOpts = {};
+  if (typeof userAgent === "string" && userAgent) {
+    loadOpts.userAgent = userAgent;
+  }
+
   if (pipWindow && !pipWindow.isDestroyed()) {
-    pipWindow.loadURL(url);
+    // Drop a previously applied custom UA when the new source uses the default
+    if (pipUaCustom && !loadOpts.userAgent) {
+      pipWindow.webContents.setUserAgent(app.userAgentFallback);
+    }
+    pipUaCustom = !!loadOpts.userAgent;
+    pipWindow.loadURL(url, loadOpts);
     pipWindow.focus();
     return { ok: true };
   }
@@ -427,14 +705,16 @@ ipcMain.handle("open-pip-window", (_, { url, title }) => {
   });
 
   // Block all popup windows from the streaming site and any nested frames
-  pipWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  installPopupHandler(pipWindow.webContents);
+  siteTweaks.attach(pipWindow.webContents);
 
   // If the site uses <webview> elements (unlikely but safe), block there too
   pipWindow.webContents.on("did-attach-webview", (_, wc) => {
     wc.setWindowOpenHandler(() => ({ action: "deny" }));
   });
 
-  pipWindow.loadURL(url);
+  pipUaCustom = !!loadOpts.userAgent;
+  pipWindow.loadURL(url, loadOpts);
 
   // Push maximize state into the popout renderer so the title bar icon updates
   pipWindow.on("maximize", () => {

@@ -18,8 +18,13 @@ import {
   PLAYER_SOURCES,
   getSourceUrl,
   sourceSupportsProgress,
+  sourceSkipsResetGuard,
   sourceProgressViaFrames,
   sourceIsAsync,
+  sourceSupportsAnime,
+  sourceIsAnimeCapable,
+  sourceIsMovieOnly,
+  getAnimeSourceUrl,
   fetchAnilistData,
   fetchEpisodeGroup,
   buildAnilistSeasons,
@@ -28,6 +33,8 @@ import {
   ANIME_DEFAULT_SOURCE,
   NON_ANIME_DEFAULT_SOURCE,
   NEEDS_INTERCEPT,
+  CLEAN_USER_AGENT,
+  sourceUsesCleanUa,
   getNextNonAsyncSource,
 } from "../utils/api";
 import {
@@ -67,6 +74,15 @@ import {
   getRatingCountry,
 } from "../utils/ageRating";
 import CastModal from "../components/CastModal";
+import {
+  GAMEPAD_PLAYER_SCRIPT,
+  GAMEPAD_EXIT_CHECK_JS,
+  GAMEPAD_EXIT_RESET_JS,
+  GAMEPAD_CLEANUP_JS,
+} from "../utils/playerGamepadScript";
+import { useSourceId } from "../utils/useSourceId";
+import { setPlayerGamepadActive } from "../utils/gamepadPlayerState";
+import HiAnimeLoader from "../components/HiAnimeLoader";
 
 // ── Partial-circle progress icon (cached per pct tier) ───────────────────────
 // Uses a single SVG arc. Three instances (25/50/75)
@@ -357,6 +373,40 @@ const INJECT_SKIP_CONTROLS = `
 })();
 `;
 
+// ── Release-date helpers ─────────────────────────────────────────────────────
+// Parses "YYYY-MM-DD" as LOCAL midnight (new Date("YYYY-MM-DD") would be UTC
+// midnight and shift the release day depending on the user's timezone).
+function parseAirDate(airDate) {
+  if (!airDate) return null;
+  const [y, m, d] = String(airDate).slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
+// Recompute on every call so the value never goes stale when the app stays
+// open past midnight.
+function startOfToday() {
+  const t = new Date();
+  t.setHours(0, 0, 0, 0);
+  return t;
+}
+
+// True only if the air date lies strictly in the future. Episodes without a
+// known air date are treated as released.
+function isUnreleased(airDate) {
+  const target = parseAirDate(airDate);
+  return !!target && target > startOfToday();
+}
+
+function getDaysUntilRelease(airDate) {
+  const target = parseAirDate(airDate);
+  if (!target) return "";
+  const days = Math.round((target - startOfToday()) / 86400000);
+  if (days <= 0) return "Releasing today";
+  if (days === 1) return "1 day left";
+  return `${days} days left`;
+}
+
 export default function TVPage({
   item,
   apiKey,
@@ -412,7 +462,7 @@ export default function TVPage({
     [playerSource],
   );
   const [dubMode, setDubMode] = useState(
-    () => storage.get(STORAGE_KEYS.ALLMANGA_DUB_MODE) || "sub",
+    () => storage.get(STORAGE_KEYS.HIANIME_DUB_MODE) || "sub",
   );
   // async URL resolution
   const [resolvedPlayerUrl, setResolvedPlayerUrl] = useState(null);
@@ -428,6 +478,14 @@ export default function TVPage({
   const [episodeGroupMap, setEpisodeGroupMap] = useState(null); // Map built from TMDB episode group
   // Webview loading overlay
   const [webviewLoading, setWebviewLoading] = useState(false);
+
+  // ID the selected source expects (TMDB id, or converted IMDb id)
+  const srcId = useSourceId(playerSource, "tv", item.id, apiKey);
+  // Re-show the loading overlay once a resolved IMDb id swaps in the real URL
+  useEffect(() => {
+    if (srcId.id && playing) setWebviewLoading(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [srcId.id]);
   const [playerFullscreen, setPlayerFullscreen] = useState(false);
   const [pipOpen, setPipOpen] = useState(false);
   const pipUrlRef = useRef(null);
@@ -693,11 +751,12 @@ export default function TVPage({
           if (mounted) setAnilistLoading(false);
         });
       // Switch to anime source if current source is not an anime source
-      const currentSrc = PLAYER_SOURCES.find((s) => s.id === playerSource);
-      if (!currentSrc?.tag) {
+      // (anime-only tagged sources and anime-capable ones like Vidnest are fine)
+      if (!sourceIsAnimeCapable(playerSource)) {
         const saved = storage.get("playerSource");
-        const savedSrc = PLAYER_SOURCES.find((s) => s.id === saved);
-        setPlayerSource(savedSrc?.tag ? saved : ANIME_DEFAULT_SOURCE);
+        setPlayerSource(
+          sourceIsAnimeCapable(saved) ? saved : ANIME_DEFAULT_SOURCE,
+        );
       }
     } else {
       setAnilistLoading(false);
@@ -714,13 +773,21 @@ export default function TVPage({
     };
   }, [item.id, isAnime]);
 
-  // Resolve allmanga episode URL via main-process IPC (GraphQL, no CORS)
+  // Movie-only sources (e.g. KinoHub) can't play series -> fall back to the
+  // default source for this page (the saved choice is kept for the movie page)
+  useEffect(() => {
+    if (sourceIsMovieOnly(playerSource)) {
+      setPlayerSource(NON_ANIME_DEFAULT_SOURCE);
+    }
+  }, [playerSource]);
+
+  // Resolve HiAnime episode URL via main-process IPC (scraping, no CORS)
   useEffect(() => {
     if (!playing || !selectedEp) return;
     const epNum = selectedEp.episode_number;
     const epKey = `tv_${item.id}_s${selectedSeason}_e${epNum}_${dubMode}`;
 
-    // Auto-failover: if a previous attempt taught us AllManga doesn't have
+    // Auto-failover: if a previous attempt taught us HiAnime doesn't have
     // this episode, skip straight to the cached fallback source.
     if (isAsync) {
       const cached = getFailoverSource(epKey);
@@ -747,7 +814,7 @@ export default function TVPage({
     const startTime = storage.get("dlTime_" + progressKey) || 0;
     let mounted = true;
     window.electron
-      .resolveAllManga({
+      .resolveHiAnime({
         title,
         seasonNumber: selectedSeason,
         episodeNumber: epNum,
@@ -761,7 +828,8 @@ export default function TVPage({
             window.electron
               .setPlayerVideo({
                 url: res.url,
-                referer: res.referer || "https://allmanga.to",
+                referer: res.referer || "https://hianime.at/",
+                subtitle: res.subtitle || null,
                 startTime,
               })
               .then((r) => {
@@ -779,7 +847,7 @@ export default function TVPage({
             setResolvedPlayerUrl(res.url);
           }
         } else {
-          // AllManga doesn't have this episode → switch to the next source
+          // HiAnime doesn't have this episode → switch to the next source
           // automatically and remember the choice for next time.
           const next = getNextNonAsyncSource(playerSource);
           if (next) {
@@ -791,7 +859,7 @@ export default function TVPage({
             setResolveError(null);
             setPlayerSource(next);
           } else {
-            setResolveError(res?.error || "Episode not found on AllManga");
+            setResolveError(res?.error || "Episode not found on HiAnime");
           }
         }
       })
@@ -861,7 +929,7 @@ export default function TVPage({
     [d.seasons],
   );
   // tmdbSeasonsWithSpecials includes season 0 for display purposes.
-  // Excluded for anime: AllManga
+  // Excluded for anime: HiAnime
   const tmdbSeasonsWithSpecials = useMemo(() => {
     if (isAnime) return tmdbSeasons;
     if (failedSeasons.has(0)) return tmdbSeasons;
@@ -951,6 +1019,51 @@ export default function TVPage({
     const rawEpisode = selectedEp._tmdbAbsolute ?? selectedEp.episode_number;
     return applyEpisodeMapping(item.id, rawSeason, rawEpisode, episodeGroupMap);
   }, [selectedEp, selectedSeason, item.id, episodeGroupMap]);
+
+  // ── Direct (non-async) player URL ─────────────────────────────────────────
+  // Anime-capable sources (Vidnest) use their anime route: AniList id of the
+  // selected season + episode number inside that entry + sub/dub.
+  // Falls back to the regular TMDB route if no AniList data is available.
+  const playerDirectUrl = useMemo(() => {
+    if (isAnime && sourceSupportsAnime(playerSource)) {
+      // Wait for AniList data instead of loading the wrong (TMDB) route first
+      if (anilistLoading) return null;
+      const seasonEntry = anilistSeasons?.find(
+        (s) => s.seasonNum === selectedSeason,
+      );
+      const anilistId = seasonEntry?.id ?? (anilistData?.id || null);
+      const animeUrl = getAnimeSourceUrl(
+        playerSource,
+        anilistId,
+        selectedEp?.episode_number,
+        dubMode,
+      );
+      if (animeUrl) return animeUrl;
+    }
+    return getSourceUrl(
+      playerSource,
+      "tv",
+      srcId.id,
+      playerEp.season,
+      playerEp.episode,
+      {},
+      playerAccentColor,
+      playerSubLang,
+    );
+  }, [
+    isAnime,
+    playerSource,
+    anilistLoading,
+    anilistSeasons,
+    anilistData,
+    selectedSeason,
+    selectedEp,
+    dubMode,
+    srcId.id,
+    playerEp,
+    playerAccentColor,
+    playerSubLang,
+  ]);
 
   // ── Memoized current season episodes ──────────────────────────────────────
   // While episode group or AniList data is still loading, return [] to prevent
@@ -1094,12 +1207,10 @@ export default function TVPage({
       const episodes =
         seasonNum === selectedSeason ? currentSeasonEpisodes : null;
       const count = episodes?.length || seasonInfo?.episode_count || 0;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
       for (let i = 1; i <= count; i++) {
         if (episodes) {
           const ep = episodes.find((e) => e.episode_number === i);
-          if (ep?.air_date && new Date(ep.air_date) > today) continue;
+          if (ep && isUnreleased(ep.air_date)) continue;
         }
         onMarkWatched?.(`tv_${item.id}_s${seasonNum}e${i}`);
       }
@@ -1177,32 +1288,35 @@ export default function TVPage({
     wv.addEventListener("did-finish-load", done);
     wv.addEventListener("did-fail-load", done);
 
-    // Poll up to 30s for video duration (metadata may load after buffering starts)
+    // Poll up to 30s for video duration (metadata may load after buffering starts).
+    // Only needed for AniSkip markers on async (anime) sources.
     let attempts = 0;
-    const pollDuration = setInterval(async () => {
-      if (durationRef.current > 0 || attempts++ > 30) {
-        clearInterval(pollDuration);
-        return;
-      }
-      try {
-        const dur = await wv.executeJavaScript(
-          `(() => { const v = document.querySelector('video'); return (v && v.duration > 0 && isFinite(v.duration)) ? v.duration : null; })()`,
-        );
-        if (dur) {
-          durationRef.current = dur;
-          // let markers re-render
-          setSkipTimings((t) => (t ? { ...t } : t));
-          clearInterval(pollDuration);
-        }
-      } catch {}
-    }, 1000);
+    const pollDuration = !isAsync
+      ? null
+      : setInterval(async () => {
+          if (durationRef.current > 0 || attempts++ > 30) {
+            clearInterval(pollDuration);
+            return;
+          }
+          try {
+            const dur = await wv.executeJavaScript(
+              `(() => { const v = document.querySelector('video'); return (v && v.duration > 0 && isFinite(v.duration)) ? v.duration : null; })()`,
+            );
+            if (dur) {
+              durationRef.current = dur;
+              // let markers re-render
+              setSkipTimings((t) => (t ? { ...t } : t));
+              clearInterval(pollDuration);
+            }
+          } catch {}
+        }, 1000);
 
     return () => {
       wv.removeEventListener("did-finish-load", done);
       wv.removeEventListener("did-fail-load", done);
       clearInterval(pollDuration);
     };
-  }, [playing, playerSource, item.id, selectedEp?.episode_number]);
+  }, [playing, playerSource, isAsync, item.id, selectedEp?.episode_number]);
 
   // ── AniSkip: fetch timings when episode changes ───────────────────────────
   useEffect(() => {
@@ -1260,7 +1374,7 @@ export default function TVPage({
     return () => wv.removeEventListener("before-input-event", handler);
   }, [skipPrompt, handleManualSkip]);
 
-  // Unified progress/skip timing tick for Allmanga and other sources.
+  // Unified progress/skip timing tick for HiAnime and other sources.
   // Skip detection runs every tick, progress is saved every 5th tick (5s).
   useEffect(() => {
     const aniSkipActive =
@@ -1357,6 +1471,7 @@ export default function TVPage({
             // - the user did NOT manually seek in the last 6s
             const now = Date.now();
             if (
+              !sourceSkipsResetGuard(playerSource) &&
               lastKnownTimeRef.current > 30 &&
               ct <= 5 &&
               !result.recentUserSeek
@@ -1471,6 +1586,63 @@ export default function TVPage({
     };
   }, [playing, playerSource]);
 
+  // ── Controller support: play/pause, seek, volume, fullscreen ─────────────
+  // Runs for any source (not just async ones) since it only needs a <video>
+  // element inside the webview. Also lets the app-wide gamepad navigation
+  // (App.jsx) know to stand down while a video is actually playing.
+  // Only active while the "controller support" setting is on.
+  const [gamepadEnabled, setGamepadEnabled] = useState(
+    () => storage.get(STORAGE_KEYS.GAMEPAD_ENABLED) !== false, // default on
+  );
+  useEffect(() => {
+    const handler = () =>
+      setGamepadEnabled(storage.get(STORAGE_KEYS.GAMEPAD_ENABLED) !== false);
+    window.addEventListener("streambert:gamepad-settings-changed", handler);
+    return () =>
+      window.removeEventListener(
+        "streambert:gamepad-settings-changed",
+        handler,
+      );
+  }, []);
+
+  useEffect(() => {
+    setPlayerGamepadActive(gamepadEnabled && playing);
+    return () => setPlayerGamepadActive(false);
+  }, [playing, gamepadEnabled]);
+
+  useEffect(() => {
+    const wv = webviewRef.current;
+    if (!wv || !playing || !gamepadEnabled) return;
+
+    const inject = () => {
+      wv.executeJavaScript(GAMEPAD_PLAYER_SCRIPT).catch(() => {});
+    };
+    wv.addEventListener("dom-ready", inject);
+    try {
+      inject();
+    } catch {}
+
+    // Poll for a B-button "leave the player" request from the guest script.
+    const exitPoll = setInterval(async () => {
+      try {
+        const requested = await wv.executeJavaScript(GAMEPAD_EXIT_CHECK_JS);
+        if (requested) {
+          wv.executeJavaScript(GAMEPAD_EXIT_RESET_JS).catch(() => {});
+          setPlaying(false);
+        }
+      } catch {}
+    }, 250);
+
+    return () => {
+      wv.removeEventListener("dom-ready", inject);
+      clearInterval(exitPoll);
+      try {
+        wv.executeJavaScript(GAMEPAD_CLEANUP_JS);
+      } catch {}
+    };
+    // playerSource: the webview is remounted when the UA mode changes
+  }, [playing, gamepadEnabled, playerSource]);
+
   const playEpisode = useCallback(
     (ep) => {
       setM3u8Url(null);
@@ -1500,7 +1672,9 @@ export default function TVPage({
       (e) => e.episode_number === selectedEp.episode_number,
     );
     if (idx >= 0 && idx < currentSeasonEpisodes.length - 1) {
-      return currentSeasonEpisodes[idx + 1];
+      const candidate = currentSeasonEpisodes[idx + 1];
+      // Never autoplay an episode that has not aired yet
+      return isUnreleased(candidate.air_date) ? null : candidate;
     }
     return null;
   }, [selectedEp, currentSeasonEpisodes]);
@@ -1535,7 +1709,7 @@ export default function TVPage({
 
   // Intercept fullscreen requests from embedded players (vidsrc / 2embed use
   // the native Fullscreen API which would otherwise fullscreen the entire app).
-  // Videasy and AllManga handle fullscreen internally via CSS, skip those.
+  // Videasy and HiAnime handle fullscreen internally via CSS, skip those.
   useEffect(() => {
     if (!playing) return;
     if (!NEEDS_INTERCEPT.includes(playerSource)) return;
@@ -1764,12 +1938,19 @@ export default function TVPage({
                       borderRadius: "inherit",
                     }}
                   >
-                    <div className="spinner" />
-                    <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                      {resolvingUrl
-                        ? "Looking up episode on AllManga…"
-                        : `Loading ${PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "source"}…`}
-                    </span>
+                    {sourceIsAsync(playerSource) ? (
+                      <HiAnimeLoader
+                        what="episode"
+                        playerStarting={!resolvingUrl && !!resolvedPlayerUrl}
+                      />
+                    ) : (
+                      <>
+                        <div className="spinner" />
+                        <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                          {`Loading ${PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "source"}…`}
+                        </span>
+                      </>
+                    )}
                   </div>
                 )}
                 {/* error if lookup failed */}
@@ -1790,13 +1971,38 @@ export default function TVPage({
                   >
                     <span style={{ fontSize: 28 }}>⚠️</span>
                     <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                      Episode not found on AllManga
+                      Episode not found on HiAnime
                     </span>
                     <span style={{ fontSize: 12, color: "var(--text3)" }}>
                       {resolveError}
                     </span>
                     <span style={{ fontSize: 12, color: "var(--text3)" }}>
                       Try a different source, or switch sub/dub.
+                    </span>
+                  </div>
+                )}
+                {/* ID conversion failed (sources that need an IMDb / Kinopoisk ID) */}
+                {srcId.error && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      zIndex: 11,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "rgba(0,0,0,0.85)",
+                      gap: 10,
+                      borderRadius: "inherit",
+                    }}
+                  >
+                    <span style={{ fontSize: 28 }}>⚠️</span>
+                    <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                      Could not resolve the {srcId.idLabel} for this title
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                      {srcId.error}. Try a different source.
                     </span>
                   </div>
                 )}
@@ -2017,21 +2223,22 @@ export default function TVPage({
                 )}
                 <webview
                   ref={webviewRef}
+                  // A fresh guest per UA mode: loadURL's userAgent override sticks
+                  // to the WebContents, so it can't be unset on a reused webview.
+                  key={
+                    sourceUsesCleanUa(playerSource) ? "ua-clean" : "ua-default"
+                  }
+                  useragent={
+                    sourceUsesCleanUa(playerSource)
+                      ? CLEAN_USER_AGENT
+                      : undefined
+                  }
                   src={
                     pipOpen
                       ? "about:blank"
                       : isAsync
                         ? resolvedPlayerUrl || "about:blank"
-                        : getSourceUrl(
-                            playerSource,
-                            "tv",
-                            item.id,
-                            playerEp.season,
-                            playerEp.episode,
-                            {},
-                            playerAccentColor,
-                            playerSubLang,
-                          )
+                        : playerDirectUrl || "about:blank"
                   }
                   partition="persist:player"
                   allowpopups="false"
@@ -2069,14 +2276,15 @@ export default function TVPage({
                     {PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ??
                       "Source"}
                   </button>
-                  {/* Sub/Dub toggle, only for AllManga */}
-                  {isAsync && (
+                  {/* Sub/Dub toggle: HiAnime, and anime-capable sources (Vidnest) on anime titles */}
+                  {(isAsync ||
+                    (isAnime && sourceSupportsAnime(playerSource))) && (
                     <button
                       className="player-overlay-btn"
                       onClick={() => {
                         const next = dubMode === "sub" ? "dub" : "sub";
                         setDubMode(next);
-                        storage.set(STORAGE_KEYS.ALLMANGA_DUB_MODE, next);
+                        storage.set(STORAGE_KEYS.HIANIME_DUB_MODE, next);
                         setM3u8Url(null);
                         setInterceptedSubs([]);
                         resolvedPlayerUrlRef.current = null;
@@ -2114,23 +2322,15 @@ export default function TVPage({
                         window.electron?.closePipWindow?.();
                         return;
                       }
-                      const url = isAsync
-                        ? resolvedPlayerUrl
-                        : getSourceUrl(
-                            playerSource,
-                            "tv",
-                            item.id,
-                            playerEp.season,
-                            playerEp.episode,
-                            {},
-                            playerAccentColor,
-                            playerSubLang,
-                          );
+                      const url = isAsync ? resolvedPlayerUrl : playerDirectUrl;
                       if (!url) return;
                       pipUrlRef.current = url;
                       window.electron?.openPipWindow?.(
                         url,
                         item.name ?? item.title,
+                        sourceUsesCleanUa(playerSource)
+                          ? CLEAN_USER_AGENT
+                          : null,
                       );
                     }}
                     title={pipOpen ? "Close pop-out" : "Pop out player"}
@@ -2149,48 +2349,50 @@ export default function TVPage({
                     style={{ top: menuPos.top, left: menuPos.left }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {PLAYER_SOURCES.map((src) => (
-                      <button
-                        key={src.id}
-                        className={
-                          "source-dropdown__item" +
-                          (playerSource === src.id
-                            ? " source-dropdown__item--active"
-                            : "")
-                        }
-                        onClick={() => {
-                          setShowSourceMenu(false);
-                          if (src.id === playerSource) return;
-                          // Manual selection wins over auto-failover
-                          if (selectedEp) {
-                            clearFailoverSource(
-                              `tv_${item.id}_s${selectedSeason}_e${selectedEp.episode_number}_${dubMode}`,
-                            );
+                    {PLAYER_SOURCES.filter((src) => !src.movieOnly).map(
+                      (src) => (
+                        <button
+                          key={src.id}
+                          className={
+                            "source-dropdown__item" +
+                            (playerSource === src.id
+                              ? " source-dropdown__item--active"
+                              : "")
                           }
-                          setPlayerSource(src.id);
-                          storage.set(STORAGE_KEYS.PLAYER_SOURCE, src.id);
-                          setM3u8Url(null);
-                          setInterceptedSubs([]);
-                          resolvedPlayerUrlRef.current = null;
-                          setResolvedPlayerUrl(null);
-                          resolvingUrlRef.current = false;
-                          setResolvingUrl(false);
-                          setResolveError(null);
-                        }}
-                      >
-                        <span>{src.label}</span>
-                        {src.tag && (
-                          <span className="source-dropdown__tag">
-                            {src.tag}
-                          </span>
-                        )}
-                        {src.note && (
-                          <span className="source-dropdown__note">
-                            {src.note}
-                          </span>
-                        )}
-                      </button>
-                    ))}
+                          onClick={() => {
+                            setShowSourceMenu(false);
+                            if (src.id === playerSource) return;
+                            // Manual selection wins over auto-failover
+                            if (selectedEp) {
+                              clearFailoverSource(
+                                `tv_${item.id}_s${selectedSeason}_e${selectedEp.episode_number}_${dubMode}`,
+                              );
+                            }
+                            setPlayerSource(src.id);
+                            storage.set(STORAGE_KEYS.PLAYER_SOURCE, src.id);
+                            setM3u8Url(null);
+                            setInterceptedSubs([]);
+                            resolvedPlayerUrlRef.current = null;
+                            setResolvedPlayerUrl(null);
+                            resolvingUrlRef.current = false;
+                            setResolvingUrl(false);
+                            setResolveError(null);
+                          }}
+                        >
+                          <span>{src.label}</span>
+                          {src.tag && (
+                            <span className="source-dropdown__tag">
+                              {src.tag}
+                            </span>
+                          )}
+                          {src.note && (
+                            <span className="source-dropdown__note">
+                              {src.note}
+                            </span>
+                          )}
+                        </button>
+                      ),
+                    )}
                   </div>
                 )}
                 <button
@@ -2551,11 +2753,6 @@ export default function TVPage({
 // ── EpisodeCard ────────────────────────────────────────────────────────────
 // Isolated memo'd component so progress-bar updates (every 5s) only re-render
 // the one currently-playing card, not all 24+ cards in the grid.
-const _todayForEpisodes = (() => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-})();
 
 const EpisodeCard = memo(function EpisodeCard({
   ep,
@@ -2573,9 +2770,7 @@ const EpisodeCard = memo(function EpisodeCard({
 }) {
   const pk = `tv_${itemId}_s${selectedSeason}e${ep.episode_number}`;
   const isPlaying = playing && selectedEpNumber === ep.episode_number;
-  const epUnreleased = ep.air_date
-    ? new Date(ep.air_date) > _todayForEpisodes
-    : false;
+  const epUnreleased = isUnreleased(ep.air_date);
   const epDownload =
     downloadsByEpisodeKey.get(`s${selectedSeason}e${ep.episode_number}`) ??
     null;
@@ -2620,6 +2815,7 @@ const EpisodeCard = memo(function EpisodeCard({
         ) : epUnreleased ? (
           <div className="episode-restricted-overlay">
             🔒<span>Unreleased</span>
+            <span>{getDaysUntilRelease(ep.air_date)}</span>
           </div>
         ) : isPlaying ? (
           <div className="episode-playing-badge">

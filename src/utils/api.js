@@ -116,28 +116,24 @@ export const tmdbFetch = async (path, apiKey) => {
 };
 
 // Documentation:
-// https://www.videasy.to/docs
 // https://vsembed.su/api/
-// https://www.vidking.net/#documentation
+// https://peachify.top/
+// https://vidfast.vc
+// https://vidlove.cc/#embed
+// https://rentry.co/aetherdomains
+// https://vidrift.net/docs
+// https://vidnest.fun
+// https://devideosrc.co/docs
+// https://frembed.bar/api-docs
+// https://on.kinohub.vip/
 
 // ── Player Sources ────────────────────────────────────────────────────────────
 // supportsProgress: true = executeJavaScript tracking works for this source
+// cleanUserAgent:   true = load this source with the cleaned Chromium UA
+//                   (default Electron UA minus the "Electron/x.y.z" and app
+//                   tokens). Omit/false = Electron's untouched default UA.
+//
 export const PLAYER_SOURCES = [
-  {
-    id: "videasy",
-    label: "Videasy",
-    tag: null,
-    note: null,
-    supportsProgress: true,
-    colorParam: "color", // hex without # → e.g. "e50914"
-    langParam: null, // no subtitle lang param
-    params: {
-      overlay: "true",
-    },
-    movieUrl: (id) => `https://player.videasy.to/movie/${id}`,
-    tvUrl: (id, season, ep) =>
-      `https://player.videasy.to/tv/${id}/${season}/${ep}`,
-  },
   {
     id: "vidsrc",
     label: "VidSrc",
@@ -147,38 +143,162 @@ export const PLAYER_SOURCES = [
     progressViaFrames: true, // video is in a nested iframe, needs main-process frame query
     colorParam: null, // vidsrc doesn't support color param
     langParam: "ds_lang", // ISO 639-1 language code
-    params: {},
+    params: {
+      autoplay: "1"
+    },
     movieUrl: (id) => `https://vsembed.su/embed/movie/${id}`,
     tvUrl: (id, season, ep) =>
       `https://vsembed.su/embed/tv/${id}/${season}/${ep}`,
   },
   {
-    id: "vidking",
-    label: "Vidking",
+    id: "vidfast",
+    label: "Vidfast",
     tag: null,
     note: null,
     supportsProgress: true,
-    colorParam: "color", // hex without # → e.g. "e50914"
-    langParam: null,
+    cleanUserAgent: true,
+    colorParam: "theme", // hex without # → e.g. "e50914"
+    langParam: "sub",
     params: {
       autoPlay: "true",
+      poster: "true",
+      title: "true",
+      pip: "hide",
     },
-    movieUrl: (id) => `https://www.vidking.net/embed/movie/${id}`,
+    movieUrl: (id) => `https://vidfast.vc/movie/${id}`,
     tvUrl: (id, season, ep) =>
-      `https://www.vidking.net/embed/tv/${id}/${season}/${ep}`,
+      `https://vidfast.vc/tv/${id}/${season}/${ep}`,
   },
   {
-    id: "allmanga",
-    label: "AllManga",
+    id: "vidlove",
+    label: "Vidlove",
+    tag: null,
+    note: null,
+    supportsProgress: true,
+    colorParam: "primarycolor", // hex without # → e.g. "e50914"
+    params: {
+      autoplay: "true",
+      autonext: "false",
+      tour: "true",
+      showNextEpisode: "false",
+      hideautonext: "true",
+      hidenextbutton: "true",
+    },
+    movieUrl: (id) => `https://player.vidlove.cc/embed/movie/${id}`,
+    tvUrl: (id, season, ep) =>
+      `https://player.vidlove.cc/embed/tv/${id}/${season}/${ep}`,
+  },
+  {
+    id: "aether",
+    label: "Aether",
+    tag: null,
+    note: "Multi Lang", // Has multiple audio languages
+    supportsProgress: true,
+    colorParam: null,
+    langParam: null,
+    params: {},
+    movieUrl: (id) => `https://aether.ist/media/tmdb-movie-${id}`,
+    tvUrl: (id, season, ep) =>
+      `https://aether.ist/media/tmdb-tv-${id}/${season}/${ep}`,
+  },
+  {
+    id: "vidrift",
+    label: "Vidrift",
+    tag: null,
+    note: "Multi Lang, Anime ✓", // Has Anime sub/dub and multi language support but not with anilistId
+    supportsProgress: true,
+    colorParam: "brandColor",
+    langParam: "sub",
+    params: {
+      title: "true",
+      hide: "next,episodes,cast",
+    },
+    movieUrl: (id) => `https://embed.vidrift.net/embed/movie/${id}`,
+    tvUrl: (id, season, ep) =>
+      `https://embed.vidrift.net/embed/tv/${id}/${season}/${ep}`,
+  },
+  {
+    id: "vidnest",
+    label: "Vidnest",
+    tag: null, // not anime-only -> works for movies/TV as well
+    note: "Anime ✓",
+    supportsProgress: true,
+    progressViaFrames: false,
+    supportsAnime: true, // has a dedicated anime route (AniList id + sub/dub)
+    colorParam: null, // no accent-colour query param documented
+    langParam: null,
+    params: {},
+    movieUrl: (id) => `https://vidnest.fun/movie/${id}`,
+    tvUrl: (id, season, ep) => `https://vidnest.fun/tv/${id}/${season}/${ep}`,
+    // Anime route: AniList id (not TMDB), episode number, "sub" | "dub"
+    animeUrl: (anilistId, ep, lang) =>
+      `https://vidnest.fun/anime/${anilistId}/${ep}/${lang}`,
+  },
+  {
+    id: "devideosrc",
+    label: "DeVideoSrc",
+    tag: null,
+    note: "🇩🇪",
+    supportsProgress: true,
+    progressViaFrames: true, // player may sit in a nested provider iframe -> main-process frame query
+    skipResetGuard: true, // no quality-change reset -> don't "seek back" after a manual rewind
+    idType: "imdb", // needs an IMDb ID (tt…) instead of the TMDB ID
+    colorParam: "color", // hex WITH # (URLSearchParams encodes it as %23)
+    colorWithHash: true,
+    langParam: null,
+    params: {
+      autoplay: "1",
+      muted: "0",
+    },
+    movieUrl: (id) => `https://devideosrc.co/custom/movie/${id}`,
+    tvUrl: (id, season, ep) =>
+      `https://devideosrc.co/custom/serial/${id}/${season}/${ep}`,
+  },
+  {
+    id: "frembed",
+    label: "Frembed",
+    tag: null, // movies, TV and anime (anime uses the normal movie/serie endpoints)
+    note: "🇫🇷",
+    supportsProgress: true,
+    progressViaFrames: true,
+    skipResetGuard: true, // no quality-change reset -> don't "seek back" after a manual rewind
+    colorParam: null,
+    langParam: null,
+    params: {},
+    movieUrl: (id) => `https://frembed.uno/embed/movie/${id}`,
+    tvUrl: (id, season, ep) =>
+      `https://frembed.uno/embed/serie/${id}?sa=${season}&epi=${ep}`,
+  },
+  {
+    id: "kinohub",
+    label: "KinoHub",
+    tag: null,
+    note: "🇷🇺",
+    supportsProgress: true,
+    progressViaFrames: true, // player may sit in a nested iframe -> main-process frame query
+    idType: "kinopoisk", // needs a Kinopoisk ID (resolved via Wikidata)
+    movieOnly: true, // series support not implemented yet
+    colorParam: null,
+    langParam: null,
+    params: {},
+    movieUrl: (id) => `https://on.kinohub.vip/movie/${id}`,
+  },
+  {
+    id: "hianime",
+    label: "HiAnime",
     tag: "ANIME",
     note: null,
     supportsProgress: true,
     async: true,
     params: {},
-    movieUrl: (_id) => "https://allmanga.to",
-    tvUrl: (_id, _season, _ep) => "https://allmanga.to",
+    movieUrl: (_id) => "https://hianime.at",
+    tvUrl: (_id, _season, _ep) => "https://hianime.at",
   },
 ];
+
+// Sources that require a transparent webRequest intercept to load properly
+export const NEEDS_INTERCEPT = ["vidsrc", "devideosrc", "frembed", "kinohub"];
+
 export const getSourceUrl = (
   sourceId,
   type,
@@ -192,6 +312,10 @@ export const getSourceUrl = (
 ) => {
   const src =
     PLAYER_SOURCES.find((s) => s.id === sourceId) ?? PLAYER_SOURCES[0];
+  // No usable ID yet (e.g. IMDb/Kinopoisk ID still being resolved) -> no URL
+  if (!id) return null;
+  // Movie-only source requested for a series -> no URL
+  if (type !== "movie" && !src.tvUrl) return null;
   const baseUrl =
     type === "movie" ? src.movieUrl(id) : src.tvUrl(id, season, ep);
   const url = new URL(baseUrl);
@@ -202,7 +326,8 @@ export const getSourceUrl = (
 
   // Inject accent color into the player if the source supports it
   if (accentColor && src.colorParam) {
-    url.searchParams.set(src.colorParam, accentColor.replace(/^#/, ""));
+    const hex = accentColor.replace(/^#/, "");
+    url.searchParams.set(src.colorParam, src.colorWithHash ? `#${hex}` : hex);
   }
 
   if (subtitleLang && src.langParam) {
@@ -218,14 +343,165 @@ export const getSourceUrl = (
   return url.toString();
 };
 
+// ── Per-source user agent ─────────────────────────────────────────────────────
+// Provided by the main process (buildCleanUserAgent() in index.js) via preload.
+export const CLEAN_USER_AGENT =
+  (typeof window !== "undefined" && window.electron?.cleanUserAgent) || "";
+
+// Source should be loaded with the cleaned Chromium UA
+export const sourceUsesCleanUa = (sourceId) =>
+  PLAYER_SOURCES.find((s) => s.id === sourceId)?.cleanUserAgent ?? false;
+
+export const sourceNeedsImdb = (sourceId) =>
+  PLAYER_SOURCES.find((s) => s.id === sourceId)?.idType === "imdb";
+
+// ── TMDB -> IMDb ID conversion ────────────────────────────────────────────────
+// IMDb IDs never change, so they are cached for the whole session (separately
+// from the 5 min tmdbFetch cache). In-flight requests are de-duplicated.
+const _imdbCache = new Map(); // "movie:123" -> "tt0123456"
+const _imdbPending = new Map(); // "movie:123" -> Promise<string>
+
+/**
+ * Resolve the IMDb ID for a TMDB movie / TV show.
+ * @param {"movie"|"tv"} type
+ * @param {number|string} tmdbId
+ * @param {string} apiKey
+ * @returns {Promise<string>} e.g. "tt0133093" (rejects if TMDB has none)
+ */
+export function fetchImdbId(type, tmdbId, apiKey) {
+  const kind = type === "movie" ? "movie" : "tv";
+  const key = `${kind}:${tmdbId}`;
+  if (_imdbCache.has(key)) return Promise.resolve(_imdbCache.get(key));
+  if (_imdbPending.has(key)) return _imdbPending.get(key);
+
+  const p = tmdbFetch(`/${kind}/${tmdbId}/external_ids`, apiKey)
+    .then((data) => {
+      const imdb = data?.imdb_id;
+      if (!imdb || !/^tt\d+$/.test(imdb)) {
+        throw new Error(`No IMDb ID found for TMDB ${kind} ${tmdbId}`);
+      }
+      _imdbCache.set(key, imdb);
+      return imdb;
+    })
+    .finally(() => _imdbPending.delete(key));
+  _imdbPending.set(key, p);
+  return p;
+}
+
+// Which ID a source expects: "tmdb" (default) | "imdb" | "kinopoisk"
+export const sourceIdType = (sourceId) =>
+  PLAYER_SOURCES.find((s) => s.id === sourceId)?.idType ?? "tmdb";
+
+export const sourceNeedsKinopoisk = (sourceId) =>
+  sourceIdType(sourceId) === "kinopoisk";
+
+// Source can only play movies (no series route yet)
+export const sourceIsMovieOnly = (sourceId) =>
+  PLAYER_SOURCES.find((s) => s.id === sourceId)?.movieOnly ?? false;
+
+// ── TMDB -> Kinopoisk ID conversion (via Wikidata) ────────────────────────────
+// Wikidata properties: P2603 Kinopoisk film ID, P4947 TMDB movie ID,
+// P4983 TMDB TV series ID, P345 IMDb ID.
+// Kinopoisk IDs never change -> cached for the whole session, in-flight
+// requests are de-duplicated.
+const WIKIDATA_SPARQL = "https://query.wikidata.org/sparql";
+const _kpCache = new Map(); // "movie:123" -> "5494049"
+const _kpPending = new Map(); // "movie:123" -> Promise<string>
+
+// value is validated by the callers (digits / tt+digits) before interpolation
+async function _wikidataKinopoisk(prop, value) {
+  const query = `SELECT ?kp WHERE { ?item wdt:${prop} "${value}" . ?item wdt:P2603 ?kp . } LIMIT 1`;
+  const res = await fetch(
+    `${WIKIDATA_SPARQL}?format=json&query=${encodeURIComponent(query)}`,
+  );
+  if (!res.ok) throw new Error(`Wikidata ${res.status}`);
+  const data = await res.json();
+  const kp = data?.results?.bindings?.[0]?.kp?.value;
+  return /^\d+$/.test(kp ?? "") ? kp : null;
+}
+
+/**
+ * Resolve the Kinopoisk ID for a TMDB movie / TV show via Wikidata.
+ * 1st try: TMDB ID, 2nd try (fallback): IMDb ID.
+ * @returns {Promise<string>} e.g. "5494049" (rejects if Wikidata has none)
+ */
+export function fetchKinopoiskId(type, tmdbId, apiKey) {
+  const kind = type === "movie" ? "movie" : "tv";
+  const key = `${kind}:${tmdbId}`;
+  if (_kpCache.has(key)) return Promise.resolve(_kpCache.get(key));
+  if (_kpPending.has(key)) return _kpPending.get(key);
+
+  const p = (async () => {
+    if (!/^\d+$/.test(String(tmdbId))) {
+      throw new Error(`Invalid TMDB id ${tmdbId}`);
+    }
+    const tmdbProp = kind === "movie" ? "P4947" : "P4983";
+    let kp = await _wikidataKinopoisk(tmdbProp, String(tmdbId));
+    if (!kp) {
+      // Fallback: some Wikidata items only carry the IMDb ID
+      const imdb = await fetchImdbId(kind, tmdbId, apiKey).catch(() => null);
+      if (imdb && /^tt\d+$/.test(imdb)) {
+        kp = await _wikidataKinopoisk("P345", imdb);
+      }
+    }
+    if (!kp) throw new Error(`No Kinopoisk ID found for TMDB ${kind} ${tmdbId}`);
+    _kpCache.set(key, kp);
+    return kp;
+  })().finally(() => _kpPending.delete(key));
+  _kpPending.set(key, p);
+  return p;
+}
+
 export const sourceSupportsProgress = (sourceId) =>
   PLAYER_SOURCES.find((s) => s.id === sourceId)?.supportsProgress ?? false;
 
 export const sourceProgressViaFrames = (sourceId) =>
   PLAYER_SOURCES.find((s) => s.id === sourceId)?.progressViaFrames ?? false;
 
+export const sourceSkipsResetGuard = (sourceId) =>
+  PLAYER_SOURCES.find((s) => s.id === sourceId)?.skipResetGuard ?? false;
+
 export const sourceIsAsync = (sourceId) =>
   PLAYER_SOURCES.find((s) => s.id === sourceId)?.async ?? false;
+
+// Source has its own anime route (AniList id + sub/dub) but is not anime-only
+export const sourceSupportsAnime = (sourceId) =>
+  PLAYER_SOURCES.find((s) => s.id === sourceId)?.supportsAnime ?? false;
+
+// Source is usable for anime: anime-only (tagged) or anime-capable
+export const sourceIsAnimeCapable = (sourceId) => {
+  const src = PLAYER_SOURCES.find((s) => s.id === sourceId);
+  return !!(src && (src.tag || src.supportsAnime));
+};
+
+/**
+ * Build the anime-route URL for sources that support it (e.g. Vidnest).
+ * @param {string} sourceId
+ * @param {number|string} anilistId AniList media id of the season/movie
+ * @param {number|string} episode   episode number inside that AniList entry
+ * @param {"sub"|"dub"} dubMode
+ * @returns {string|null} null if the source has no anime route or id is missing
+ */
+export const getAnimeSourceUrl = (
+  sourceId,
+  anilistId,
+  episode,
+  dubMode = "sub",
+  extraParams = {},
+) => {
+  const src = PLAYER_SOURCES.find((s) => s.id === sourceId);
+  if (!src?.animeUrl || !anilistId || !episode) return null;
+  const url = new URL(
+    src.animeUrl(anilistId, episode, dubMode === "dub" ? "dub" : "sub"),
+  );
+  Object.entries(src.params || {}).forEach(([k, v]) =>
+    url.searchParams.set(k, v),
+  );
+  Object.entries(extraParams).forEach(([k, v]) => {
+    if (v != null) url.searchParams.set(k, v);
+  });
+  return url.toString();
+};
 
 // Return the next non-async source after `currentId` in PLAYER_SOURCES order
 export const getNextNonAsyncSource = (currentId) => {
@@ -233,13 +509,10 @@ export const getNextNonAsyncSource = (currentId) => {
   if (nonAsync.length === 0) return null;
   const idx = nonAsync.findIndex((s) => s.id === currentId);
   // If currentId is itself non-async, return the next one (wrap around).
-  // If currentId is async (e.g. AllManga), just return the first non-async.
+  // If currentId is async (e.g. HiAnime), just return the first non-async.
   if (idx < 0) return nonAsync[0].id;
   return nonAsync[(idx + 1) % nonAsync.length].id;
 };
-
-// Sources that require a transparent webRequest intercept to load properly
-export const NEEDS_INTERCEPT = ["vidsrc"];
 
 // ── AniList API (anime metadata) ──────────────────────────────────────────────
 const ANILIST_API = "https://graphql.anilist.co";
@@ -450,8 +723,8 @@ export const isAnimeContent = (item, details) => {
 };
 
 // Default sources
-export const ANIME_DEFAULT_SOURCE = "allmanga";
-export const NON_ANIME_DEFAULT_SOURCE = "vidking";
+export const ANIME_DEFAULT_SOURCE = "hianime";
+export const NON_ANIME_DEFAULT_SOURCE = "vidrift";
 
 // ── Episode Group fetch (localStorage + in-memory cache, 7-day TTL) ─────────
 // Episode groups almost never change -> cache aggressively across sessions.

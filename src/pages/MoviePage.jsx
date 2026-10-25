@@ -13,14 +13,20 @@ import {
   PLAYER_SOURCES,
   getSourceUrl,
   sourceSupportsProgress,
+  sourceSkipsResetGuard,
   sourceProgressViaFrames,
   sourceIsAsync,
+  sourceSupportsAnime,
+  sourceIsAnimeCapable,
+  getAnimeSourceUrl,
   fetchAnilistData,
   cleanAnilistDescription,
   isAnimeContent,
   ANIME_DEFAULT_SOURCE,
   NON_ANIME_DEFAULT_SOURCE,
   NEEDS_INTERCEPT,
+  CLEAN_USER_AGENT,
+  sourceUsesCleanUa,
   getNextNonAsyncSource,
 } from "../utils/api";
 import {
@@ -59,6 +65,15 @@ import {
   getRatingCountry,
 } from "../utils/ageRating";
 import CastModal from "../components/CastModal";
+import {
+  GAMEPAD_PLAYER_SCRIPT,
+  GAMEPAD_EXIT_CHECK_JS,
+  GAMEPAD_EXIT_RESET_JS,
+  GAMEPAD_CLEANUP_JS,
+} from "../utils/playerGamepadScript";
+import { useSourceId } from "../utils/useSourceId";
+import { setPlayerGamepadActive } from "../utils/gamepadPlayerState";
+import HiAnimeLoader from "../components/HiAnimeLoader";
 
 export default function MoviePage({
   item,
@@ -103,7 +118,7 @@ export default function MoviePage({
   );
   const [showSourceMenu, setShowSourceMenu] = useState(false);
   const [dubMode, setDubMode] = useState(
-    () => storage.get(STORAGE_KEYS.ALLMANGA_DUB_MODE) || "sub",
+    () => storage.get(STORAGE_KEYS.HIANIME_DUB_MODE) || "sub",
   );
   const [anilistData, setAnilistData] = useState(null);
   const [menuPos, setMenuPos] = useState(null);
@@ -115,7 +130,7 @@ export default function MoviePage({
   saveProgressRef.current = saveProgress;
   const onMarkWatchedRef = useRef(onMarkWatched);
   onMarkWatchedRef.current = onMarkWatched;
-  // AllManga async URL resolution
+  // HiAnime async URL resolution
   const [resolvedPlayerUrl, setResolvedPlayerUrl] = useState(null);
   const [resolvingUrl, setResolvingUrl] = useState(false);
   const [resolveError, setResolveError] = useState(null);
@@ -125,6 +140,14 @@ export default function MoviePage({
   const [collection, setCollection] = useState(null); // { name, parts }
   // Webview loading overlay
   const [webviewLoading, setWebviewLoading] = useState(false);
+
+  // ID the selected source expects (TMDB id, or converted IMDb id)
+  const srcId = useSourceId(playerSource, "movie", item.id, apiKey);
+  // Re-show the loading overlay once a resolved IMDb id swaps in the real URL
+  useEffect(() => {
+    if (srcId.id && playing) setWebviewLoading(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [srcId.id]);
   const [playerFullscreen, setPlayerFullscreen] = useState(false);
   // pipOpen=true: main webview shows about:blank, pop-out window has the real player
   const [pipOpen, setPipOpen] = useState(false);
@@ -136,6 +159,39 @@ export default function MoviePage({
     () => isAnimeContent(item, details),
     [item.id, details],
   );
+
+  // Direct (non-async) player URL. Anime-capable sources (Vidnest) use their
+  // anime route (AniList id + episode 1 + sub/dub) when AniList data exists;
+  // otherwise the regular TMDB movie route is used.
+  const playerDirectUrl = useMemo(() => {
+    if (isAnime && sourceSupportsAnime(playerSource) && anilistData?.id) {
+      const animeUrl = getAnimeSourceUrl(
+        playerSource,
+        anilistData.id,
+        1,
+        dubMode,
+      );
+      if (animeUrl) return animeUrl;
+    }
+    return getSourceUrl(
+      playerSource,
+      "movie",
+      srcId.id,
+      null,
+      null,
+      {},
+      playerAccentColor,
+      playerSubLang,
+    );
+  }, [
+    isAnime,
+    playerSource,
+    anilistData,
+    dubMode,
+    srcId.id,
+    playerAccentColor,
+    playerSubLang,
+  ]);
   const [downloaderFolder, setDownloaderFolder] = useState(
     () => storage.get("downloaderFolder") || "",
   );
@@ -307,11 +363,12 @@ export default function MoviePage({
         },
       );
       // Switch to anime source if current source is not an anime source
-      const currentSrc = PLAYER_SOURCES.find((s) => s.id === playerSource);
-      if (!currentSrc?.tag) {
+      // (anime-only tagged sources and anime-capable ones like Vidnest are fine)
+      if (!sourceIsAnimeCapable(playerSource)) {
         const saved = storage.get("playerSource");
-        const savedSrc = PLAYER_SOURCES.find((s) => s.id === saved);
-        setPlayerSource(savedSrc?.tag ? saved : ANIME_DEFAULT_SOURCE);
+        setPlayerSource(
+          sourceIsAnimeCapable(saved) ? saved : ANIME_DEFAULT_SOURCE,
+        );
       }
     } else {
       // Switch back to non-anime source if current source is anime-only
@@ -327,12 +384,12 @@ export default function MoviePage({
     };
   }, [item.id, isAnime]);
 
-  // Resolve AllManga movie URL via main-process IPC
+  // Resolve HiAnime movie URL via main-process IPC (scraping, no CORS)
   useEffect(() => {
     if (!playing) return;
     const epKey = `movie_${item.id}_${dubMode}`;
 
-    // Auto-failover: if a previous attempt taught us AllManga doesn't have
+    // Auto-failover: if a previous attempt taught us HiAnime doesn't have
     // this title, skip straight to the cached fallback source.
     if (sourceIsAsync(playerSource)) {
       const cached = getFailoverSource(epKey);
@@ -358,7 +415,7 @@ export default function MoviePage({
     const startTime = storage.get("dlTime_" + progressKey) || 0;
     let mounted = true;
     window.electron
-      .resolveAllManga({
+      .resolveHiAnime({
         title,
         seasonNumber: 1,
         episodeNumber: 1,
@@ -373,7 +430,8 @@ export default function MoviePage({
             window.electron
               .setPlayerVideo({
                 url: res.url,
-                referer: res.referer || "https://allmanga.to",
+                referer: res.referer || "https://hianime.at/",
+                subtitle: res.subtitle || null,
                 startTime,
               })
               .then((r) => {
@@ -390,7 +448,7 @@ export default function MoviePage({
             setResolvedPlayerUrl(res.url);
           }
         } else {
-          // AllManga doesn't have this title → switch to the next source
+          // HiAnime doesn't have this title → switch to the next source
           // automatically and remember the choice for next time.
           const next = getNextNonAsyncSource(playerSource);
           if (next) {
@@ -402,7 +460,7 @@ export default function MoviePage({
             setResolveError(null);
             setPlayerSource(next);
           } else {
-            setResolveError(res?.error || "Movie not found on AllManga");
+            setResolveError(res?.error || "Movie not found on HiAnime");
           }
         }
       })
@@ -494,6 +552,60 @@ export default function MoviePage({
     };
   }, []);
 
+  // ── Controller support: play/pause, seek, volume, fullscreen ─────────────
+  // Only active while the "controller support" setting is on.
+  const [gamepadEnabled, setGamepadEnabled] = useState(
+    () => storage.get(STORAGE_KEYS.GAMEPAD_ENABLED) !== false, // default on
+  );
+  useEffect(() => {
+    const handler = () =>
+      setGamepadEnabled(storage.get(STORAGE_KEYS.GAMEPAD_ENABLED) !== false);
+    window.addEventListener("streambert:gamepad-settings-changed", handler);
+    return () =>
+      window.removeEventListener(
+        "streambert:gamepad-settings-changed",
+        handler,
+      );
+  }, []);
+
+  useEffect(() => {
+    setPlayerGamepadActive(gamepadEnabled && playing);
+    return () => setPlayerGamepadActive(false);
+  }, [playing, gamepadEnabled]);
+
+  useEffect(() => {
+    const wv = webviewRef.current;
+    if (!wv || !playing || !gamepadEnabled) return;
+
+    const inject = () => {
+      wv.executeJavaScript(GAMEPAD_PLAYER_SCRIPT).catch(() => {});
+    };
+    wv.addEventListener("dom-ready", inject);
+    try {
+      inject();
+    } catch {}
+
+    // Poll for a B-button "leave the player" request from the guest script.
+    const exitPoll = setInterval(async () => {
+      try {
+        const requested = await wv.executeJavaScript(GAMEPAD_EXIT_CHECK_JS);
+        if (requested) {
+          wv.executeJavaScript(GAMEPAD_EXIT_RESET_JS).catch(() => {});
+          setPlaying(false);
+        }
+      } catch {}
+    }, 250);
+
+    return () => {
+      wv.removeEventListener("dom-ready", inject);
+      clearInterval(exitPoll);
+      try {
+        wv.executeJavaScript(GAMEPAD_CLEANUP_JS);
+      } catch {}
+    };
+    // playerSource: the webview is remounted when the UA mode changes
+  }, [playing, gamepadEnabled, playerSource]);
+
   // Attach webview load events so we know when the new source has painted
   useEffect(() => {
     if (!playing) return;
@@ -563,6 +675,7 @@ export default function MoviePage({
             // - the user did NOT manually seek in the last 6s
             const now = Date.now();
             if (
+              !sourceSkipsResetGuard(playerSource) &&
               lastKnownTimeRef.current > 30 &&
               ct <= 5 &&
               !result.recentUserSeek
@@ -624,7 +737,7 @@ export default function MoviePage({
 
   // Intercept fullscreen requests from embedded players (vidsrc / 2embed use
   // the native Fullscreen API which would otherwise fullscreen the entire app).
-  // Videasy and AllManga handle fullscreen internally via CSS, skip those.
+  // Videasy and HiAnime handle fullscreen internally via CSS, skip those.
   useEffect(() => {
     if (!playing) return;
     if (!NEEDS_INTERCEPT.includes(playerSource)) return;
@@ -898,15 +1011,22 @@ export default function MoviePage({
                   borderRadius: "inherit",
                 }}
               >
-                <div className="spinner" />
-                <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                  {resolvingUrl
-                    ? "Looking up movie on AllManga…"
-                    : `Loading ${PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "source"}…`}
-                </span>
+                {sourceIsAsync(playerSource) ? (
+                  <HiAnimeLoader
+                    what="movie"
+                    playerStarting={!resolvingUrl && !!resolvedPlayerUrl}
+                  />
+                ) : (
+                  <>
+                    <div className="spinner" />
+                    <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                      {`Loading ${PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "source"}…`}
+                    </span>
+                  </>
+                )}
               </div>
             )}
-            {/* AllManga: error if lookup failed */}
+            {/* HiAnime: error if lookup failed */}
             {sourceIsAsync(playerSource) && resolveError && !resolvingUrl && (
               <div
                 style={{
@@ -924,13 +1044,38 @@ export default function MoviePage({
               >
                 <span style={{ fontSize: 28 }}>⚠️</span>
                 <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                  Movie not found on AllManga
+                  Movie not found on HiAnime
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text3)" }}>
                   {resolveError}
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text3)" }}>
                   Try a different source, or switch sub/dub.
+                </span>
+              </div>
+            )}
+            {/* ID conversion failed (sources that need an IMDb / Kinopoisk ID) */}
+            {srcId.error && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 11,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "rgba(0,0,0,0.85)",
+                  gap: 10,
+                  borderRadius: "inherit",
+                }}
+              >
+                <span style={{ fontSize: 28 }}>⚠️</span>
+                <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                  Could not resolve the {srcId.idLabel} for this title
+                </span>
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                  {srcId.error}. Try a different source.
                 </span>
               </div>
             )}
@@ -981,21 +1126,18 @@ export default function MoviePage({
             )}
             <webview
               ref={webviewRef}
+              // A fresh guest per UA mode: loadURL's userAgent override sticks
+              // to the WebContents, so it can't be unset on a reused webview.
+              key={sourceUsesCleanUa(playerSource) ? "ua-clean" : "ua-default"}
+              useragent={
+                sourceUsesCleanUa(playerSource) ? CLEAN_USER_AGENT : undefined
+              }
               src={
                 pipOpen
                   ? "about:blank"
                   : sourceIsAsync(playerSource)
                     ? resolvedPlayerUrl || "about:blank"
-                    : getSourceUrl(
-                        playerSource,
-                        "movie",
-                        item.id,
-                        null,
-                        null,
-                        {},
-                        playerAccentColor,
-                        playerSubLang,
-                      )
+                    : playerDirectUrl || "about:blank"
               }
               partition="persist:player"
               allowpopups="false"
@@ -1030,14 +1172,15 @@ export default function MoviePage({
                 {PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ??
                   "Source"}
               </button>
-              {/* Sub/Dub toggle, only for async (AllManga) sources */}
-              {sourceIsAsync(playerSource) && (
+              {/* Sub/Dub toggle: HiAnime, and anime-capable sources (Vidnest) on anime titles */}
+              {(sourceIsAsync(playerSource) ||
+                (isAnime && sourceSupportsAnime(playerSource))) && (
                 <button
                   className="player-overlay-btn"
                   onClick={() => {
                     const next = dubMode === "sub" ? "dub" : "sub";
                     setDubMode(next);
-                    storage.set(STORAGE_KEYS.ALLMANGA_DUB_MODE, next);
+                    storage.set(STORAGE_KEYS.HIANIME_DUB_MODE, next);
                     setM3u8Url(null);
                     setInterceptedSubs([]);
                     resolvedPlayerUrlRef.current = null;
@@ -1075,19 +1218,14 @@ export default function MoviePage({
                   }
                   const url = sourceIsAsync(playerSource)
                     ? resolvedPlayerUrl
-                    : getSourceUrl(
-                        playerSource,
-                        "movie",
-                        item.id,
-                        null,
-                        null,
-                        {},
-                        playerAccentColor,
-                        playerSubLang,
-                      );
+                    : playerDirectUrl;
                   if (!url) return;
                   pipUrlRef.current = url;
-                  window.electron?.openPipWindow?.(url, item.title);
+                  window.electron?.openPipWindow?.(
+                    url,
+                    item.title,
+                    sourceUsesCleanUa(playerSource) ? CLEAN_USER_AGENT : null,
+                  );
                 }}
                 title={pipOpen ? "Close pop-out" : "Pop out player"}
                 disabled={

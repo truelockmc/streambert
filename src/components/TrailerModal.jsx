@@ -169,19 +169,7 @@ export default function TrailerModal({ trailerKey, title, onClose }) {
             <button
               onClick={openInBrowser}
               title="Open in browser"
-              style={{
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.15)",
-                borderRadius: 6,
-                color: "rgba(255,255,255,0.75)",
-                cursor: "pointer",
-                fontSize: 12,
-                padding: "4px 10px",
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                whiteSpace: "nowrap",
-              }}
+              className="trailer-openbrowser-btn"
             >
               <ExternalLinkIcon size={13} />
               Open in Browser
