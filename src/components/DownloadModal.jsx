@@ -429,7 +429,7 @@ export default function DownloadModal({
   const binaryHint = ua.includes("win")
     ? "Windows_x64-portable"
     : ua.includes("mac")
-      ? "For MacOS you will have to compile it yourself"
+      ? "macOS_arm64-portable (Apple Silicon) or macOS_x86_64-portable (Intel)"
       : "Linux_x64-portable";
   const releaseUrl =
     "https://github.com/truelockmc/vid-dl-cli-only/releases/latest";
