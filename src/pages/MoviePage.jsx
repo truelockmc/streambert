@@ -65,6 +65,7 @@ import {
   getRatingCountry,
 } from "../utils/ageRating";
 import CastModal from "../components/CastModal";
+import { useCredits } from "../utils/useCredits";
 import {
   GAMEPAD_PLAYER_SCRIPT,
   GAMEPAD_EXIT_CHECK_JS,
@@ -100,8 +101,8 @@ export default function MoviePage({
   const [trailerKey, setTrailerKey] = useState(null);
   const [showTrailer, setShowTrailer] = useState(false);
   const [showCast, setShowCast] = useState(false);
+  const credits = useCredits("movie", item.id, apiKey);
 
-  const [credits, setCredits] = useState({ cast: [], crew: [] });
   const [m3u8Url, setM3u8Url] = useState(null);
   const [interceptedSubs, setInterceptedSubs] = useState([]);
   const [playerSource, setPlayerSource] = useState(
@@ -297,20 +298,6 @@ export default function MoviePage({
         if (trailer) setTrailerKey(trailer.key);
       })
       .catch(() => {});
-    return () => {
-      mounted = false;
-    };
-  }, [item.id, apiKey]);
-
-  useEffect(() => {
-    let mounted = true;
-    tmdbFetch(`/movie/${item.id}/credits`, apiKey)
-      .then((data) => {
-        if (!mounted) return;
-        setCredits({ cast: data.cast || [], crew: data.crew || [] });
-      })
-      .catch(() => setCast([]));
-
     return () => {
       mounted = false;
     };

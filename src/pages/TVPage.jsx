@@ -74,6 +74,7 @@ import {
   getRatingCountry,
 } from "../utils/ageRating";
 import CastModal from "../components/CastModal";
+import { useCredits } from "../utils/useCredits";
 import {
   GAMEPAD_PLAYER_SCRIPT,
   GAMEPAD_EXIT_CHECK_JS,
@@ -439,8 +440,8 @@ export default function TVPage({
   const [showDownload, setShowDownload] = useState(false);
   const [trailerKey, setTrailerKey] = useState(null);
   const [showTrailer, setShowTrailer] = useState(false);
-  const [credits, setCredits] = useState({ cast: [], crew: [] });
   const [showCast, setShowCast] = useState(false);
+  const credits = useCredits("tv", item.id, apiKey);
   const [m3u8Url, setM3u8Url] = useState(null);
   const [interceptedSubs, setInterceptedSubs] = useState([]);
   const [playerSource, setPlayerSource] = useState(
@@ -641,20 +642,6 @@ export default function TVPage({
         if (trailer) setTrailerKey(trailer.key);
       })
       .catch(() => {});
-    return () => {
-      mounted = false;
-    };
-  }, [item.id, apiKey]);
-
-  useEffect(() => {
-    let mounted = true;
-    tmdbFetch(`/tv/${item.id}/aggregate_credits`, apiKey)
-      .then((data) => {
-        if (!mounted) return;
-        setCredits({ cast: data.cast || [], crew: data.crew || [] });
-      })
-      .catch(() => setCast([]));
-
     return () => {
       mounted = false;
     };
@@ -2682,6 +2669,7 @@ export default function TVPage({
         <CastModal
           cast={credits.cast}
           crew={credits.crew}
+          creators={details?.created_by || []}
           title={title}
           onClose={() => setShowCast(false)}
         />
