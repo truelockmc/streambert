@@ -439,6 +439,7 @@ function setupSession(playerSession, trailerSession) {
       const mw = getMainWindow();
       if (mw && !mw.isDestroyed()) {
         if (url.includes(".m3u8")) {
+          playerIpc.rememberStreamMeta(url, details.referrer);
           mw.webContents.send("m3u8-found", url);
         } else if (url.includes(".vtt")) {
           const { extractSubtitleLang } = require("./src/ipc/subtitles");

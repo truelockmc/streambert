@@ -52,6 +52,31 @@ function findTrustedUpdateSource(parsedUrl) {
   );
 }
 
+// ── Stream metadata (Referer / UA) remembered per captured m3u8 URL ──────────
+// The session hook in index.js records these so "open in external player" can
+// send the same headers the embedded player used. Capped to avoid unbounded growth.
+const streamMeta = new Map(); // url -> { referer, userAgent }
+const STREAM_META_MAX = 50;
+function rememberStreamMeta(url, referer, userAgent) {
+  if (typeof url !== "string" || !url) return;
+  if (streamMeta.size >= STREAM_META_MAX) {
+    streamMeta.delete(streamMeta.keys().next().value);
+  }
+  streamMeta.set(url, {
+    referer: typeof referer === "string" ? referer : "",
+    userAgent: typeof userAgent === "string" ? userAgent : "",
+  });
+}
+
+const isHttpUrl = (u) => {
+  try {
+    const p = new URL(u);
+    return p.protocol === "http:" || p.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
 function register(getMainWindow, { writeSecretMigration }) {
   // ── Open file at specific timestamp in mpv / VLC ─────────────────────────
 
@@ -184,6 +209,86 @@ function register(getMainWindow, { writeSecretMigration }) {
       shell.openPath(safeFilePath);
     },
   );
+
+  // ── Open a live stream URL (m3u8) in an external player (mpv / VLC) ────────
+  ipcMain.handle("open-stream-external", (_, { url, title, subtitles } = {}) => {
+    if (!isHttpUrl(url)) return { ok: false, error: "Invalid stream URL" };
+
+    const platform = process.platform;
+    const meta = streamMeta.get(url) || {};
+    const safeTitle =
+      typeof title === "string" ? title.replace(/[\r\n]/g, " ").slice(0, 200) : "";
+    const subUrls = (Array.isArray(subtitles) ? subtitles : [])
+      .map((s) => (typeof s === "string" ? s : s?.url))
+      .filter(isHttpUrl);
+
+    const resolveBin = (bin) => {
+      if (path.isAbsolute(bin)) return fs.existsSync(bin) ? bin : null;
+      try {
+        const r = spawnSync(platform === "win32" ? "where" : "which", [bin], {
+          encoding: "utf8",
+        });
+        if (r.status === 0 && r.stdout.trim()) {
+          return r.stdout.trim().split(/\r?\n/)[0].trim();
+        }
+      } catch {}
+      return null;
+    };
+    const tryLaunch = (bin, args) => {
+      const resolved = resolveBin(bin);
+      if (!resolved) return false;
+      try {
+        const child = spawn(resolved, args, { detached: true, stdio: "ignore" });
+        child.on("error", () => {});
+        child.unref();
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const mpvPaths =
+      platform === "win32"
+        ? ["mpv", "C:\\Program Files\\mpv\\mpv.exe"]
+        : platform === "darwin"
+          ? ["/opt/homebrew/bin/mpv", "/usr/local/bin/mpv", "mpv"]
+          : ["/usr/bin/mpv", "/usr/local/bin/mpv", "/snap/bin/mpv", "mpv"];
+    const vlcPaths =
+      platform === "win32"
+        ? [
+            "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe",
+            "C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe",
+            "vlc",
+          ]
+        : platform === "darwin"
+          ? ["/Applications/VLC.app/Contents/MacOS/VLC", "vlc"]
+          : ["/usr/bin/vlc", "/usr/local/bin/vlc", "/snap/bin/vlc", "vlc"];
+
+    const mpvArgs = [];
+    if (meta.referer) mpvArgs.push(`--referrer=${meta.referer}`);
+    if (meta.userAgent) mpvArgs.push(`--user-agent=${meta.userAgent}`);
+    if (safeTitle) mpvArgs.push(`--force-media-title=${safeTitle}`);
+    subUrls.forEach((u) => mpvArgs.push(`--sub-file=${u}`));
+    mpvArgs.push("--", url);
+
+    // VLC cannot load remote subtitle files via CLI, so subtitles are skipped.
+    const vlcArgs = [];
+    if (meta.referer) vlcArgs.push(`--http-referrer=${meta.referer}`);
+    if (meta.userAgent) vlcArgs.push(`--http-user-agent=${meta.userAgent}`);
+    if (safeTitle) vlcArgs.push(`--meta-title=${safeTitle}`);
+    vlcArgs.push(url);
+
+    for (const bin of mpvPaths) {
+      if (tryLaunch(bin, mpvArgs)) return { ok: true, player: "mpv" };
+    }
+    for (const bin of vlcPaths) {
+      if (tryLaunch(bin, vlcArgs)) return { ok: true, player: "vlc" };
+    }
+    return {
+      ok: false,
+      error: "No external player found. Install mpv or VLC and try again.",
+    };
+  });
 
   // ── Window controls (custom Windows titlebar) ─────────────────────────────
   ipcMain.handle("window-minimize", () => {
@@ -764,4 +869,4 @@ function registerAudioDeviceRecovery() {
   ipc.on("audio-device-changed", () => setTimeout(recoverAllWebContents, 150));
 }
 
-module.exports = { register, registerAudioDeviceRecovery };
+module.exports = { register, registerAudioDeviceRecovery, rememberStreamMeta };
