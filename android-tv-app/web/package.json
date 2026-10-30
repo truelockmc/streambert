@@ -1,0 +1,19 @@
+{
+  "name": "streambert-tv-web",
+  "private": true,
+  "type": "module",
+  "description": "Builds Streambert's React UI for the Android TV WebView shell",
+  "scripts": {
+    "build": "node scripts/extract-blocklist.mjs && vite build"
+  },
+  "dependencies": {
+    "hls.js": "1.5.17",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "terser": "^5.46.0",
+    "vite": "^7.3.1"
+  }
+}

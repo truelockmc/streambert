@@ -131,6 +131,9 @@ npm run dist
 > - **libcrypt.so.1 error:** `sudo pacman -S libxcrypt-compat`
 > - **http-parser dependency error:** `yay -S http-parser` (from AUR)
 
+### Android TV
+An Android TV build (WebView shell with remote-control navigation) lives in [`android-tv-app/`](android-tv-app/README.md); see its README for build steps.
+
 ## License
 This project is open-source software licensed under the GNU General Public License v3.0 [(GPL-3.0)](LICENSE).
 

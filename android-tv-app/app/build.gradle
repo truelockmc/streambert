@@ -1,0 +1,59 @@
+// Streambert for Android TV: a WebView shell around the desktop app's React UI.
+// Build the UI into src/main/assets/www first: `cd web && npm run build`.
+plugins {
+    id 'com.android.application'
+}
+
+// Optional built-in TMDB Read Access Token (local.properties: tmdb.token=eyJ...),
+// used until one is entered in the app. Kept out of source control.
+def localProps = new Properties()
+def localPropsFile = rootProject.file("local.properties")
+if (localPropsFile.exists()) localPropsFile.withInputStream { localProps.load(it) }
+
+android {
+    namespace 'com.streambert.tv'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.streambert.tv"
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName "2.6.0-tv"
+        buildConfigField "String", "TMDB_TOKEN", "\"${localProps.getProperty('tmdb.token', '')}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    // Release signing from local.properties (release.storeFile, release.storePassword,
+    // release.keyAlias, release.keyPassword); without them the release APK is unsigned.
+    if (localProps.getProperty('release.storeFile')) {
+        signingConfigs {
+            release {
+                storeFile file(localProps.getProperty('release.storeFile'))
+                storePassword localProps.getProperty('release.storePassword')
+                keyAlias localProps.getProperty('release.keyAlias')
+                keyPassword localProps.getProperty('release.keyPassword')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (localProps.getProperty('release.storeFile')) signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // WebViewAssetLoader, document-start scripts and frame message listeners
+    implementation "androidx.webkit:webkit:1.12.1"
+}
