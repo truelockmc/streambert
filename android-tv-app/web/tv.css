@@ -1,0 +1,16 @@
+/* TV-only tweaks layered over src/styles/global.css */
+
+/* The focus ring has to read from across the room */
+.gamepad-focused {
+    outline-width: 4px !important;
+    outline-offset: 4px;
+}
+
+tv-webview:focus {
+    outline: none;
+}
+
+/* No mouse on TV: hide scrollbars */
+::-webkit-scrollbar {
+    display: none;
+}
