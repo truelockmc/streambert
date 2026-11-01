@@ -272,21 +272,26 @@ function register(getMainWindow, { writeSecretMigration }) {
           child.stdout.on("data", grab);
           child.stderr.on("data", grab);
           child.on("error", () => finish(null));
-          child.on("exit", (code) => {
-            const line =
-              errText
-                .split(/\r?\n/)
-                .map((l) => l.trim())
-                .filter(Boolean)
-                .reverse()
-                .find((l) => /error|failed|forbidden|denied/i.test(l)) ||
-              `Player exited (code ${code})`;
-            finish({ failed: true, error: line.slice(0, 300) });
+          child.on("exit", (code, signal) => {
+            // Show the last meaningful output lines so the real reason
+            // (403, DNS, TLS, bad option…) is visible in the UI.
+            const lines = errText
+              .split(/\r?\n/)
+              .map((l) => l.trim())
+              .filter(Boolean);
+            const key = [...lines]
+              .reverse()
+              .find((l) => /error|failed|forbidden|denied|unable|invalid|unknown option/i.test(l));
+            const tail = lines.slice(-3).join(" | ");
+            const detail = key && !tail.includes(key) ? `${key} | ${tail}` : tail;
+            finish({
+              failed: true,
+              error: `${detail || "No output"} (exit ${code ?? signal})`.slice(0, 400),
+            });
           });
           setTimeout(() => {
             if (done) return;
-            child.stdout.destroy();
-            child.stderr.destroy();
+            // IMPORTANT: do NOT close the stdout/stderr pipes here.
             child.unref();
             finish({ failed: false });
           }, 2500);
@@ -313,7 +318,7 @@ function register(getMainWindow, { writeSecretMigration }) {
           ? ["/Applications/VLC.app/Contents/MacOS/VLC", "vlc"]
           : ["/usr/bin/vlc", "/usr/local/bin/vlc", "/snap/bin/vlc", "vlc"];
 
-    const mpvArgs = ["--ytdl=no"];
+    const mpvArgs = ["--ytdl=no", "--msg-level=all=info"];
     if (meta.referer) mpvArgs.push(`--referrer=${meta.referer}`);
     if (meta.userAgent) mpvArgs.push(`--user-agent=${meta.userAgent}`);
     if (meta.origin) mpvArgs.push(`--http-header-fields=Origin: ${meta.origin}`);
