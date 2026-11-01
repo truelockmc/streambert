@@ -52,6 +52,43 @@ function findTrustedUpdateSource(parsedUrl) {
   );
 }
 
+// ── Stream metadata (Referer / UA) remembered per captured m3u8 URL ──────────
+// The session hook in index.js records these so "open in external player" can
+// send the same headers the embedded player used. Capped to avoid unbounded growth.
+const binCache = new Map(); // bare binary name -> resolved path | null
+const streamMeta = new Map(); // url -> { referer, origin, userAgent }
+const STREAM_META_MAX = 50;
+// Header values end up in player command lines / config: strip control chars
+// (no header or option injection via CR/LF) and cap the length.
+const cleanHeader = (v, max = 4096) =>
+  typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, max) : "";
+
+function hasStreamMeta(url) {
+  return streamMeta.has(url);
+}
+
+function rememberStreamMeta(url, meta = {}) {
+  if (typeof url !== "string" || !url) return;
+  if (!streamMeta.has(url) && streamMeta.size >= STREAM_META_MAX) {
+    streamMeta.delete(streamMeta.keys().next().value);
+  }
+  const web = (v) => (/^https?:\/\//i.test(v) ? v : "");
+  streamMeta.set(url, {
+    referer: web(cleanHeader(meta.referer, 2048)),
+    origin: web(cleanHeader(meta.origin, 512)),
+    userAgent: cleanHeader(meta.userAgent, 512),
+  });
+}
+
+const isHttpUrl = (u) => {
+  try {
+    const p = new URL(u);
+    return p.protocol === "http:" || p.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
 function register(getMainWindow, { writeSecretMigration }) {
   // ── Open file at specific timestamp in mpv / VLC ─────────────────────────
 
@@ -184,6 +221,180 @@ function register(getMainWindow, { writeSecretMigration }) {
       shell.openPath(safeFilePath);
     },
   );
+
+  // ── Open a live stream URL (m3u8) in an external player (mpv / VLC) ────────
+  ipcMain.handle("open-stream-external", async (_, { url, title, subtitles } = {}) => {
+    if (!isHttpUrl(url)) return { ok: false, error: "Invalid stream URL" };
+
+    const platform = process.platform;
+    const meta = streamMeta.get(url) || {};
+    const safeTitle =
+      typeof title === "string" ? title.replace(/[\r\n]/g, " ").slice(0, 200) : "";
+    const subUrls = (Array.isArray(subtitles) ? subtitles : [])
+      .map((s) => (typeof s === "string" ? s : s?.url))
+      .filter(isHttpUrl);
+
+    const resolveBin = (bin) => {
+      if (path.isAbsolute(bin)) return fs.existsSync(bin) ? bin : null;
+      if (binCache.has(bin)) return binCache.get(bin);
+      try {
+        const r = spawnSync(platform === "win32" ? "where" : "which", [bin], {
+          encoding: "utf8",
+        });
+        if (r.status === 0 && r.stdout.trim()) {
+          const found = r.stdout.trim().split(/\r?\n/)[0].trim();
+          binCache.set(bin, found);
+          return found;
+        }
+      } catch {}
+      return null;
+    };
+    // Launch and wait for a short time.
+    // The player's output goes to a log FILE (not a pipe) so it is fully
+    // independent of this app: quitting Streambert will not close the player
+    const tryLaunch = (bin, args) => {
+      const resolved = resolveBin(bin);
+      if (!resolved) return Promise.resolve(null);
+      return new Promise((resolve) => {
+        const logPath = path.join(
+          os.tmpdir(),
+          `streambert_player_${process.pid}_${Date.now()}.log`,
+        );
+        let fd = null;
+        let done = false;
+        const finish = (v) => {
+          if (done) return;
+          done = true;
+          resolve(v);
+        };
+        const closeFd = () => {
+          if (fd !== null) {
+            try {
+              fs.closeSync(fd);
+            } catch {}
+            fd = null;
+          }
+        };
+        const removeLog = () => {
+          try {
+            fs.unlinkSync(logPath);
+          } catch {}
+        };
+        try {
+          fd = fs.openSync(logPath, "a", 0o600);
+          const child = spawn(resolved, args, {
+            detached: true,
+            stdio: ["ignore", fd, fd],
+            windowsHide: false,
+          });
+          child.on("error", () => {
+            closeFd();
+            removeLog();
+            finish(null);
+          });
+          child.on("exit", (code, signal) => {
+            closeFd();
+            let text = "";
+            try {
+              text = fs.readFileSync(logPath, "utf8").slice(-4000);
+            } catch {}
+            removeLog();
+            const lines = text
+              .split(/\r?\n/)
+              .map((l) => l.trim())
+              .filter(Boolean);
+            const key = [...lines]
+              .reverse()
+              .find((l) =>
+                /error|failed|forbidden|denied|unable|invalid|unknown option/i.test(l),
+              );
+            const tail = lines.slice(-3).join(" | ");
+            const detail = key && !tail.includes(key) ? `${key} | ${tail}` : tail;
+            // After the startup window this only cleans up; finish() is a no-op
+            finish({
+              failed: true,
+              error: `${detail || "No output"} (exit ${code ?? signal})`.slice(0, 400),
+            });
+          });
+          setTimeout(() => {
+            if (done) return;
+            closeFd(); // the child keeps its own copy of the descriptor
+            child.unref();
+            finish({ failed: false });
+          }, 2500);
+        } catch {
+          closeFd();
+          removeLog();
+          finish(null);
+        }
+      });
+    };
+
+    const mpvPaths =
+      platform === "win32"
+        ? ["mpv", "C:\\Program Files\\mpv\\mpv.exe"]
+        : platform === "darwin"
+          ? ["/opt/homebrew/bin/mpv", "/usr/local/bin/mpv", "mpv"]
+          : ["/usr/bin/mpv", "/usr/local/bin/mpv", "/snap/bin/mpv", "mpv"];
+    const vlcPaths =
+      platform === "win32"
+        ? [
+            "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe",
+            "C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe",
+            "vlc",
+          ]
+        : platform === "darwin"
+          ? ["/Applications/VLC.app/Contents/MacOS/VLC", "vlc"]
+          : ["/usr/bin/vlc", "/usr/local/bin/vlc", "/snap/bin/vlc", "vlc"];
+
+    const mpvArgs = ["--ytdl=no", "--msg-level=all=warn"];
+    if (meta.referer) mpvArgs.push(`--referrer=${meta.referer}`);
+    if (meta.userAgent) mpvArgs.push(`--user-agent=${meta.userAgent}`);
+    if (meta.origin) mpvArgs.push(`--http-header-fields=Origin: ${meta.origin}`);
+    if (safeTitle) mpvArgs.push(`--force-media-title=${safeTitle}`);
+    subUrls.forEach((u) => mpvArgs.push(`--sub-file=${u}`));
+    mpvArgs.push("--", url);
+
+    // VLC cannot load remote subtitle files via CLI, so subtitles are skipped.
+    const vlcArgs = [];
+    if (meta.referer) vlcArgs.push(`--http-referrer=${meta.referer}`);
+    if (meta.userAgent) vlcArgs.push(`--http-user-agent=${meta.userAgent}`);
+    if (safeTitle) vlcArgs.push(`--meta-title=${safeTitle}`);
+    vlcArgs.push(url);
+
+    let lastError = null;
+    for (const bin of mpvPaths) {
+      const r = await tryLaunch(bin, mpvArgs);
+      if (!r) continue;
+      if (!r.failed) return { ok: true, player: "mpv" };
+      lastError = r.error;
+      break; // mpv exists but failed; the same stream would fail in VLC too
+    }
+    if (!lastError) {
+      for (const bin of vlcPaths) {
+        const r = await tryLaunch(bin, vlcArgs);
+        if (!r) continue;
+        if (!r.failed) return { ok: true, player: "vlc" };
+        lastError = r.error;
+        break;
+      }
+    }
+    if (lastError) {
+      const sent = [
+        meta.referer && "Referer",
+        meta.origin && "Origin",
+        meta.userAgent && "User-Agent",
+      ].filter(Boolean);
+      return {
+        ok: false,
+        error: `${lastError} [sent: ${sent.join(", ") || "no captured headers"}]`,
+      };
+    }
+    return {
+      ok: false,
+      error: "No external player found. Install mpv or VLC and try again.",
+    };
+  });
 
   // ── Window controls (custom Windows titlebar) ─────────────────────────────
   ipcMain.handle("window-minimize", () => {
@@ -764,4 +975,9 @@ function registerAudioDeviceRecovery() {
   ipc.on("audio-device-changed", () => setTimeout(recoverAllWebContents, 150));
 }
 
-module.exports = { register, registerAudioDeviceRecovery };
+module.exports = {
+  register,
+  registerAudioDeviceRecovery,
+  rememberStreamMeta,
+  hasStreamMeta,
+};
