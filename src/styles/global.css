@@ -574,6 +574,22 @@ body.no-anim *::after {
     margin-left: 2px;
 }
 
+.card-overview {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 8px 10px 10px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text2);
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
 .card-info {
     padding: 10px 12px;
 }
@@ -1000,6 +1016,91 @@ body.no-anim *::after {
     background: var(--surface3);
     border: 1px solid var(--border);
     color: var(--text2);
+}
+
+/* ── Genre browse page ─────────────────────────────────────────────────── */
+.genre-filter-bar {
+    padding: 24px 48px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.genre-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.type-toggle {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: fit-content;
+}
+
+.type-toggle-btn {
+    padding: 6px 16px;
+    border-radius: calc(var(--radius) - 2px);
+    border: none;
+    background: transparent;
+    color: var(--text2);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.type-toggle-btn:hover {
+    color: var(--text);
+}
+
+.type-toggle-btn--active {
+    background: var(--red);
+    color: white;
+}
+
+.genre-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.genre-chip {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.genre-chip:hover:not(:disabled) {
+    border-color: var(--text3);
+    color: var(--text);
+}
+
+.genre-chip--active {
+    background: var(--red);
+    border-color: var(--red);
+    color: white;
+}
+
+.genre-chip:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.genre-load-more {
+    display: flex;
+    justify-content: center;
+    padding: 32px 0 8px;
 }
 
 /* ── Player ──────────────────────────────────────────────────────────────── */
