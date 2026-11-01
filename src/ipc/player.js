@@ -249,41 +249,68 @@ function register(getMainWindow, { writeSecretMigration }) {
       } catch {}
       return null;
     };
-    // Launch and wait for a short time
+    // Launch and wait for a short time.
+    // The player's output goes to a log FILE (not a pipe) so it is fully
+    // independent of this app: quitting Streambert will not close the player
     const tryLaunch = (bin, args) => {
       const resolved = resolveBin(bin);
       if (!resolved) return Promise.resolve(null);
       return new Promise((resolve) => {
-        let errText = "";
+        const logPath = path.join(
+          os.tmpdir(),
+          `streambert_player_${process.pid}_${Date.now()}.log`,
+        );
+        let fd = null;
         let done = false;
         const finish = (v) => {
           if (done) return;
           done = true;
           resolve(v);
         };
+        const closeFd = () => {
+          if (fd !== null) {
+            try {
+              fs.closeSync(fd);
+            } catch {}
+            fd = null;
+          }
+        };
+        const removeLog = () => {
+          try {
+            fs.unlinkSync(logPath);
+          } catch {}
+        };
         try {
+          fd = fs.openSync(logPath, "a", 0o600);
           const child = spawn(resolved, args, {
             detached: true,
-            stdio: ["ignore", "pipe", "pipe"],
+            stdio: ["ignore", fd, fd],
+            windowsHide: false,
           });
-          const grab = (d) => {
-            errText = (errText + d.toString()).slice(-4000);
-          };
-          child.stdout.on("data", grab);
-          child.stderr.on("data", grab);
-          child.on("error", () => finish(null));
+          child.on("error", () => {
+            closeFd();
+            removeLog();
+            finish(null);
+          });
           child.on("exit", (code, signal) => {
-            // Show the last meaningful output lines so the real reason
-            // (403, DNS, TLS, bad option…) is visible in the UI.
-            const lines = errText
+            closeFd();
+            let text = "";
+            try {
+              text = fs.readFileSync(logPath, "utf8").slice(-4000);
+            } catch {}
+            removeLog();
+            const lines = text
               .split(/\r?\n/)
               .map((l) => l.trim())
               .filter(Boolean);
             const key = [...lines]
               .reverse()
-              .find((l) => /error|failed|forbidden|denied|unable|invalid|unknown option/i.test(l));
+              .find((l) =>
+                /error|failed|forbidden|denied|unable|invalid|unknown option/i.test(l),
+              );
             const tail = lines.slice(-3).join(" | ");
             const detail = key && !tail.includes(key) ? `${key} | ${tail}` : tail;
+            // After the startup window this only cleans up; finish() is a no-op
             finish({
               failed: true,
               error: `${detail || "No output"} (exit ${code ?? signal})`.slice(0, 400),
@@ -291,11 +318,13 @@ function register(getMainWindow, { writeSecretMigration }) {
           });
           setTimeout(() => {
             if (done) return;
-            // IMPORTANT: do NOT close the stdout/stderr pipes here.
+            closeFd(); // the child keeps its own copy of the descriptor
             child.unref();
             finish({ failed: false });
           }, 2500);
         } catch {
+          closeFd();
+          removeLog();
           finish(null);
         }
       });
@@ -318,7 +347,7 @@ function register(getMainWindow, { writeSecretMigration }) {
           ? ["/Applications/VLC.app/Contents/MacOS/VLC", "vlc"]
           : ["/usr/bin/vlc", "/usr/local/bin/vlc", "/snap/bin/vlc", "vlc"];
 
-    const mpvArgs = ["--ytdl=no", "--msg-level=all=info"];
+    const mpvArgs = ["--ytdl=no", "--msg-level=all=warn"];
     if (meta.referer) mpvArgs.push(`--referrer=${meta.referer}`);
     if (meta.userAgent) mpvArgs.push(`--user-agent=${meta.userAgent}`);
     if (meta.origin) mpvArgs.push(`--http-header-fields=Origin: ${meta.origin}`);
