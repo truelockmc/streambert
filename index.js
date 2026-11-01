@@ -439,7 +439,6 @@ function setupSession(playerSession, trailerSession) {
       const mw = getMainWindow();
       if (mw && !mw.isDestroyed()) {
         if (url.includes(".m3u8")) {
-          playerIpc.rememberStreamMeta(url, details.referrer);
           mw.webContents.send("m3u8-found", url);
         } else if (url.includes(".vtt")) {
           const { extractSubtitleLang } = require("./src/ipc/subtitles");
@@ -450,6 +449,38 @@ function setupSession(playerSession, trailerSession) {
         }
       }
       callback({});
+    },
+  );
+
+  // Record the real request headers of captured m3u8 requests so the external
+  // player can replay them (hosts often 403 without Referer/Origin/UA).
+  // Cookies are intentionally NOT captured or forwarded.
+  // Performance: the request is released immediately and recorded only once
+  // per URL, so live playlists that are re-requested every few seconds add
+  // no latency or repeated work.
+  playerSession.webRequest.onBeforeSendHeaders(
+    { urls: ["*://*/*.m3u8*", "*://*/*.m3u8"] },
+    (details, callback) => {
+      callback({ requestHeaders: details.requestHeaders });
+      try {
+        if (playerIpc.hasStreamMeta(details.url)) return;
+        const h = details.requestHeaders || {};
+        const get = (n) =>
+          h[Object.keys(h).find((k) => k.toLowerCase() === n) || ""] || "";
+        let pageUrl = "";
+        try {
+          pageUrl = details.frame?.url || details.webContents?.getURL() || "";
+        } catch {}
+        const pageOrigin = /^https?:/.test(pageUrl)
+          ? new URL(pageUrl).origin
+          : "";
+        const meta = {
+          referer: get("referer") || details.referrer || pageUrl,
+          origin: get("origin") || pageOrigin,
+          userAgent: get("user-agent"),
+        };
+        playerIpc.rememberStreamMeta(details.url, meta);
+      } catch {}
     },
   );
 

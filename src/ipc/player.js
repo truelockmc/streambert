@@ -55,16 +55,28 @@ function findTrustedUpdateSource(parsedUrl) {
 // ── Stream metadata (Referer / UA) remembered per captured m3u8 URL ──────────
 // The session hook in index.js records these so "open in external player" can
 // send the same headers the embedded player used. Capped to avoid unbounded growth.
-const streamMeta = new Map(); // url -> { referer, userAgent }
+const binCache = new Map(); // bare binary name -> resolved path | null
+const streamMeta = new Map(); // url -> { referer, origin, userAgent }
 const STREAM_META_MAX = 50;
-function rememberStreamMeta(url, referer, userAgent) {
+// Header values end up in player command lines / config: strip control chars
+// (no header or option injection via CR/LF) and cap the length.
+const cleanHeader = (v, max = 4096) =>
+  typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, max) : "";
+
+function hasStreamMeta(url) {
+  return streamMeta.has(url);
+}
+
+function rememberStreamMeta(url, meta = {}) {
   if (typeof url !== "string" || !url) return;
-  if (streamMeta.size >= STREAM_META_MAX) {
+  if (!streamMeta.has(url) && streamMeta.size >= STREAM_META_MAX) {
     streamMeta.delete(streamMeta.keys().next().value);
   }
+  const web = (v) => (/^https?:\/\//i.test(v) ? v : "");
   streamMeta.set(url, {
-    referer: typeof referer === "string" ? referer : "",
-    userAgent: typeof userAgent === "string" ? userAgent : "",
+    referer: web(cleanHeader(meta.referer, 2048)),
+    origin: web(cleanHeader(meta.origin, 512)),
+    userAgent: cleanHeader(meta.userAgent, 512),
   });
 }
 
@@ -211,7 +223,7 @@ function register(getMainWindow, { writeSecretMigration }) {
   );
 
   // ── Open a live stream URL (m3u8) in an external player (mpv / VLC) ────────
-  ipcMain.handle("open-stream-external", (_, { url, title, subtitles } = {}) => {
+  ipcMain.handle("open-stream-external", async (_, { url, title, subtitles } = {}) => {
     if (!isHttpUrl(url)) return { ok: false, error: "Invalid stream URL" };
 
     const platform = process.platform;
@@ -224,27 +236,64 @@ function register(getMainWindow, { writeSecretMigration }) {
 
     const resolveBin = (bin) => {
       if (path.isAbsolute(bin)) return fs.existsSync(bin) ? bin : null;
+      if (binCache.has(bin)) return binCache.get(bin);
       try {
         const r = spawnSync(platform === "win32" ? "where" : "which", [bin], {
           encoding: "utf8",
         });
         if (r.status === 0 && r.stdout.trim()) {
-          return r.stdout.trim().split(/\r?\n/)[0].trim();
+          const found = r.stdout.trim().split(/\r?\n/)[0].trim();
+          binCache.set(bin, found);
+          return found;
         }
       } catch {}
       return null;
     };
+    // Launch and wait for a short time
     const tryLaunch = (bin, args) => {
       const resolved = resolveBin(bin);
-      if (!resolved) return false;
-      try {
-        const child = spawn(resolved, args, { detached: true, stdio: "ignore" });
-        child.on("error", () => {});
-        child.unref();
-        return true;
-      } catch {
-        return false;
-      }
+      if (!resolved) return Promise.resolve(null);
+      return new Promise((resolve) => {
+        let errText = "";
+        let done = false;
+        const finish = (v) => {
+          if (done) return;
+          done = true;
+          resolve(v);
+        };
+        try {
+          const child = spawn(resolved, args, {
+            detached: true,
+            stdio: ["ignore", "pipe", "pipe"],
+          });
+          const grab = (d) => {
+            errText = (errText + d.toString()).slice(-4000);
+          };
+          child.stdout.on("data", grab);
+          child.stderr.on("data", grab);
+          child.on("error", () => finish(null));
+          child.on("exit", (code) => {
+            const line =
+              errText
+                .split(/\r?\n/)
+                .map((l) => l.trim())
+                .filter(Boolean)
+                .reverse()
+                .find((l) => /error|failed|forbidden|denied/i.test(l)) ||
+              `Player exited (code ${code})`;
+            finish({ failed: true, error: line.slice(0, 300) });
+          });
+          setTimeout(() => {
+            if (done) return;
+            child.stdout.destroy();
+            child.stderr.destroy();
+            child.unref();
+            finish({ failed: false });
+          }, 2500);
+        } catch {
+          finish(null);
+        }
+      });
     };
 
     const mpvPaths =
@@ -264,9 +313,10 @@ function register(getMainWindow, { writeSecretMigration }) {
           ? ["/Applications/VLC.app/Contents/MacOS/VLC", "vlc"]
           : ["/usr/bin/vlc", "/usr/local/bin/vlc", "/snap/bin/vlc", "vlc"];
 
-    const mpvArgs = [];
+    const mpvArgs = ["--ytdl=no"];
     if (meta.referer) mpvArgs.push(`--referrer=${meta.referer}`);
     if (meta.userAgent) mpvArgs.push(`--user-agent=${meta.userAgent}`);
+    if (meta.origin) mpvArgs.push(`--http-header-fields=Origin: ${meta.origin}`);
     if (safeTitle) mpvArgs.push(`--force-media-title=${safeTitle}`);
     subUrls.forEach((u) => mpvArgs.push(`--sub-file=${u}`));
     mpvArgs.push("--", url);
@@ -278,11 +328,33 @@ function register(getMainWindow, { writeSecretMigration }) {
     if (safeTitle) vlcArgs.push(`--meta-title=${safeTitle}`);
     vlcArgs.push(url);
 
+    let lastError = null;
     for (const bin of mpvPaths) {
-      if (tryLaunch(bin, mpvArgs)) return { ok: true, player: "mpv" };
+      const r = await tryLaunch(bin, mpvArgs);
+      if (!r) continue;
+      if (!r.failed) return { ok: true, player: "mpv" };
+      lastError = r.error;
+      break; // mpv exists but failed; the same stream would fail in VLC too
     }
-    for (const bin of vlcPaths) {
-      if (tryLaunch(bin, vlcArgs)) return { ok: true, player: "vlc" };
+    if (!lastError) {
+      for (const bin of vlcPaths) {
+        const r = await tryLaunch(bin, vlcArgs);
+        if (!r) continue;
+        if (!r.failed) return { ok: true, player: "vlc" };
+        lastError = r.error;
+        break;
+      }
+    }
+    if (lastError) {
+      const sent = [
+        meta.referer && "Referer",
+        meta.origin && "Origin",
+        meta.userAgent && "User-Agent",
+      ].filter(Boolean);
+      return {
+        ok: false,
+        error: `${lastError} [sent: ${sent.join(", ") || "no captured headers"}]`,
+      };
     }
     return {
       ok: false,
@@ -869,4 +941,9 @@ function registerAudioDeviceRecovery() {
   ipc.on("audio-device-changed", () => setTimeout(recoverAllWebContents, 150));
 }
 
-module.exports = { register, registerAudioDeviceRecovery, rememberStreamMeta };
+module.exports = {
+  register,
+  registerAudioDeviceRecovery,
+  rememberStreamMeta,
+  hasStreamMeta,
+};
