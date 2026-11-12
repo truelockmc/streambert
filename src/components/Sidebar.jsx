@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { imgUrl } from "../utils/api";
 import { useSeasonalEvent } from "../components/seasonalEvents.jsx";
+import { isTvMode } from "../utils/tvMode";
 import {
   StreambertLogo,
   HomeIcon,
@@ -113,10 +114,18 @@ export default function Sidebar({
       </div>
 
       {canGoBack && (
-        <SideBtn onClick={onBack} icon={<BackIcon />} label="Back (Ctrl+Z)" />
+        <SideBtn
+          onClick={onBack}
+          icon={<BackIcon />}
+          label={isTvMode() ? "Back" : "Back (Ctrl+Z)"}
+        />
       )}
 
-      <SideBtn onClick={onSearch} icon={<SearchIcon />} label="Search  (⌘F)" />
+      <SideBtn
+        onClick={onSearch}
+        icon={<SearchIcon />}
+        label={isTvMode() ? "Search" : "Search  (⌘F)"}
+      />
       <SideBtn
         active={page === "home"}
         onClick={() => onNavigate("home")}
@@ -127,7 +136,7 @@ export default function Sidebar({
         active={page === "history"}
         onClick={() => onNavigate("history")}
         icon={<HistoryIcon />}
-        label="Library & History"
+        label={isTvMode() ? "Library" : "Library & History"}
       />
       <SideBtn
         active={page === "downloads"}
@@ -220,7 +229,7 @@ export default function Sidebar({
         <SideBtn
           onClick={onShowShortcuts}
           icon={<HelpIcon />}
-          label="Help & Shortcuts (?)"
+          label={isTvMode() ? "Help" : "Help & Shortcuts (?)"}
         />
         <SideBtn
           active={page === "settings"}
@@ -228,8 +237,8 @@ export default function Sidebar({
           icon={<SettingsIcon />}
           label="Settings"
         />
-        <button
-          className="sidebar-btn"
+          <button
+          className="sidebar-btn sidebar-quit"
           onClick={() => window.electron?.quitApp?.()}
           title="Quit App"
           style={{ color: "#e53e3e", marginTop: 4 }}

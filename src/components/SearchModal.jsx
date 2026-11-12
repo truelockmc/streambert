@@ -171,6 +171,7 @@ export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
               <div
                 key={r.id}
                 className="search-result"
+                tabIndex={-1}
                 onClick={() => handleSelect(r)}
               >
                 <img
@@ -208,6 +209,7 @@ export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
                 <div
                   key={term}
                   className="search-history-item"
+                  tabIndex={-1}
                   onClick={() => handleHistoryClick(term)}
                 >
                   <span className="search-history-icon">

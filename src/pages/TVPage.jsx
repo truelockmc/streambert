@@ -37,6 +37,7 @@ import {
   sourceUsesCleanUa,
   getNextNonAsyncSource,
 } from "../utils/api";
+import { isTvMode } from "../utils/tvMode";
 import {
   BookmarkIcon,
   BookmarkFillIcon,
@@ -82,6 +83,7 @@ import {
   GAMEPAD_CLEANUP_JS,
 } from "../utils/playerGamepadScript";
 import { useSourceId } from "../utils/useSourceId";
+import { hasTvShellPlayer, useTvShellPlayer } from "../utils/tvShellPlayer";
 import { setPlayerGamepadActive } from "../utils/gamepadPlayerState";
 import HiAnimeLoader from "../components/HiAnimeLoader";
 
@@ -435,6 +437,15 @@ export default function TVPage({
   );
   const [selectedEp, setSelectedEp] = useState(null);
   const [playing, setPlaying] = useState(false);
+  useEffect(() => {
+    if (!playing) return undefined;
+    const onTvBack = (event) => {
+      event.preventDefault();
+      setPlaying(false);
+    };
+    window.addEventListener("streambert:tv-back", onTvBack);
+    return () => window.removeEventListener("streambert:tv-back", onTvBack);
+  }, [playing]);
   const [loading, setLoading] = useState(true);
   const [loadingSeason, setLoadingSeason] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
@@ -484,7 +495,7 @@ export default function TVPage({
   const srcId = useSourceId(playerSource, "tv", item.id, apiKey);
   // Re-show the loading overlay once a resolved IMDb id swaps in the real URL
   useEffect(() => {
-    if (srcId.id && playing) setWebviewLoading(true);
+    if (srcId.id && playing && !hasTvShellPlayer()) setWebviewLoading(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [srcId.id]);
   const [playerFullscreen, setPlayerFullscreen] = useState(false);
@@ -708,7 +719,7 @@ export default function TVPage({
     resolvingUrlRef.current = false;
     setResolvingUrl(false);
     setResolveError(null);
-    setWebviewLoading(true); // instantly blank the player on every source/episode switch
+    if (!hasTvShellPlayer()) setWebviewLoading(true);
   }, [
     item.id,
     selectedEp?.episode_number,
@@ -1051,6 +1062,10 @@ export default function TVPage({
     playerAccentColor,
     playerSubLang,
   ]);
+  useTvShellPlayer(
+    sourceIsAsync(playerSource) ? resolvedPlayerUrl : playerDirectUrl,
+    playing,
+  );
 
   // ── Memoized current season episodes ──────────────────────────────────────
   // While episode group or AniList data is still loading, return [] to prevent
@@ -1241,7 +1256,8 @@ export default function TVPage({
 
   // Show loader instantly when playback starts
   useEffect(() => {
-    if (playing) setWebviewLoading(true);
+    if (!playing) return;
+    setWebviewLoading(!hasTvShellPlayer());
   }, [playing]);
 
   // ── Webview memory cleanup ────────────────────────────────────────────────
@@ -2645,6 +2661,10 @@ export default function TVPage({
                         selectedEpNumber={selectedEp?.episode_number}
                         downloadsByEpisodeKey={downloadsByEpisodeKey}
                         restricted={restricted}
+                        tvInitial={
+                          ep.episode_number ===
+                          currentSeasonEpisodes[0]?.episode_number
+                        }
                         onPlay={playEpisode}
                         onContextMenu={setEpMenu}
                         onGoToDownloads={onGoToDownloads}
@@ -2755,6 +2775,7 @@ const EpisodeCard = memo(function EpisodeCard({
   onPlay,
   onContextMenu,
   onGoToDownloads,
+  tvInitial,
 }) {
   const pk = `tv_${itemId}_s${selectedSeason}e${ep.episode_number}`;
   const isPlaying = playing && selectedEpNumber === ep.episode_number;
@@ -2766,6 +2787,9 @@ const EpisodeCard = memo(function EpisodeCard({
   return (
     <div
       className={`episode-card ${isPlaying ? "playing" : ""} ${epWatched ? "ep-watched" : ""} ${restricted ? "episode-card--restricted" : ""} ${epUnreleased ? "episode-card--unreleased" : ""}`}
+      tabIndex={-1}
+      data-tv-initial={tvInitial ? "" : undefined}
+      data-tv-play={tvInitial ? "" : undefined}
       onClick={() => (restricted || epUnreleased ? null : onPlay(ep))}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -2778,7 +2802,7 @@ const EpisodeCard = memo(function EpisodeCard({
       <div className="episode-thumb">
         {ep.still_path ? (
           <img
-            src={imgUrl(ep.still_path, "w300")}
+            src={imgUrl(ep.still_path, isTvMode() ? "w500" : "w300")}
             alt={ep.name}
             loading="lazy"
           />

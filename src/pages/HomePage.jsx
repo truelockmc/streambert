@@ -7,6 +7,8 @@ import { useRatings, getRatingForItem } from "../utils/useRatings";
 import { isRestricted } from "../utils/ageRating";
 import { storage } from "../utils/storage";
 import { loadHomeLayout, loadHomeViewMode } from "../utils/homeLayout";
+import { isTvMode } from "../utils/tvMode";
+import TvShelf from "../components/TvShelf";
 
 /**
  * Extract up to `count` unique, recently watched items from the user's
@@ -57,6 +59,7 @@ export default function HomePage({
   const { order: rowOrder, visible: rowVisible } = layout;
 
   const [viewMode] = useState(() => loadHomeViewMode());
+  const tv = isTvMode();
 
   // All items for batch ratings fetch
   const allItems = useMemo(
@@ -268,6 +271,8 @@ export default function HomePage({
             <div className="hero-actions">
               <button
                 className="btn btn-primary"
+                data-tv-initial=""
+                data-tv-play=""
                 onClick={() => onSelect(hero)}
               >
                 <PlayIcon /> Watch Now
@@ -287,34 +292,46 @@ export default function HomePage({
       {rowOrder.map((id) => {
         if (!rowVisible[id]) return null;
 
+        const renderCards = (items, withProgress) =>
+          items.map((item) => {
+            const type = item.media_type === "tv" ? "tv" : "movie";
+            const pk = withProgress
+              ? type === "movie"
+                ? `movie_${item.id}`
+                : `tv_${item.id}_s${item.season}e${item.episode}`
+              : null;
+            const rd = enrichedRatingsMap[`${type}_${item.id}`] || {};
+            const rating = withProgress ? getRating(item) : rd;
+            return (
+              <MediaCard
+                key={`${item.media_type}_${item.id}_${item.season ?? ""}_${item.episode ?? ""}`}
+                item={item}
+                onClick={() => onSelect(item)}
+                progress={pk ? progress[pk] || 0 : 0}
+                watched={watched}
+                onMarkWatched={onMarkWatched}
+                onMarkUnwatched={onMarkUnwatched}
+                ageRating={rating.cert}
+                restricted={
+                  withProgress ? itemRestricted(item) : rd.restricted
+                }
+              />
+            );
+          });
+
         if (id === "continue") {
           if (inProgress.length === 0) return null;
+          if (tv) {
+            return (
+              <TvShelf key="continue" title="Continue Watching">
+                {renderCards(inProgress, true)}
+              </TvShelf>
+            );
+          }
           return (
             <div key="continue" className="section">
               <div className="section-title">Continue Watching</div>
-              <div className="cards-grid">
-                {inProgress.map((item) => {
-                  const pk =
-                    item.media_type === "movie"
-                      ? `movie_${item.id}`
-                      : `tv_${item.id}_s${item.season}e${item.episode}`;
-                  const r = getRating(item);
-                  const restr = itemRestricted(item);
-                  return (
-                    <MediaCard
-                      key={`${item.media_type}_${item.id}`}
-                      item={item}
-                      onClick={() => onSelect(item)}
-                      progress={progress[pk] || 0}
-                      watched={watched}
-                      onMarkWatched={onMarkWatched}
-                      onMarkUnwatched={onMarkUnwatched}
-                      ageRating={r.cert}
-                      restricted={restr}
-                    />
-                  );
-                })}
-              </div>
+              <div className="cards-grid">{renderCards(inProgress, true)}</div>
             </div>
           );
         }
@@ -360,8 +377,20 @@ export default function HomePage({
           );
         };
 
+        const renderShelf = (key, title, items) => (
+          <TvShelf key={key} title={title}>
+            {renderCards(items, false)}
+          </TvShelf>
+        );
+
         if (id === "recommended") {
           if (filteredRecommendedItems.length === 0) return null;
+          if (tv)
+            return renderShelf(
+              "recommended",
+              "Recommended for You",
+              filteredRecommendedItems,
+            );
           if (viewMode === "list")
             return renderList(
               "recommended",
@@ -382,6 +411,12 @@ export default function HomePage({
 
         if (id === "trendingMovies") {
           if (trendingMovieItems.length === 0) return null;
+          if (tv)
+            return renderShelf(
+              "trendingMovies",
+              "Trending Movies",
+              trendingMovieItems,
+            );
           if (viewMode === "list")
             return renderList(
               "trendingMovies",
@@ -402,6 +437,8 @@ export default function HomePage({
 
         if (id === "trendingTV") {
           if (trendingTVItems.length === 0) return null;
+          if (tv)
+            return renderShelf("trendingTV", "Trending Series", trendingTVItems);
           if (viewMode === "list")
             return renderList(
               "trendingTV",
@@ -422,6 +459,7 @@ export default function HomePage({
 
         if (id === "topRated") {
           if (topRatedItems.length === 0) return null;
+          if (tv) return renderShelf("topRated", "Top Rated", topRatedItems);
           if (viewMode === "list")
             return renderList("topRated", "Top Rated", null, topRatedItems);
           return (

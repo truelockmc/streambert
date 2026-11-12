@@ -80,8 +80,10 @@ const MediaCard = memo(function MediaCard({
 
   return (
     <>
-      <div
+      <button
+        type="button"
         className={`card${isWatched ? " ep-watched" : ""}${isUnreleased ? " card--unreleased" : ""}`}
+        tabIndex={-1}
         onClick={onClick}
         onContextMenu={isUnreleased ? undefined : openMenu}
       >
@@ -153,7 +155,7 @@ const MediaCard = memo(function MediaCard({
         >
           {isUnreleased ? "SOON" : isAnime ? "ANIME" : isTV ? "TV" : "HD"}
         </span>
-      </div>
+      </button>
 
       {menu && (
         <div

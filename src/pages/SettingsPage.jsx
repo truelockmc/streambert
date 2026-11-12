@@ -7,7 +7,11 @@ import {
   isElectron,
   clearAppCaches,
 } from "../utils/storage";
-import { clearTmdbCache } from "../utils/api";
+import {
+  clearTmdbCache,
+  NON_ANIME_DEFAULT_SOURCE,
+  PLAYER_SOURCES,
+} from "../utils/api";
 import {
   ACCENT_PRESETS,
   applyAccentColor,
@@ -125,33 +129,31 @@ function SettingsSelect({ value, onChange, options, style }) {
           {options.map((o) => {
             const active = String(o.value) === String(value);
             return (
-              <div
+              <button
                 key={o.value}
-                onMouseDown={() => {
+                type="button"
+                onClick={() => {
                   onChange(o.value);
                   setOpen(false);
                 }}
                 style={{
+                  display: "block",
+                  width: "100%",
                   padding: "8px 12px",
                   fontSize: 14,
                   borderRadius: 7,
+                  border: "none",
+                  textAlign: "left",
+                  fontFamily: "inherit",
                   cursor: "pointer",
                   color: active ? "var(--red)" : "var(--text)",
                   background: active ? "rgba(229,9,20,0.10)" : "transparent",
                   fontWeight: active ? 600 : 400,
-                  transition: "background 0.1s, color 0.1s",
                   whiteSpace: "nowrap",
-                }}
-                onMouseEnter={(e) => {
-                  if (!active)
-                    e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!active) e.currentTarget.style.background = "transparent";
                 }}
               >
                 {o.label}
-              </div>
+              </button>
             );
           })}
         </div>
@@ -1799,6 +1801,61 @@ function LibraryPrivacySection() {
   );
 }
 
+function PlaybackSourceSection() {
+  const [source, setSource] = useState(
+    () => storage.get(STORAGE_KEYS.PLAYER_SOURCE) || NON_ANIME_DEFAULT_SOURCE,
+  );
+
+  const choose = (id) => {
+    setSource(id);
+    storage.set(STORAGE_KEYS.PLAYER_SOURCE, id);
+  };
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">Playback Source</div>
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--text3)",
+          marginBottom: 16,
+          lineHeight: 1.6,
+        }}
+      >
+        The stream used when you press play. Leave the video, pick a source
+        here, then start the episode again.
+      </div>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          maxWidth: 480,
+        }}
+      >
+        {PLAYER_SOURCES.filter((src) => !src.movieOnly).map((src) => {
+          const selected = source === src.id;
+          return (
+            <button
+              key={src.id}
+              className="btn"
+              onClick={() => choose(src.id)}
+              style={{
+                justifyContent: "flex-start",
+                background: selected ? "#fff" : "var(--surface2)",
+                color: selected ? "#111" : "#fff",
+              }}
+            >
+              {src.label}
+              {src.tag ? ` · ${src.tag}` : ""}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function StartPageSection() {
   const [startPage, setStartPage] = useState(
     () => storage.get(STORAGE_KEYS.START_PAGE) || "home",
@@ -2588,6 +2645,9 @@ const SECTION_NAV = [
       "threshold",
       "watched",
       "playback",
+      "source",
+      "stream",
+      "vidrift",
       "seconds",
       "mark",
       "auto-watched",
@@ -3276,7 +3336,7 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
               {SECTION_NAV.map((s) => (
                 <button
                   key={s.id}
-                  onMouseDown={() => scrollTo(s.id)}
+                  onClick={() => scrollTo(s.id)}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -3569,7 +3629,7 @@ export default function SettingsPage({
   };
 
   return (
-    <>
+    <div className="settings-page">
       {showProgressConfirm && (
         <ConfirmDialog
           title="CLEAR WATCH PROGRESS?"
@@ -3784,8 +3844,12 @@ export default function SettingsPage({
         <div ref={secPlayback} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
             title="Playback"
-            subtitle="Trailer source and auto-watched behavior"
+            subtitle="Stream source, trailers, and auto-watched behavior"
           />
+
+          <PlaybackSourceSection />
+
+          <Divider />
 
           {/* Invidious */}
           <div style={{ marginBottom: 40 }}>
@@ -4503,6 +4567,6 @@ export default function SettingsPage({
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

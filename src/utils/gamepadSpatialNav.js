@@ -13,6 +13,9 @@ const FOCUSABLE_SELECTOR = [
   '[role="button"]:not([aria-disabled="true"])',
   ".card",
   ".sidebar-btn",
+  ".episode-card",
+  ".search-result",
+  ".search-history-item",
   '[tabindex]:not([tabindex="-1"])',
   "input:not([disabled])",
   "select:not([disabled])",
@@ -31,8 +34,15 @@ function isVisible(el) {
   if (el.offsetParent === null && style.position !== "fixed") return false;
   const rect = el.getBoundingClientRect();
   if (rect.width === 0 && rect.height === 0) return false;
-  // Allow a little overscroll so off-screen-but-scrollable items still count.
-  return rect.bottom > -80 && rect.top < window.innerHeight + 80;
+  if (
+    document.documentElement.dataset.tv === "1" &&
+    (el.closest(".sidebar-saved") || el.closest(".sidebar-logo"))
+  ) {
+    return false;
+  }
+  // TV pages are long. Keep episodes and shelves focusable before they scroll in.
+  const pad = document.documentElement.dataset.tv === "1" ? 20000 : 80;
+  return rect.bottom > -pad && rect.top < window.innerHeight + pad;
 }
 
 const CLICKABLE_CURSORS = new Set(["pointer", "grab"]);
@@ -64,6 +74,8 @@ function isModalRoot(el) {
 }
 
 function getScopeRoot() {
+  const keyboard = document.querySelector(".tv-keyboard");
+  if (keyboard && isVisible(keyboard)) return keyboard;
   const overlays = Array.from(
     document.querySelectorAll('[class*="overlay"]'),
   ).filter((el) => isVisible(el) && isModalRoot(el));
@@ -79,6 +91,13 @@ function getCandidates() {
   const out = [];
   for (const el of semantic) {
     if (!isVisible(el) || seen.has(el)) continue;
+    // The card itself is the target. Inner buttons (More, remove) stay out of the path.
+    if (
+      el.closest(".episode-card, .search-result, .search-history-item") &&
+      !el.matches(".episode-card, .search-result, .search-history-item")
+    ) {
+      continue;
+    }
     seen.add(el);
     out.push(el);
   }
@@ -102,13 +121,55 @@ export function setGamepadFocus(el, { scroll = true } = {}) {
   try {
     currentEl.focus?.({ preventScroll: true });
   } catch {}
-  if (scroll) {
-    currentEl.scrollIntoView?.({
-      block: "nearest",
-      inline: "nearest",
-      behavior: "smooth",
-    });
+  if (scroll) revealFocus(currentEl);
+}
+
+function revealFocus(el) {
+  const page = el.closest(".main");
+  let scrolledList = false;
+  let node = el.parentElement;
+  while (node && node !== document.body) {
+    const style = getComputedStyle(node);
+    const scrolls =
+      /(auto|scroll)/.test(style.overflowY) &&
+      node.scrollHeight > node.clientHeight + 8;
+    if (scrolls && node !== page) {
+      const elRect = el.getBoundingClientRect();
+      const box = node.getBoundingClientRect();
+      if (elRect.top < box.top + 8 || elRect.bottom > box.bottom - 8) {
+        node.scrollTop += elRect.top - box.top - 8;
+      }
+      scrolledList = true;
+      break;
+    }
+    node = node.parentElement;
   }
+  if (page && !scrolledList) {
+    const elRect = el.getBoundingClientRect();
+    const box = page.getBoundingClientRect();
+    const hidden = elRect.top < box.top + 16 || elRect.bottom > box.bottom - 16;
+      if (hidden) {
+      page.scrollBy({
+        top: elRect.top - box.top - box.height * 0.28,
+        behavior: "auto",
+      });
+    }
+  }
+  const row = el.closest(".tv-shelf-row, .season-selector, .episodes-grid");
+  if (row && row.scrollWidth > row.clientWidth + 8) {
+    const elRect = el.getBoundingClientRect();
+    const box = row.getBoundingClientRect();
+    if (elRect.left < box.left + 8 || elRect.right > box.right - 8) {
+      row.scrollBy({
+        left: elRect.left - box.left - 48,
+        behavior: "auto",
+      });
+    }
+  }
+}
+
+export function ensureFocusVisible() {
+  if (currentEl && document.contains(currentEl)) revealFocus(currentEl);
 }
 
 export function getGamepadFocus() {
@@ -123,6 +184,9 @@ export function clearGamepadFocus() {
 export function confirmGamepadFocus() {
   const el = getGamepadFocus();
   if (!el) return false;
+  const eventInit = { bubbles: true, cancelable: true, view: window };
+  el.dispatchEvent(new MouseEvent("mousedown", eventInit));
+  el.dispatchEvent(new MouseEvent("mouseup", eventInit));
   el.click();
   return true;
 }
@@ -150,6 +214,10 @@ export function dismissActiveOverlay() {
 
 function pickInitial(candidates) {
   if (candidates.length === 0) return null;
+  if (document.documentElement.dataset.tv === "1") {
+    const marked = candidates.find((el) => el.hasAttribute("data-tv-initial"));
+    if (marked) return marked;
+  }
   let best = null;
   let bestScore = Infinity;
   for (const el of candidates) {
@@ -170,14 +238,34 @@ const DIR_VECTOR = {
   right: [1, 0],
 };
 
-export function moveGamepadFocus(direction) {
-  const candidates = getCandidates();
-  if (candidates.length === 0) return;
+function settingsPage() {
+  if (document.documentElement.dataset.tv !== "1") return null;
+  return document.querySelector(".settings-page");
+}
 
+/** Settings stays in its own column. Up and down never cross into the sidebar. */
+function candidatesForMove(direction, from) {
+  const candidates = getCandidates();
+  const page = settingsPage();
+  if (!page) return candidates;
+  if (!from) return candidates.filter((el) => page.contains(el));
+  const inPage = page.contains(from);
+  const inSidebar = !!from.closest(".sidebar");
+  if (!inPage && !inSidebar) return candidates;
+  if (direction !== "up" && direction !== "down") return candidates;
+  return candidates.filter((el) =>
+    inPage ? page.contains(el) : !!el.closest(".sidebar"),
+  );
+}
+
+export function moveGamepadFocus(direction) {
   const from = getGamepadFocus();
+  const candidates = candidatesForMove(direction, from);
+  if (candidates.length === 0) return false;
+
   if (!from || !candidates.includes(from)) {
     setGamepadFocus(pickInitial(candidates));
-    return;
+    return true;
   }
 
   const fromRect = from.getBoundingClientRect();
@@ -186,20 +274,26 @@ export function moveGamepadFocus(direction) {
     y: fromRect.top + fromRect.height / 2,
   };
   const [dx, dy] = DIR_VECTOR[direction];
+  const overlap = 16;
+  const isPastEdge = (rect) => {
+    if (direction === "down") return rect.top >= fromRect.bottom - overlap;
+    if (direction === "up") return rect.bottom <= fromRect.top + overlap;
+    if (direction === "right") return rect.left >= fromRect.right - overlap;
+    if (direction === "left") return rect.right <= fromRect.left + overlap;
+    return false;
+  };
 
   let best = null;
   let bestScore = Infinity;
   for (const el of candidates) {
     if (el === from) continue;
     const r = el.getBoundingClientRect();
+    if (!isPastEdge(r)) continue;
     const center = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
     const vx = center.x - fromCenter.x;
     const vy = center.y - fromCenter.y;
-    // Candidate must lie (at least a bit) in the pressed direction.
     const primary = vx * dx + vy * dy;
     if (primary <= 0) continue;
-    // Penalise perpendicular drift so rows/columns feel straight rather
-    // than jumping diagonally to the nearest raw-distance element.
     const perpendicular = Math.abs(vx * dy - vy * dx);
     const score = primary + perpendicular * 2.5;
     if (score < bestScore) {
@@ -208,7 +302,11 @@ export function moveGamepadFocus(direction) {
     }
   }
 
-  if (best) setGamepadFocus(best);
+  if (best) {
+    setGamepadFocus(best);
+    return true;
+  }
+  return false;
 }
 
 export function ensureInitialFocus() {

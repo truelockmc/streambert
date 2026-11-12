@@ -501,6 +501,15 @@ body.no-anim *::after {
     position: relative;
 }
 
+button.card {
+    display: block;
+    width: 100%;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+}
+
 .card:hover {
     transform: translateY(-4px) scale(1.02);
     border-color: var(--red);
@@ -701,8 +710,21 @@ body.no-anim *::after {
     transition: background 0.15s;
 }
 
-.search-result:hover {
+.search-result:hover,
+.search-result.gamepad-focused {
     background: var(--surface2);
+}
+
+html[data-tv="1"] .search-result.gamepad-focused {
+    background: #fff;
+    color: #111;
+    outline: none;
+}
+
+html[data-tv="1"] .search-result.gamepad-focused .search-result-title,
+html[data-tv="1"] .search-result.gamepad-focused .search-result-meta,
+html[data-tv="1"] .search-result.gamepad-focused .search-result-type {
+    color: #111;
 }
 
 .search-result img {
@@ -1432,8 +1454,8 @@ body.no-anim *::after {
 }
 
 .history-thumb {
-    width: 32px;
-    height: 46px;
+    width: 54px;
+    height: 78px;
     border-radius: 4px;
     overflow: hidden;
     background: var(--surface3);
@@ -1476,6 +1498,118 @@ body.no-anim *::after {
 .history-remove-btn:hover {
     color: var(--red);
     background: color-mix(in srgb, var(--red) 12%, transparent);
+}
+
+.history-entry {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.history-entry .history-row {
+    flex: 1;
+    min-width: 0;
+}
+
+.history-copy {
+    flex: 1;
+    min-width: 0;
+}
+
+.history-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.history-meta {
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--text3);
+}
+
+.history-progress {
+    margin-top: 8px;
+    height: 4px;
+    border-radius: 99px;
+    background: var(--surface3);
+    overflow: hidden;
+}
+
+.history-progress > div {
+    height: 100%;
+    background: var(--red);
+}
+
+.history-thumb-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: var(--text3);
+    font-weight: 700;
+}
+
+.history-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.history-action {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.history-action--remove {
+    color: var(--red);
+}
+
+.library-back {
+    margin-bottom: 18px;
+}
+
+.library-series-head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.library-series-head .history-thumb {
+    width: 72px;
+    height: 104px;
+}
+
+.library-series-title {
+    font-size: 36px;
+    margin-bottom: 4px;
+}
+
+.library-series-actions {
+    margin-bottom: 18px;
+}
+
+html[data-tv="1"] .history-row.gamepad-focused,
+html[data-tv="1"] .history-action.gamepad-focused,
+html[data-tv="1"] .library-series .btn.gamepad-focused,
+html[data-tv="1"] [data-history-empty].gamepad-focused {
+    outline: 4px solid #fff !important;
+    outline-offset: 3px;
+}
+
+.history-empty {
+    padding: 28px 8px;
 }
 
 /* ── API Key Setup ───────────────────────────────────────────────────────── */
@@ -4057,3 +4191,356 @@ html[data-win-titlebar][data-maximized] .main {
 .episode-check-item:hover {
     color: var(--text) !important;
 }
+
+/* ── Fire TV / 10-foot mode (?tv=1) ─────────────────────────────────────── */
+html[data-tv="1"] {
+    --sidebar: 248px;
+}
+
+html[data-fire="1"] {
+    cursor: none;
+}
+
+html[data-tv="1"] :focus,
+html[data-tv="1"] :focus-visible {
+    outline: none;
+}
+
+html[data-tv="1"] * {
+    scrollbar-width: none;
+}
+
+html[data-tv="1"] *::-webkit-scrollbar {
+    display: none;
+}
+
+html[data-tv="1"] .sidebar {
+    width: var(--sidebar);
+    align-items: stretch;
+    padding: 36px 18px 24px;
+    gap: 8px;
+    background: linear-gradient(90deg, #050505 0%, rgba(5, 5, 5, 0.92) 78%, rgba(5, 5, 5, 0));
+    border-right: none;
+}
+
+html[data-tv="1"] .sidebar-logo {
+    width: 56px;
+    height: 56px;
+    margin: 0 0 18px 8px;
+}
+
+html[data-tv="1"] .sidebar-saved,
+html[data-tv="1"] .sidebar-sep,
+html[data-tv="1"] .sidebar-quit {
+    display: none;
+}
+
+html[data-tv="1"] .sidebar-btn {
+    width: 100%;
+    height: 58px;
+    justify-content: flex-start;
+    gap: 16px;
+    padding: 0 18px;
+    border-radius: 10px;
+    color: #d6d6d6;
+}
+
+html[data-tv="1"] .sidebar-btn svg {
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+}
+
+html[data-tv="1"] .sidebar-btn .tooltip {
+    position: static;
+    transform: none;
+    opacity: 1;
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 22px;
+    font-weight: 600;
+    color: inherit;
+    pointer-events: none;
+}
+
+html[data-tv="1"] .sidebar-btn:hover,
+html[data-tv="1"] .sidebar-btn.active {
+    color: #fff;
+    background: transparent;
+    box-shadow: none;
+}
+
+html[data-tv="1"] .sidebar-btn.gamepad-focused {
+    outline: none !important;
+    background: #fff;
+    color: #111;
+    transform: none;
+    box-shadow: none;
+}
+
+html[data-tv="1"] .main {
+    background: #000;
+}
+
+html[data-tv="1"] .hero {
+    height: 54vh;
+    min-height: 0;
+}
+
+html[data-tv="1"] .hero-content {
+    max-width: 720px;
+    padding: 0 64px 56px;
+}
+
+html[data-tv="1"] .hero-title,
+html[data-tv="1"] .detail-title {
+    font-size: 84px;
+}
+
+html[data-tv="1"] .hero-overview,
+html[data-tv="1"] .detail-overview {
+    font-size: 22px;
+    line-height: 1.45;
+    max-width: 640px;
+}
+
+html[data-tv="1"] .hero-type,
+html[data-tv="1"] .hero-meta,
+html[data-tv="1"] .card-year {
+    font-size: 14px;
+}
+
+html[data-tv="1"] .card-title {
+    font-size: 15px;
+}
+
+html[data-tv="1"] .btn {
+    min-height: 52px;
+    padding: 12px 26px;
+    font-size: 20px;
+}
+
+html[data-tv="1"] .btn.gamepad-focused,
+html[data-tv="1"] .season-btn.gamepad-focused,
+html[data-tv="1"] .episode-card.gamepad-focused {
+    outline: 4px solid #fff !important;
+    outline-offset: 4px;
+}
+
+html[data-tv="1"] .tv-shelf {
+    position: relative;
+    z-index: 2;
+    margin-top: 8px;
+}
+
+html[data-tv="1"] .tv-shelf-title {
+    font-family: var(--font-body);
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: 0;
+    padding: 8px 64px 0;
+}
+
+html[data-tv="1"] .tv-shelf-row {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding: 22px 64px 36px;
+    scroll-padding-inline: 64px;
+}
+
+html[data-tv="1"] .tv-shelf-row .card {
+    flex: 0 0 196px;
+    width: 196px;
+    scroll-margin: 48px;
+}
+
+html[data-tv="1"] .card:hover {
+    transform: none;
+    border-color: var(--border);
+    box-shadow: none;
+}
+
+html[data-tv="1"] .card:hover .card-overlay {
+    opacity: 0;
+}
+
+html[data-tv="1"] .card.gamepad-focused {
+    transform: scale(1.08);
+    z-index: 5;
+    border-color: #fff;
+    outline: none !important;
+    box-shadow:
+        0 0 0 4px #fff,
+        0 18px 40px rgba(0, 0, 0, 0.7);
+}
+
+html[data-tv="1"] .card.gamepad-focused .card-overlay {
+    opacity: 1;
+}
+
+html[data-tv="1"] .cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 22px;
+    padding: 8px;
+}
+
+html[data-tv="1"] .detail-hero {
+    min-height: 0;
+}
+
+html[data-tv="1"] .season-selector {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 12px;
+    padding-bottom: 8px;
+}
+
+html[data-tv="1"] .season-btn {
+    flex-shrink: 0;
+    font-size: 20px;
+    padding: 12px 22px;
+}
+
+html[data-tv="1"] .episodes-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    overflow: visible;
+    padding: 16px 64px 80px;
+}
+
+html[data-tv="1"] .episode-card {
+    flex: none;
+    width: min(1180px, 100%);
+    min-height: 0;
+    gap: 24px;
+    padding: 16px 20px;
+    align-items: center;
+}
+
+html[data-tv="1"] .episode-thumb {
+    width: 360px;
+    border-radius: 10px;
+}
+
+html[data-tv="1"] .episode-thumb-play svg {
+    width: 48px;
+    height: 48px;
+}
+
+html[data-tv="1"] .episode-num {
+    font-size: 18px;
+    margin-bottom: 6px;
+}
+
+html[data-tv="1"] .episode-name {
+    font-size: 28px;
+    line-height: 1.25;
+    margin-bottom: 8px;
+}
+
+html[data-tv="1"] .episode-desc {
+    font-size: 20px;
+    -webkit-line-clamp: 3;
+}
+
+/* Search keeps the size it had before the UI was fit to the panel. */
+html[data-fire="1"] .modal-overlay {
+    padding-top: calc(80px * var(--tv-restore, 1));
+}
+
+html[data-fire="1"] .search-box {
+    zoom: var(--tv-restore, 1);
+}
+
+/* My Library keeps the size it had before the UI was fit to the panel. */
+html[data-fire="1"] .library-page {
+    zoom: var(--tv-restore, 1);
+    width: 100%;
+}
+
+html[data-tv="1"] .episode-card:hover {
+    border-color: var(--border);
+    background: var(--surface2);
+}
+
+html[data-tv="1"] .player-wrap .player-overlay-btn,
+html[data-tv="1"] .player-wrap .player-overlay-group {
+    opacity: 1;
+}
+
+html[data-tv="1"] .player-overlay-btn {
+    min-height: 48px;
+    padding: 10px 16px;
+    font-size: 16px;
+}
+
+.tv-keyboard {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px 36px 22px;
+    background: rgba(8, 8, 8, 0.96);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.tv-keyboard__row {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+}
+
+.tv-keyboard__key {
+    height: 46px;
+    border: none;
+    border-radius: 8px;
+    background: #2c2c2c;
+    color: #fff;
+    font-family: var(--font-body);
+    font-size: 22px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.tv-keyboard__remote {
+    display: inline-flex;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+}
+
+.tv-keyboard__remote svg {
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+}
+
+.tv-keyboard__key.gamepad-focused {
+    background: #fff;
+    color: #111;
+    outline: none !important;
+    outline-offset: 0;
+}
+
+html[data-tv-keyboard="1"] .modal-overlay {
+    padding-top: 28px;
+}
+
+html[data-fire="1"][data-tv-keyboard="1"] .modal-overlay {
+    padding-top: calc(28px * var(--tv-restore, 1));
+}
+
+html[data-tv-keyboard="1"] .search-results {
+    max-height: 168px;
+}
+

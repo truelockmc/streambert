@@ -106,7 +106,14 @@ export const STORAGE_KEYS = {
   GAMEPAD_ENABLED: "gamepadEnabled",
 };
 
-export const getApiKey = () => storage.get(STORAGE_KEYS.API_KEY);
+/** TMDB Read Access Token baked in via `.env` (Vite exposes only `VITE_*`). */
+export function envTmdbApiKey() {
+  const key = import.meta.env?.VITE_TMDB_API_KEY;
+  return typeof key === "string" && key.trim() ? key.trim() : null;
+}
+
+export const getApiKey = () =>
+  storage.get(STORAGE_KEYS.API_KEY) || envTmdbApiKey();
 
 // ── Source failover cache ────────────────────────────────────────────────────
 // HiAnime doesn't always have every episode; rather than nag the user every
@@ -158,7 +165,7 @@ export function formatBytes(bytes) {
 
 // ── Secure storage for sensitive keys ────────────────────────────────────────
 // Uses Electron safeStorage (OS keychain / DPAPI / libsecret).
-// All methods are async. Non-Electron environments silently fall back to no-op.
+// All methods are async. Outside Electron, "apikey" falls back to VITE_TMDB_API_KEY.
 //
 // Sensitive keys managed here (NOT stored in localStorage):
 //   "apikey"      - TMDB API key
@@ -171,8 +178,12 @@ const _isElectronSecure =
 export const secureStorage = {
   /** Read an encrypted value. Returns null if not set. */
   async get(key) {
-    if (!_isElectronSecure) return null;
-    return window.electron.secureGet(key);
+    if (_isElectronSecure) {
+      const stored = await window.electron.secureGet(key);
+      if (stored) return stored;
+    }
+    if (key === "apikey") return envTmdbApiKey();
+    return null;
   },
 
   /** Write an encrypted value. Pass null/empty to delete. */

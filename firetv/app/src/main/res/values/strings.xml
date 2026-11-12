@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Streambert</string>
+    <string name="start_url">http://192.168.4.26:5173/?tv=1</string>
+    <string name="offline_message">Can\'t reach Streambert.\n\nLeave the Mac awake and running\nnpx vite with --host\n\nPress Select to retry.</string>
+</resources>

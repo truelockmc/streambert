@@ -73,6 +73,7 @@ import {
   GAMEPAD_CLEANUP_JS,
 } from "../utils/playerGamepadScript";
 import { useSourceId } from "../utils/useSourceId";
+import { hasTvShellPlayer, useTvShellPlayer } from "../utils/tvShellPlayer";
 import { setPlayerGamepadActive } from "../utils/gamepadPlayerState";
 import HiAnimeLoader from "../components/HiAnimeLoader";
 
@@ -97,6 +98,15 @@ export default function MoviePage({
 }) {
   const [details, setDetails] = useState(null);
   const [playing, setPlaying] = useState(false);
+  useEffect(() => {
+    if (!playing) return undefined;
+    const onTvBack = (event) => {
+      event.preventDefault();
+      setPlaying(false);
+    };
+    window.addEventListener("streambert:tv-back", onTvBack);
+    return () => window.removeEventListener("streambert:tv-back", onTvBack);
+  }, [playing]);
   const [showDownload, setShowDownload] = useState(false);
   const [trailerKey, setTrailerKey] = useState(null);
   const [showTrailer, setShowTrailer] = useState(false);
@@ -146,7 +156,7 @@ export default function MoviePage({
   const srcId = useSourceId(playerSource, "movie", item.id, apiKey);
   // Re-show the loading overlay once a resolved IMDb id swaps in the real URL
   useEffect(() => {
-    if (srcId.id && playing) setWebviewLoading(true);
+    if (srcId.id && playing && !hasTvShellPlayer()) setWebviewLoading(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [srcId.id]);
   const [playerFullscreen, setPlayerFullscreen] = useState(false);
@@ -193,6 +203,10 @@ export default function MoviePage({
     playerAccentColor,
     playerSubLang,
   ]);
+  useTvShellPlayer(
+    sourceIsAsync(playerSource) ? resolvedPlayerUrl : playerDirectUrl,
+    playing,
+  );
   const [downloaderFolder, setDownloaderFolder] = useState(
     () => storage.get("downloaderFolder") || "",
   );
@@ -337,7 +351,7 @@ export default function MoviePage({
     resolvingUrlRef.current = false;
     setResolvingUrl(false);
     setResolveError(null);
-    setWebviewLoading(true); // instantly blank the player on every source/item switch
+    if (!hasTvShellPlayer()) setWebviewLoading(true);
   }, [item.id, playerSource, dubMode]);
 
   // Fetch AniList data + auto-set source for anime/non-anime
@@ -515,7 +529,8 @@ export default function MoviePage({
 
   // Show loader instantly when play starts
   useEffect(() => {
-    if (playing) setWebviewLoading(true);
+    if (!playing) return;
+    setWebviewLoading(!hasTvShellPlayer());
   }, [playing]);
 
   // ── Webview memory cleanup ────────────────────────────────────────────────
@@ -907,7 +922,12 @@ export default function MoviePage({
                   🔒 Restricted
                 </button>
               ) : (
-                <button className="btn btn-primary" onClick={handlePlay}>
+                <button
+                  className="btn btn-primary"
+                  data-tv-initial=""
+                  data-tv-play=""
+                  onClick={handlePlay}
+                >
                   <PlayIcon /> {playing ? "Restart" : "Play"}
                 </button>
               )}

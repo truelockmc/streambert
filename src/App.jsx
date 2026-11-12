@@ -33,6 +33,9 @@ import SetupScreen from "./components/SetupScreen";
 import CloseConfirmModal from "./components/CloseConfirmModal";
 import UpdateModal from "./components/UpdateModal";
 import { useGamepadNav } from "./utils/useGamepadNav";
+import { isTvMode } from "./utils/tvMode";
+import { useTvRemote } from "./utils/useTvRemote";
+import { TvKeyboard } from "./components/TvKeyboard";
 
 // Lazy-loaded pages: each chunk is only downloaded when the user first visits
 const HomePage = lazy(() => import("./pages/HomePage"));
@@ -654,6 +657,8 @@ export default function App() {
   // Refs so navigate/navigateBack never need page/selected as deps
   const pageRef = useRef(page);
   const selectedRef = useRef(selected);
+  const navStackRef = useRef(navStack);
+  navStackRef.current = navStack;
   useEffect(() => {
     pageRef.current = page;
   }, [page]);
@@ -745,6 +750,12 @@ export default function App() {
     enabled: gamepadEnabled,
     onBack: navigateBack,
     onOpenSearch: () => setShowSearch(true),
+  });
+  const tvMode = isTvMode();
+  useTvRemote({
+    enabled: tvMode,
+    onBack: navigateBack,
+    navStackRef,
   });
   useEffect(() => {
     if (!gamepadEnabled) return;
@@ -1163,6 +1174,7 @@ export default function App() {
           </Suspense>
         </div>
 
+        {tvMode && <TvKeyboard />}
         {showSearch && (
           <SearchModal
             apiKey={apiKey}
