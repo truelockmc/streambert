@@ -6,11 +6,11 @@ The Stick does not ship the UI. The APK is a shell with two WebViews. The app We
 
 ## What has to be running
 
-Current addresses, also written in `firetv/app/src/main/res/values/strings.xml`:
+Put your own addresses in `firetv/app/src/main/res/values/strings.xml` before you build. Do not commit them.
 
-- Fire TV Stick: `192.168.4.22` (model AFTSSS / sheldonp). ADB is on.
-- Mac on the same LAN: `192.168.4.26`
-- App URL: `http://192.168.4.26:5173/?tv=1`
+- Fire TV Stick: `YOUR_STICK_IP`. ADB is on.
+- Mac on the same LAN: `YOUR_LAN_IP`
+- App URL: `http://YOUR_LAN_IP:5173/?tv=1`
 
 On the Mac:
 
@@ -27,10 +27,10 @@ If the Mac's LAN address changes, edit `start_url` in `firetv/app/src/main/res/v
 ## Day to day
 
 ```sh
-adb connect 192.168.4.22:5555
-adb -s 192.168.4.22:5555 install -r firetv/streambert-tv.apk
-adb -s 192.168.4.22:5555 shell am force-stop com.streambert.tv
-adb -s 192.168.4.22:5555 shell am start -n com.streambert.tv/.MainActivity
+adb connect YOUR_STICK_IP:5555
+adb -s YOUR_STICK_IP:5555 install -r firetv/streambert-tv.apk
+adb -s YOUR_STICK_IP:5555 shell am force-stop com.streambert.tv
+adb -s YOUR_STICK_IP:5555 shell am start -n com.streambert.tv/.MainActivity
 ```
 
 Package name is `com.streambert.tv`. The activity is `MainActivity`. The signed APK is `firetv/streambert-tv.apk`. `firetv/.gitignore` ignores `*.apk`, `build/`, and `local.properties`, so the APK and the debug keystore stay on this machine.
@@ -47,8 +47,8 @@ Remote key codes, if you need to drive it from the Mac:
 Chrome DevTools for the WebView:
 
 ```sh
-PID=$(adb -s 192.168.4.22:5555 shell pidof com.streambert.tv)
-adb -s 192.168.4.22:5555 forward tcp:9222 localabstract:webview_devtools_remote_$PID
+PID=$(adb -s YOUR_STICK_IP:5555 shell pidof com.streambert.tv)
+adb -s YOUR_STICK_IP:5555 forward tcp:9222 localabstract:webview_devtools_remote_$PID
 ```
 
 Then open `http://127.0.0.1:9222/json`. The app page is the one on port 5173. While something is playing, a second page is the player WebView.
