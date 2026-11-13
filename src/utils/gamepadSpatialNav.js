@@ -245,29 +245,64 @@ function settingsPage() {
 
 /** Settings stays in its own column. Up and down never cross into the sidebar. */
 function candidatesForMove(direction, from) {
-  const candidates = getCandidates();
+  let candidates = getCandidates();
   const page = settingsPage();
-  if (!page) return candidates;
-  if (!from) return candidates.filter((el) => page.contains(el));
-  const inPage = page.contains(from);
-  const inSidebar = !!from.closest(".sidebar");
-  if (!inPage && !inSidebar) return candidates;
-  if (direction !== "up" && direction !== "down") return candidates;
-  return candidates.filter((el) =>
-    inPage ? page.contains(el) : !!el.closest(".sidebar"),
-  );
+  if (page) {
+    if (!from) return candidates.filter((el) => page.contains(el));
+    const inPage = page.contains(from);
+    const inSidebar = !!from.closest(".sidebar");
+    if (
+      (inPage || inSidebar) &&
+      (direction === "up" || direction === "down")
+    ) {
+      candidates = candidates.filter((el) =>
+        inPage ? page.contains(el) : !!el.closest(".sidebar"),
+      );
+    }
+  }
+  return constrainEpisodeList(direction, from, candidates);
 }
 
-export function moveGamepadFocus(direction) {
-  const from = getGamepadFocus();
-  const candidates = candidatesForMove(direction, from);
-  if (candidates.length === 0) return false;
+/**
+ * A season row is horizontal, and episode cards are wide. Plain geometry
+ * treats Down as "whatever center is lower", so Down from Season 1 lands on
+ * Season 10 or the sidebar. Keep vertical moves inside the season the
+ * screen is showing.
+ */
+function constrainEpisodeList(direction, from, candidates) {
+  if (document.documentElement.dataset.tv !== "1" || !from) return candidates;
+  const episodes = from.closest(".tv-episodes");
+  if (!episodes) return candidates;
+  const onSeason = !!from.closest(".season-btn");
+  const onEpisode = !!from.closest(".episode-card");
 
-  if (!from || !candidates.includes(from)) {
-    setGamepadFocus(pickInitial(candidates));
-    return true;
+  if (onSeason && (direction === "left" || direction === "right")) {
+    return candidates.filter((el) => el.classList.contains("season-btn"));
   }
+  if (onSeason && direction === "down") {
+    return candidates.filter((el) => el.classList.contains("episode-card"));
+  }
+  if (onSeason && direction === "up") {
+    return candidates.filter(
+      (el) => !el.closest(".sidebar") && !el.closest(".tv-episodes"),
+    );
+  }
+  if (onEpisode && direction === "down") {
+    return candidates.filter((el) => el.classList.contains("episode-card"));
+  }
+  if (onEpisode && direction === "up") {
+    const cards = candidates.filter((el) => el.classList.contains("episode-card"));
+    const active = episodes.querySelector(".season-btn.active");
+    if (active instanceof HTMLElement) cards.push(active);
+    return cards;
+  }
+  if (direction === "up" || direction === "down") {
+    return candidates.filter((el) => !el.closest(".sidebar"));
+  }
+  return candidates;
+}
 
+function pickInDirection(from, candidates, direction) {
   const fromRect = from.getBoundingClientRect();
   const fromCenter = {
     x: fromRect.left + fromRect.width / 2,
@@ -301,10 +336,38 @@ export function moveGamepadFocus(direction) {
       best = el;
     }
   }
+  return best;
+}
 
+export function moveGamepadFocus(direction) {
+  const from = getGamepadFocus();
+  const candidates = candidatesForMove(direction, from);
+  if (!from) {
+    if (candidates.length === 0) return false;
+    setGamepadFocus(pickInitial(candidates));
+    return true;
+  }
+  if (candidates.length === 0) return false;
+
+  const best = pickInDirection(from, candidates, direction);
   if (best) {
     setGamepadFocus(best);
     return true;
+  }
+  // Left from the first season or the episode list steps out to the sidebar.
+  if (
+    direction === "left" &&
+    from.closest(".season-btn, .episode-card")
+  ) {
+    const side = pickInDirection(
+      from,
+      getCandidates().filter((el) => el.closest(".sidebar")),
+      direction,
+    );
+    if (side) {
+      setGamepadFocus(side);
+      return true;
+    }
   }
   return false;
 }

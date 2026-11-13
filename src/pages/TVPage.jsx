@@ -2580,7 +2580,7 @@ export default function TVPage({
             </div>
           )}
 
-          <div className="section">
+          <div className="section tv-episodes">
             <div className="section-title">Episodes</div>
             {seasons.length > 0 && (
               <div className="season-selector">
