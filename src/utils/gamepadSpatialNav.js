@@ -111,9 +111,14 @@ function getCandidates() {
 
 function clearHighlight() {
   currentEl?.classList.remove(FOCUS_CLASS);
+  document.querySelectorAll(`.${FOCUS_CLASS}`).forEach((el) => {
+    if (el !== currentEl) el.classList.remove(FOCUS_CLASS);
+  });
 }
 
 export function setGamepadFocus(el, { scroll = true } = {}) {
+  const page = document.querySelector(".main");
+  const pageTop = page ? page.scrollTop : 0;
   clearHighlight();
   currentEl = el || null;
   if (!currentEl) return;
@@ -122,6 +127,7 @@ export function setGamepadFocus(el, { scroll = true } = {}) {
     currentEl.focus?.({ preventScroll: true });
   } catch {}
   if (scroll) revealFocus(currentEl);
+  else if (page && page.scrollTop !== pageTop) page.scrollTop = pageTop;
 }
 
 function revealFocus(el) {
@@ -349,7 +355,18 @@ export function moveGamepadFocus(direction) {
   }
   if (candidates.length === 0) return false;
 
-  const best = pickInDirection(from, candidates, direction);
+  let best = pickInDirection(from, candidates, direction);
+  // The row above the seasons is Trailer, Cast, Favorite, Save. Geometry
+  // would carry that button's column down onto Season 3. Down enters the
+  // season that is already selected.
+  if (
+    direction === "down" &&
+    best?.classList.contains("season-btn") &&
+    !from.closest(".season-selector")
+  ) {
+    const active = document.querySelector(".tv-episodes .season-btn.active");
+    if (active instanceof HTMLElement) best = active;
+  }
   if (best) {
     setGamepadFocus(best);
     return true;

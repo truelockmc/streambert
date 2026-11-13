@@ -11,6 +11,7 @@ import android.os.Message;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.text.Editable;
@@ -21,6 +22,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebChromeClient;
@@ -46,6 +48,7 @@ public class MainActivity extends Activity {
     private EditText keyboardField;
     private String playerHost;
     private long lastSeekAt;
+    private boolean tapVidSrcOnLoad;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -190,7 +193,8 @@ public class MainActivity extends Activity {
                 return true;
             }
             if (isSelect(code)) {
-                playerCommand("select");
+                if (isVidSrc(playerHost)) tapPlayerCenter();
+                else playerCommand("select");
                 return true;
             }
             if (code == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
@@ -441,6 +445,7 @@ public class MainActivity extends Activity {
         settings.setSupportMultipleWindows(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setUserAgentString(PLAYER_UA);
+        view.addJavascriptInterface(new MatchBridge(), "StreambertMatch");
         view.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onCreateWindow(
@@ -479,8 +484,15 @@ public class MainActivity extends Activity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
+                if (tapVidSrcOnLoad && url != null && url.contains("vsembed.su")) {
+                    tapVidSrcOnLoad = false;
+                    // VidSrc waits on a play button inside a nested frame.
+                    view.postDelayed(() -> tapPlayerCenter(), 1200);
+                }
                 injectPlayerChrome(view, url);
+                injectEpisodeMatch(view, url);
                 view.postDelayed(() -> injectPlayerChrome(view, url), 700);
+                view.postDelayed(() -> injectEpisodeMatch(view, url), 700);
                 view.postDelayed(() -> injectPlayerChrome(view, url), 2000);
             }
 
@@ -504,6 +516,7 @@ public class MainActivity extends Activity {
         if (url == null || !(url.startsWith("https://") || url.startsWith("http://"))) return;
         if (keyboardOpen) hideKeyboard();
         playerHost = Uri.parse(url).getHost();
+        tapVidSrcOnLoad = isVidSrc(playerHost);
         playerVisible = true;
         // Keep the show page hidden so its surface cannot cover the video,
         // but leave JavaScript running so a source change can reload this player.
@@ -515,6 +528,25 @@ public class MainActivity extends Activity {
         playerWeb.onResume();
         playerWeb.loadUrl(url);
         playerWeb.requestFocus();
+    }
+
+    private static boolean isVidSrc(String host) {
+        return host != null && (host.equals("vsembed.su") || host.endsWith(".vsembed.su"));
+    }
+
+    /** Hits the play button VidSrc puts in the middle of a nested frame. */
+    private void tapPlayerCenter() {
+        if (playerWeb == null) return;
+        int x = playerWeb.getWidth() / 2;
+        int y = playerWeb.getHeight() / 2;
+        if (x <= 0 || y <= 0) return;
+        long now = android.os.SystemClock.uptimeMillis();
+        MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, x, y, 0);
+        MotionEvent up = MotionEvent.obtain(now, now + 40, MotionEvent.ACTION_UP, x, y, 0);
+        playerWeb.dispatchTouchEvent(down);
+        playerWeb.dispatchTouchEvent(up);
+        down.recycle();
+        up.recycle();
     }
 
     /** Remote controls for the embed. The page's own D-pad handling seeks too far. */
@@ -578,6 +610,34 @@ public class MainActivity extends Activity {
                     "window.dispatchEvent(new CustomEvent('streambert:tv-back',{cancelable:true}))",
                     null);
         }
+    }
+
+    /** The player page asks for another source when its files are the wrong episode. */
+    public class MatchBridge {
+        @android.webkit.JavascriptInterface
+        public void failover() {
+            runOnUiThread(() -> webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('streambert:source-mismatch'))",
+                    null));
+        }
+    }
+
+    /** Ask the app page for the episode check and run it in the player page. */
+    private void injectEpisodeMatch(WebView view, String url) {
+        if (view == null || url == null || !url.contains("vidrift")) return;
+        webView.evaluateJavascript(
+                "(function(){return window.__sbEpisodeMatchSource||''})()",
+                value -> {
+                    if (value == null || value.length() < 2 || "null".equals(value)) return;
+                    String src;
+                    try {
+                        src = new JSONArray("[" + value + "]").getString(0);
+                    } catch (Exception error) {
+                        return;
+                    }
+                    if (src.isEmpty()) return;
+                    view.evaluateJavascript(src, null);
+                });
     }
 
     /** Same chrome removal the desktop player applies in siteTweaks.js. */

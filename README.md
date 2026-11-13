@@ -40,6 +40,26 @@ A cross-platform Electron Desktop App to stream and download any Movie, TV Serie
 The Application gets video streams from different hosters/aggregators, see [PLAYER_SOURCES](src/utils/api.js). <br></br>
 It fetches Information for Images, Info Texts, Search and Homepage from [tmdb](https://www.themoviedb.org/).
 
+### A source plays the wrong series
+
+Some episodes on a source are a different series that shares the name. Doctor Who (2005, TMDB `57243`) season 1 episodes 1–3 on Vidrift are the 2024 series, so those three play on VidSrc. The Eleventh Hour and every other episode of that show stay on the saved source. The saved source itself is not changed.
+
+`whoEpisode` in [src/utils/episodeMatch.js](src/utils/episodeMatch.js) is that list (`WHO_EPISODES`). Another show is another row:
+
+```js
+{
+  id: 57243,          // TMDB show id
+  season: 1,
+  episodes: [1, 2, 3],
+  source: "vidrift",  // the source whose file is the wrong series
+  playOn: "vidsrc",   // the source that has the right episode
+}
+```
+
+Only those episodes switch, and only when the saved source is `source`. The rest of the show stays on the saved source, including after one of the bad episodes has played.
+
+Vidrift also checks the opening English captions against the episode title. Captions that contradict the title leave that source for that episode. A file with no captions stays, so a known case still needs a row. Do not add a whole show because one episode was wrong.
+
 ---
 
 ## Downloading
@@ -85,8 +105,46 @@ Download the latest `Streambert Setup *.exe` from the [Releases](https://codeber
 ### macOS
 Download the latest `Streambert-*-universal.dmg` from the [Releases](https://codeberg.org/truelockmc/streambert/releases/latest) page, open it and drag Streambert to your Applications folder.
 
----
+### Fire TV Stick
 
+The Stick build is a sideload, not an Amazon Appstore app. The APK in `firetv/` is a shell with two WebViews. One loads the Streambert UI. Playback opens in a second fullscreen WebView, because the embed hosts refuse to be iframed.
+
+The Stick does not bundle the app. It loads a dev server on your computer.
+
+1. In `firetv/app/src/main/res/values/strings.xml`, set `start_url` to your computer's address:
+
+```xml
+<string name="start_url">http://YOUR_LAN_IP:5173/?tv=1</string>
+```
+
+Use your own LAN address. Do not commit it.
+
+2. From the repo, start the dev server and leave that computer awake:
+
+```bash
+npx vite --host
+```
+
+The TMDB token stays in `.env` as `VITE_TMDB_API_KEY`. That file is gitignored. Restart Vite after changing it. If the server is down, the Stick says it can't reach Streambert. Select retries.
+
+3. Turn on ADB on the Stick, then install and open the shell. The Stick and the computer have to be on the same network.
+
+```bash
+adb connect YOUR_STICK_IP:5555
+adb -s YOUR_STICK_IP:5555 install -r firetv/streambert-tv.apk
+adb -s YOUR_STICK_IP:5555 shell am force-stop com.streambert.tv
+adb -s YOUR_STICK_IP:5555 shell am start -n com.streambert.tv/.MainActivity
+```
+
+`?tv=1` turns on the remote layout. A Fire TV browser user agent does too, and so does `localStorage` key `streambert_tv`. `?tv=0` turns it off.
+
+On the remote, the D-pad moves focus and Select activates the focused control. Back leaves the current screen. While something is playing, Left and Rewind go back 10 seconds, Right and Fast-forward go forward 10 seconds, and Select presses Skip intro when that button is on screen. Otherwise Select pauses. Play pauses too.
+
+If your computer's LAN address changes, edit `start_url` and rebuild the APK. The shell keeps the URL it was built with.
+
+Build from `firetv/` with `./gradlew assembleDebug` (compile SDK 34, min SDK 21, Java 17). [`fire-tv-setup.readme`](fire-tv-setup.readme) has the manual build for when a full Gradle run is not practical, plus the rest of the remote behavior.
+
+---
 
 ## Building from Source
 1. Install dependencies:

@@ -69,6 +69,9 @@ export default function App() {
   const [navStack, setNavStack] = useState([]);
 
   const [saved, setSaved] = useState(() => storage.get("saved") || {});
+  const [favorites, setFavorites] = useState(
+    () => storage.get(STORAGE_KEYS.FAVORITES) || {},
+  );
   // Separate order array for drag-and-drop reordering
   const [savedOrder, setSavedOrder] = useState(
     () => storage.get("savedOrder") || null,
@@ -855,6 +858,46 @@ export default function App() {
     [saved, getMediaType],
   );
 
+  const favoritesRef = useRef(favorites);
+  useEffect(() => {
+    favoritesRef.current = favorites;
+  }, [favorites]);
+
+  const toggleFavorite = useCallback(
+    (item) => {
+      const mt = getMediaType(item);
+      const id = `${mt}_${item.id}`;
+      const current = favoritesRef.current;
+      const next = { ...current };
+      if (next[id]) {
+        delete next[id];
+        showToast("Removed from favorites");
+      } else {
+        next[id] = {
+          id: item.id,
+          title: item.title || item.name,
+          poster_path: item.poster_path,
+          media_type: mt,
+          vote_average: item.vote_average,
+          year: (item.release_date || item.first_air_date || "").slice(0, 4),
+          addedAt: Date.now(),
+        };
+        showToast("Added to favorites");
+      }
+      setFavorites(next);
+      storage.set(STORAGE_KEYS.FAVORITES, next);
+    },
+    [showToast, getMediaType],
+  );
+
+  const isFavorite = useCallback(
+    (item) => {
+      const id = `${getMediaType(item)}_${item.id}`;
+      return !!favorites[id];
+    },
+    [favorites, getMediaType],
+  );
+
   const addHistory = useCallback((item) => {
     // Respect the "disable watch history" setting
     const historyEnabled = storage.get(STORAGE_KEYS.HISTORY_ENABLED);
@@ -982,6 +1025,14 @@ export default function App() {
     return list;
   }, [saved, savedOrder, librarySort]);
 
+  const favoritesList = useMemo(
+    () =>
+      Object.values(favorites)
+        .filter(Boolean)
+        .sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0)),
+    [favorites],
+  );
+
   const handleReorderSaved = useCallback((newOrder) => {
     setSavedOrder(newOrder);
     storage.set("savedOrder", newOrder);
@@ -1071,6 +1122,7 @@ export default function App() {
                 onSelect={handleSelectResult}
                 progress={progress}
                 inProgress={inProgress}
+                favorites={favoritesList}
                 offline={offline}
                 onRetry={retryHome}
                 watched={watched}
@@ -1087,6 +1139,8 @@ export default function App() {
                 playerSettings={playerSettings}
                 onSave={() => toggleSave(selected)}
                 isSaved={isSaved(selected)}
+                onFavorite={() => toggleFavorite(selected)}
+                isFavorite={isFavorite(selected)}
                 onHistory={addHistory}
                 progress={progress}
                 saveProgress={saveProgress}
@@ -1110,6 +1164,8 @@ export default function App() {
                 playerSettings={playerSettings}
                 onSave={() => toggleSave(selected)}
                 isSaved={isSaved(selected)}
+                onFavorite={() => toggleFavorite(selected)}
+                isFavorite={isFavorite(selected)}
                 onHistory={addHistory}
                 progress={progress}
                 saveProgress={saveProgress}
@@ -1131,6 +1187,7 @@ export default function App() {
                 history={history}
                 inProgress={inProgress}
                 saved={savedList}
+                favorites={favoritesList}
                 progress={progress}
                 onSelect={handleSelectResult}
                 watched={watched}

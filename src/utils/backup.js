@@ -9,6 +9,7 @@ export const BACKUP_KEYS = [
   // Watch data
   "saved",
   "savedOrder",
+  "favorites",
   "history",
   "progress",
   "watched",

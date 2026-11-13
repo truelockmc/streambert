@@ -79,6 +79,7 @@ export default function LibraryPage({
   history,
   inProgress,
   saved,
+  favorites = [],
   progress,
   onSelect,
   watched,
@@ -87,8 +88,8 @@ export default function LibraryPage({
   onRemoveHistory,
 }) {
   const allItems = useMemo(
-    () => [...inProgress, ...saved],
-    [inProgress, saved],
+    () => [...inProgress, ...saved, ...favorites],
+    [inProgress, saved, favorites],
   );
   const { ratingsMap, ageLimitSetting } = useRatings(allItems);
 
@@ -195,7 +196,7 @@ export default function LibraryPage({
       <div className="library-header">
         <div className="library-title">My Library</div>
         <div className="library-sub">
-          Watch history, progress, and saved titles
+          Watch history, favorites, and your watchlist
         </div>
       </div>
 
@@ -216,6 +217,32 @@ export default function LibraryPage({
                   item={item}
                   onClick={() => onSelect(item)}
                   progress={progress[pk] || 0}
+                  watched={watched}
+                  onMarkWatched={onMarkWatched}
+                  onMarkUnwatched={onMarkUnwatched}
+                  ageRating={r.cert}
+                  restricted={restr}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {favorites.length > 0 && !openGroup && (
+        <div className="library-section">
+          <div className="library-section-title">
+            Favorites ({favorites.length})
+          </div>
+          <div className="cards-grid">
+            {favorites.map((item) => {
+              const r = getRating(item);
+              const restr = itemRestricted(item);
+              return (
+                <MediaCard
+                  key={`fav_${item.media_type}_${item.id}`}
+                  item={item}
+                  onClick={() => onSelect(item)}
                   watched={watched}
                   onMarkWatched={onMarkWatched}
                   onMarkUnwatched={onMarkUnwatched}
@@ -317,7 +344,9 @@ export default function LibraryPage({
         </div>
       )}
 
-      {!openGroup && history.length === 0 && saved.length > 0 && (
+      {!openGroup &&
+        history.length === 0 &&
+        (saved.length > 0 || favorites.length > 0) && (
         <div className="library-section">
           <div className="library-section-title">Watch History</div>
           <div
@@ -332,7 +361,7 @@ export default function LibraryPage({
         </div>
       )}
 
-      {history.length === 0 && saved.length === 0 && (
+      {history.length === 0 && saved.length === 0 && favorites.length === 0 && (
         <div
           className="empty-state"
           tabIndex={0}

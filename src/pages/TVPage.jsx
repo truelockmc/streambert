@@ -41,6 +41,8 @@ import { isTvMode } from "../utils/tvMode";
 import {
   BookmarkIcon,
   BookmarkFillIcon,
+  HeartIcon,
+  HeartFillIcon,
   BackIcon,
   StarIcon,
   PlayIcon,
@@ -84,6 +86,7 @@ import {
 } from "../utils/playerGamepadScript";
 import { useSourceId } from "../utils/useSourceId";
 import { hasTvShellPlayer, useTvShellPlayer } from "../utils/tvShellPlayer";
+import { useEpisodeMatch, nextTvSource, showUsesWhoEpisode, whoEpisode, withRuntimeHint } from "../utils/episodeMatch";
 import { setPlayerGamepadActive } from "../utils/gamepadPlayerState";
 import HiAnimeLoader from "../components/HiAnimeLoader";
 
@@ -416,6 +419,8 @@ export default function TVPage({
   playerSettings,
   onSave,
   isSaved,
+  onFavorite,
+  isFavorite,
   onHistory,
   progress,
   saveProgress,
@@ -681,7 +686,8 @@ export default function TVPage({
     setLoadingSeason(true);
     setSelectedEp(null);
     setPlaying(false);
-    setSeasonData(null); // clear stale episodes immediately
+    // Keep the current episode list mounted. Clearing it shrinks the page
+    // and the scroll position clamps to the top.
     // AniList virtual seasons on a single-season show: always fetch TMDB S1.
     const tmdbSeasonToFetch =
       isAnime && anilistSeasons?.length > 0 && tmdbSeasons.length <= 1
@@ -1038,15 +1044,19 @@ export default function TVPage({
       );
       if (animeUrl) return animeUrl;
     }
-    return getSourceUrl(
-      playerSource,
-      "tv",
-      srcId.id,
-      playerEp.season,
-      playerEp.episode,
-      {},
-      playerAccentColor,
-      playerSubLang,
+    return withRuntimeHint(
+      getSourceUrl(
+        playerSource,
+        "tv",
+        srcId.id,
+        playerEp.season,
+        playerEp.episode,
+        {},
+        playerAccentColor,
+        playerSubLang,
+      ),
+      selectedEp?.runtime || d.episode_run_time?.[0] || 0,
+      selectedEp?.name,
     );
   }, [
     isAnime,
@@ -1061,11 +1071,64 @@ export default function TVPage({
     playerEp,
     playerAccentColor,
     playerSubLang,
+    d.episode_run_time,
   ]);
+  useLayoutEffect(() => {
+    if (!playing || !selectedEp || isAnime || sourceIsAsync(playerSource)) return;
+    const epNum = selectedEp.episode_number;
+    const epKey = `tv_${item.id}_s${selectedSeason}_e${epNum}_${dubMode}`;
+    const saved = storage.get(STORAGE_KEYS.PLAYER_SOURCE) || NON_ANIME_DEFAULT_SOURCE;
+    const replacement = whoEpisode(item.id, selectedSeason, epNum, saved);
+    if (replacement) {
+      if (playerSource !== replacement) {
+        setFailoverSource(epKey, replacement);
+        setPlayerSource(replacement);
+      }
+      return;
+    }
+    if (showUsesWhoEpisode(item.id)) {
+      if (getFailoverSource(epKey)) clearFailoverSource(epKey);
+      if (playerSource !== saved) setPlayerSource(saved);
+      return;
+    }
+    const cached = getFailoverSource(epKey);
+    if (!cached || cached === playerSource) return;
+    const known = PLAYER_SOURCES.find((source) => source.id === cached);
+    if (!known?.tvUrl || known.async || known.movieOnly) return;
+    setPlayerSource(cached);
+  }, [playing, selectedEp, isAnime, playerSource, item.id, selectedSeason, dubMode]);
+
   useTvShellPlayer(
     sourceIsAsync(playerSource) ? resolvedPlayerUrl : playerDirectUrl,
     playing,
   );
+  useEpisodeMatch(webviewRef, playing, playerDirectUrl);
+
+  const mismatchTried = useRef(new Set());
+  useEffect(() => {
+    mismatchTried.current = new Set();
+  }, [item.id, selectedSeason, selectedEp?.episode_number]);
+
+  useEffect(() => {
+    if (!playing || !selectedEp || isAnime) return undefined;
+    const onMismatch = () => {
+      if (
+        showUsesWhoEpisode(item.id) &&
+        !whoEpisode(item.id, selectedSeason, selectedEp.episode_number, playerSource)
+      ) {
+        return;
+      }
+      if (mismatchTried.current.has(playerSource)) return;
+      const next = nextTvSource(PLAYER_SOURCES, playerSource, mismatchTried.current);
+      if (!next || mismatchTried.current.has(next)) return;
+      mismatchTried.current.add(playerSource);
+      const epKey = `tv_${item.id}_s${selectedSeason}_e${selectedEp.episode_number}_${dubMode}`;
+      setFailoverSource(epKey, next);
+      setPlayerSource(next);
+    };
+    window.addEventListener("streambert:source-mismatch", onMismatch);
+    return () => window.removeEventListener("streambert:source-mismatch", onMismatch);
+  }, [playing, selectedEp, isAnime, playerSource, item.id, selectedSeason, dubMode]);
 
   // ── Memoized current season episodes ──────────────────────────────────────
   // While episode group or AniList data is still loading, return [] to prevent
@@ -1875,6 +1938,13 @@ export default function TVPage({
                   >
                     <CastIcon /> Cast
                   </button>
+                  <button
+                    className={`btn btn-secondary${isFavorite ? " detail-favorite" : ""}`}
+                    onClick={onFavorite}
+                  >
+                    {isFavorite ? <HeartFillIcon /> : <HeartIcon />}
+                    {isFavorite ? "Favorited" : "Favorite"}
+                  </button>
                   <button className="btn btn-secondary" onClick={onSave}>
                     {isSaved ? <BookmarkFillIcon /> : <BookmarkIcon />}
                     {isSaved ? "Saved" : "Save"}
@@ -2639,13 +2709,14 @@ export default function TVPage({
                 </span>
               </div>
             )}
-            {loadingSeason && (
+            {loadingSeason &&
+              !seasonData?.episodes &&
+              !episodeGroupCurrentEpisodes?.length && (
               <div className="loader">
                 <div className="spinner" />
               </div>
             )}
-            {!loadingSeason &&
-              (seasonData?.episodes || episodeGroupCurrentEpisodes?.length) && (
+            {(seasonData?.episodes || episodeGroupCurrentEpisodes?.length) && (
                 <div className="episodes-grid">
                   {currentSeasonEpisodes.map((ep) => {
                     const pk = `tv_${item.id}_s${selectedSeason}e${ep.episode_number}`;

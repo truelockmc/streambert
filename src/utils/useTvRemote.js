@@ -7,7 +7,6 @@ import {
   getGamepadFocus,
   moveGamepadFocus,
   setGamepadFocus,
-  ensureFocusVisible,
 } from "./gamepadSpatialNav";
 import { isFireTv } from "./tvMode";
 import {
@@ -315,18 +314,36 @@ export function useTvRemote({ enabled, onBack, navStackRef }) {
         }
         return;
       }
+      const activeFocus = getGamepadFocus();
+      // Selecting a season rewrites the button class, which drops the ring.
+      // The episode list also mounts a new initial target. Stay on the season.
+      if (!activeFocus && lockedTo?.classList?.contains("season-btn")) {
+        const active = document.querySelector(".tv-episodes .season-btn.active");
+        if (active instanceof HTMLElement) {
+          lockedTo = active;
+          setGamepadFocus(active, { scroll: false });
+          return;
+        }
+      }
       const marked = document.querySelector("[data-tv-initial]");
       if (marked instanceof HTMLElement) {
-        const previousGone = !lockedTo || !document.contains(lockedTo);
-        if (marked !== lockedTo && previousGone) {
+        const previousGone = !activeFocus;
+        if (marked !== activeFocus && previousGone) {
           lockedTo = marked;
           setGamepadFocus(marked, { scroll: true });
+        } else if (
+          activeFocus &&
+          !activeFocus.classList.contains("gamepad-focused")
+        ) {
+          lockedTo = activeFocus;
+          setGamepadFocus(activeFocus, { scroll: false });
         }
-        ensureFocusVisible();
         return;
       }
-      if (!getGamepadFocus()) ensureInitialFocus();
-      ensureFocusVisible();
+      if (!activeFocus) ensureInitialFocus();
+      else if (!activeFocus.classList.contains("gamepad-focused")) {
+        setGamepadFocus(activeFocus, { scroll: false });
+      }
     };
     const schedule = () => {
       clearTimeout(timer);

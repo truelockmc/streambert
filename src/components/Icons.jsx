@@ -31,6 +31,16 @@ export const BookmarkFillIcon = () => (
     <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
   </svg>
 );
+export const HeartIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M12 20.5 10.6 19.2C5.4 14.4 2 11.4 2 7.8 2 4.9 4.2 2.7 7.1 2.7c1.6 0 3.2.8 4.1 2C12.1 3.5 13.7 2.7 15.3 2.7c2.9 0 5.1 2.2 5.1 5.1 0 3.6-3.4 6.6-8.6 11.4L12 20.5z" />
+  </svg>
+);
+export const HeartFillIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 20.5 10.6 19.2C5.4 14.4 2 11.4 2 7.8 2 4.9 4.2 2.7 7.1 2.7c1.6 0 3.2.8 4.1 2C12.1 3.5 13.7 2.7 15.3 2.7c2.9 0 5.1 2.2 5.1 5.1 0 3.6-3.4 6.6-8.6 11.4L12 20.5z" />
+  </svg>
+);
 export const PlayIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor">
     <polygon points="5 3 19 12 5 21 5 3" />

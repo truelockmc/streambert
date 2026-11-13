@@ -41,6 +41,7 @@ export default function HomePage({
   onSelect,
   progress,
   inProgress,
+  favorites = [],
   offline,
   onRetry,
   watched,
@@ -65,12 +66,13 @@ export default function HomePage({
   const allItems = useMemo(
     () => [
       ...inProgress,
+      ...favorites,
       ...trending.map((i) => ({ ...i, media_type: "movie" })),
       ...trendingTV.map((i) => ({ ...i, media_type: "tv" })),
       ...recommendedItems,
       ...topRatedItems,
     ],
-    [inProgress, trending, trendingTV, recommendedItems, topRatedItems],
+    [inProgress, favorites, trending, trendingTV, recommendedItems, topRatedItems],
   );
 
   const { ratingsMap, ageLimitSetting } = useRatings(allItems);
@@ -332,6 +334,23 @@ export default function HomePage({
             <div key="continue" className="section">
               <div className="section-title">Continue Watching</div>
               <div className="cards-grid">{renderCards(inProgress, true)}</div>
+            </div>
+          );
+        }
+
+        if (id === "favorites") {
+          if (favorites.length === 0) return null;
+          if (tv) {
+            return (
+              <TvShelf key="favorites" title="Favorites">
+                {renderCards(favorites, false)}
+              </TvShelf>
+            );
+          }
+          return (
+            <div key="favorites" className="section">
+              <div className="section-title">Favorites</div>
+              <div className="cards-grid">{renderCards(favorites, false)}</div>
             </div>
           );
         }

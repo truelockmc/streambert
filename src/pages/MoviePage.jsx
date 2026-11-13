@@ -33,6 +33,8 @@ import {
   PlayIcon,
   BookmarkIcon,
   BookmarkFillIcon,
+  HeartIcon,
+  HeartFillIcon,
   BackIcon,
   StarIcon,
   FilmIcon,
@@ -74,6 +76,7 @@ import {
 } from "../utils/playerGamepadScript";
 import { useSourceId } from "../utils/useSourceId";
 import { hasTvShellPlayer, useTvShellPlayer } from "../utils/tvShellPlayer";
+import { useEpisodeMatch, withRuntimeHint } from "../utils/episodeMatch";
 import { setPlayerGamepadActive } from "../utils/gamepadPlayerState";
 import HiAnimeLoader from "../components/HiAnimeLoader";
 
@@ -83,6 +86,8 @@ export default function MoviePage({
   playerSettings,
   onSave,
   isSaved,
+  onFavorite,
+  isFavorite,
   onHistory,
   progress,
   saveProgress,
@@ -184,15 +189,18 @@ export default function MoviePage({
       );
       if (animeUrl) return animeUrl;
     }
-    return getSourceUrl(
-      playerSource,
-      "movie",
-      srcId.id,
-      null,
-      null,
-      {},
-      playerAccentColor,
-      playerSubLang,
+    return withRuntimeHint(
+      getSourceUrl(
+        playerSource,
+        "movie",
+        srcId.id,
+        null,
+        null,
+        {},
+        playerAccentColor,
+        playerSubLang,
+      ),
+      details?.runtime || item?.runtime || 0,
     );
   }, [
     isAnime,
@@ -202,11 +210,14 @@ export default function MoviePage({
     srcId.id,
     playerAccentColor,
     playerSubLang,
+    details?.runtime,
+    item?.runtime,
   ]);
   useTvShellPlayer(
     sourceIsAsync(playerSource) ? resolvedPlayerUrl : playerDirectUrl,
     playing,
   );
+  useEpisodeMatch(webviewRef, playing, playerDirectUrl);
   const [downloaderFolder, setDownloaderFolder] = useState(
     () => storage.get("downloaderFolder") || "",
   );
@@ -953,6 +964,13 @@ export default function MoviePage({
                 onClick={() => setShowCast(true)}
               >
                 <CastIcon /> Cast
+              </button>
+              <button
+                className={`btn btn-secondary${isFavorite ? " detail-favorite" : ""}`}
+                onClick={onFavorite}
+              >
+                {isFavorite ? <HeartFillIcon /> : <HeartIcon />}
+                {isFavorite ? "Favorited" : "Favorite"}
               </button>
               <button className="btn btn-secondary" onClick={onSave}>
                 {isSaved ? <BookmarkFillIcon /> : <BookmarkIcon />}

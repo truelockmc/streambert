@@ -1007,6 +1007,10 @@ html[data-tv="1"] .search-result.gamepad-focused .search-result-type {
     flex-wrap: wrap;
 }
 
+.detail-favorite svg {
+    color: var(--red);
+}
+
 .genres {
     display: flex;
     flex-wrap: wrap;
@@ -4281,6 +4285,7 @@ html[data-tv="1"] .sidebar-btn.gamepad-focused {
 
 html[data-tv="1"] .main {
     background: #000;
+    overflow-anchor: none;
 }
 
 html[data-tv="1"] .hero {
