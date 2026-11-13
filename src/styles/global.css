@@ -700,6 +700,49 @@ button.card {
     padding: 8px;
 }
 
+.search-pages {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 4px 8px;
+}
+
+.search-page-label {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text3);
+    font-variant-numeric: tabular-nums;
+}
+
+.search-page-btn {
+    width: 100%;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.search-page-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+html[data-tv="1"] .search-page-btn {
+    min-height: 48px;
+    font-size: 16px;
+}
+
+html[data-tv="1"] .search-page-btn.gamepad-focused {
+    background: #fff;
+    color: #111;
+    outline: none;
+}
+
 .search-result {
     display: flex;
     align-items: center;

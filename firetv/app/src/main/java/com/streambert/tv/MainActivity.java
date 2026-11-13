@@ -7,6 +7,8 @@ import android.net.Uri;
 import android.net.http.SslError;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 import android.view.Gravity;
@@ -28,10 +30,20 @@ import android.webkit.SslErrorHandler;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.CookieManager;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final String PLAYER_UA =
@@ -49,6 +61,13 @@ public class MainActivity extends Activity {
     private String playerHost;
     private long lastSeekAt;
     private boolean tapVidSrcOnLoad;
+    private boolean vidSrcChrome;
+    private long lastVidSrcAt;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Runnable vidSrcHideTask = () -> {
+        vidSrcChrome = false;
+        vidSrcPost("{\"sb\":1,\"cmd\":\"hide\"}");
+    };
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -184,6 +203,36 @@ public class MainActivity extends Activity {
         }
         if (playerVisible) {
             if (event.getAction() != KeyEvent.ACTION_DOWN) return true;
+            if (isVidSrc(playerHost)) {
+                if (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_MEDIA_REWIND) {
+                    vidSrcCommand("left");
+                    return true;
+                }
+                if (code == KeyEvent.KEYCODE_DPAD_RIGHT || code == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD) {
+                    vidSrcCommand("right");
+                    return true;
+                }
+                if (code == KeyEvent.KEYCODE_DPAD_UP) {
+                    vidSrcCommand("up");
+                    return true;
+                }
+                if (code == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    vidSrcCommand("down");
+                    return true;
+                }
+                if (isSelect(code)) {
+                    vidSrcCommand("enter");
+                    return true;
+                }
+                if (code == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+                        || code == KeyEvent.KEYCODE_MEDIA_PLAY
+                        || code == KeyEvent.KEYCODE_MEDIA_PAUSE) {
+                    vidSrcCommand("toggle");
+                    return true;
+                }
+                if (isDpad(code)) return true;
+                return playerWeb.dispatchKeyEvent(event);
+            }
             if (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_MEDIA_REWIND) {
                 playerCommand("back");
                 return true;
@@ -472,6 +521,10 @@ public class MainActivity extends Activity {
         });
         view.setWebViewClient(new WebViewClient() {
             @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                return injectVidSrcBridge(request);
+            }
+
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (request == null || !request.isForMainFrame()) return false;
                 String host = request.getUrl().getHost();
@@ -515,6 +568,8 @@ public class MainActivity extends Activity {
     private void openPlayer(String url) {
         if (url == null || !(url.startsWith("https://") || url.startsWith("http://"))) return;
         if (keyboardOpen) hideKeyboard();
+        mainHandler.removeCallbacks(vidSrcHideTask);
+        vidSrcChrome = false;
         playerHost = Uri.parse(url).getHost();
         tapVidSrcOnLoad = isVidSrc(playerHost);
         playerVisible = true;
@@ -532,6 +587,172 @@ public class MainActivity extends Activity {
 
     private static boolean isVidSrc(String host) {
         return host != null && (host.equals("vsembed.su") || host.endsWith(".vsembed.su"));
+    }
+
+    /**
+     * VidSrc's buttons live in a nested player. Up shows them (rewind, play,
+     * forward, captions, settings). Left and right move between them, or seek
+     * 10s while they are hidden. Down walks the captions or settings list.
+     */
+    private void vidSrcCommand(String cmd) {
+        if ("hide".equals(cmd)) {
+            vidSrcChrome = false;
+            vidSrcPost("{\"sb\":1,\"cmd\":\"hide\"}");
+            return;
+        }
+        long now = android.os.SystemClock.uptimeMillis();
+        if (now - lastVidSrcAt < 280) return;
+        lastVidSrcAt = now;
+        if ("up".equals(cmd)) vidSrcChrome = true;
+        if ("enter".equals(cmd)) {
+            if (vidSrcChrome) vidSrcPost("{\"sb\":1,\"cmd\":\"enter\"}");
+            else tapPlayerCenter();
+        } else if ("down".equals(cmd) && !vidSrcChrome) {
+            return;
+        } else {
+            vidSrcPost("{\"sb\":1,\"cmd\":\"" + cmd + "\"}");
+        }
+        if (vidSrcChrome) {
+            mainHandler.removeCallbacks(vidSrcHideTask);
+            mainHandler.postDelayed(vidSrcHideTask, 5000);
+        }
+    }
+
+    private void vidSrcPost(String json) {
+        if (playerWeb == null) return;
+        playerWeb.evaluateJavascript(
+                "(function(){var f=document.getElementById('player_iframe');"
+                        + "if(f&&f.contentWindow)f.contentWindow.postMessage("
+                        + json
+                        + ",'*');})();",
+                null);
+    }
+
+    /** The player document is a cross-origin frame, so the remote bridge has to ride in with its HTML. */
+    private WebResourceResponse injectVidSrcBridge(WebResourceRequest request) {
+        if (request == null || request.getUrl() == null || !"GET".equals(request.getMethod())) return null;
+        String path = request.getUrl().getPath();
+        if (path == null || !path.startsWith("/embed/player/")) return null;
+        if (path.lastIndexOf('.') > path.lastIndexOf('/')) return null;
+        HttpURLConnection conn = null;
+        try {
+            conn = (HttpURLConnection) new URL(request.getUrl().toString()).openConnection();
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(12000);
+            conn.setInstanceFollowRedirects(true);
+            for (Map.Entry<String, String> header : request.getRequestHeaders().entrySet()) {
+                String name = header.getKey();
+                if (name == null) continue;
+                if ("Host".equalsIgnoreCase(name)
+                        || "Connection".equalsIgnoreCase(name)
+                        || "Accept-Encoding".equalsIgnoreCase(name)) continue;
+                conn.setRequestProperty(name, header.getValue());
+            }
+            int code = conn.getResponseCode();
+            List<String> cookies = conn.getHeaderFields().get("Set-Cookie");
+            if (cookies != null) {
+                for (String cookie : cookies) {
+                    CookieManager.getInstance().setCookie(request.getUrl().toString(), cookie);
+                }
+            }
+            InputStream in = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
+            byte[] raw = readFully(in);
+            String type = conn.getContentType() == null ? "" : conn.getContentType();
+            boolean html = type.contains("html") || type.isEmpty() || type.contains("text/plain");
+            if (code >= 400 || !html) {
+                String mime = type.contains(";") ? type.substring(0, type.indexOf(';')).trim() : type;
+                if (mime.isEmpty()) mime = "text/html";
+                return new WebResourceResponse(mime, "utf-8", new ByteArrayInputStream(raw));
+            }
+            String page = new String(raw, StandardCharsets.UTF_8);
+            if (!page.contains("ccBtn")) {
+                return new WebResourceResponse("text/html", "utf-8", new ByteArrayInputStream(raw));
+            }
+            String bridged = page.contains("</head>")
+                    ? page.replace("</head>", vidSrcBridge() + "</head>")
+                    : vidSrcBridge() + page;
+            Log.i("Streambert", "vidsrc controls bridged");
+            return new WebResourceResponse(
+                    "text/html", "utf-8", new ByteArrayInputStream(bridged.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception error) {
+            Log.i("Streambert", "vidsrc bridge skipped " + error.getMessage());
+            return null;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    private static byte[] readFully(InputStream in) throws java.io.IOException {
+        if (in == null) return new byte[0];
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) >= 0) out.write(buf, 0, n);
+        return out.toByteArray();
+    }
+
+    private static String vidSrcBridge() {
+        return "<script>(function(){"
+                + "if(window.__sbVidSrc)return;window.__sbVidSrc=true;"
+                + "function lockTop(){var jw=window.__JW;if(!jw||!jw.state)return false;"
+                + "jw.state.manualHeight=8640;var hls=jw.state.hls,levels=hls&&hls.levels;"
+                + "if(!hls||!levels||!levels.length)return false;var best=0,score=-1,i,s;"
+                + "for(i=0;i<levels.length;i++){s=(levels[i].height||0)*10000+(levels[i].width||0);"
+                + "if(s>=score){score=s;best=i;}}"
+                + "if(hls.autoLevelEnabled||hls.currentLevel!==best)hls.currentLevel=best;"
+                + "return hls.autoLevelEnabled===false&&hls.currentLevel===best;}"
+                + "var lockTries=0,lockTimer=setInterval(function(){var done=false;"
+                + "try{done=lockTop();}catch(err){}if(done||++lockTries>80)clearInterval(lockTimer);},150);"
+                + "var ids=['rew','bigPlay','fwd','ccBtn','setBtn'];"
+                + "var focusAt=1,menuAt=-1,chrome=false,hold=0,drop=0;"
+                + "function $(id){return document.getElementById(id);}"
+                + "function styleOnce(){if(document.getElementById('sb-vs-ui'))return;"
+                + "var css=document.createElement('style');css.id='sb-vs-ui';"
+                + "css.textContent='.jw.show-ui .jw-center-seek{opacity:1 !important;pointer-events:auto !important;transform:scale(1) !important}'"
+                + "+'.sb-vs-focus{outline:3px solid #fff !important;outline-offset:3px;border-radius:8px}';"
+                + "document.documentElement.appendChild(css);}"
+                + "function show(){styleOnce();var wrap=$('player');if(!wrap)return;"
+                + "var tick=function(){wrap.classList.add('show-ui');wrap.classList.remove('mouse-idle');};"
+                + "tick();clearInterval(hold);hold=setInterval(tick,400);clearTimeout(drop);"
+                + "drop=setTimeout(function(){clearInterval(hold);},5200);}"
+                + "function rows(){var menu=document.querySelector('.jw-menu.is-open');if(!menu)return [];"
+                + "return [].slice.call(menu.querySelectorAll('.jw-row')).filter(function(el){"
+                + "var r=el.getBoundingClientRect();return r.width>8&&r.height>8;});}"
+                + "function paint(){var marked=document.querySelectorAll('.sb-vs-focus');"
+                + "for(var i=0;i<marked.length;i++)marked[i].classList.remove('sb-vs-focus');"
+                + "if(!chrome)return;if(menuAt>=0){var list=rows();"
+                + "if(list[menuAt]){list[menuAt].classList.add('sb-vs-focus');"
+                + "if(list[menuAt].scrollIntoView)list[menuAt].scrollIntoView({block:'nearest'});}return;}"
+                + "var el=$(ids[focusAt]);if(el)el.classList.add('sb-vs-focus');}"
+                + "function seek(delta){var video=$('video');if(!video)return;"
+                + "var next=(video.currentTime||0)+delta;if(next<0)next=0;"
+                + "if(video.duration&&next>video.duration)next=Math.max(0,video.duration-0.5);"
+                + "video.currentTime=next;show();}"
+                + "function clickId(id){var el=$(id);if(el)el.click();}"
+                + "window.addEventListener('message',function(e){"
+                + "if(e.source!==window.parent)return;var m=e.data;if(!m||m.sb!==1)return;"
+                + "if(m.cmd==='hide'){chrome=false;menuAt=-1;clearInterval(hold);paint();return;}"
+                + "if(m.cmd==='seek'){seek(+m.delta||0);return;}"
+                + "if(m.cmd==='toggle'){show();clickId('bigPlay');return;}"
+                + "if(m.cmd==='left'||m.cmd==='right'){"
+                + "if(!chrome){seek(m.cmd==='left'?-10:10);return;}"
+                + "if(menuAt>=0){show();return;}"
+                + "var open=document.querySelectorAll('.jw-menu.is-open');"
+                + "for(var i=0;i<open.length;i++)open[i].classList.remove('is-open');"
+                + "focusAt=(focusAt+(m.cmd==='left'?ids.length-1:1))%ids.length;show();paint();return;}"
+                + "if(m.cmd==='up'){if(!chrome){chrome=true;menuAt=-1;focusAt=1;show();paint();return;}"
+                + "if(menuAt>0){menuAt--;show();paint();return;}"
+                + "if(menuAt===0){menuAt=-1;show();paint();return;}show();paint();return;}"
+                + "if(m.cmd==='down'){if(!chrome)return;var list=rows();"
+                + "if(menuAt>=0){if(!list.length){menuAt=-1;paint();return;}"
+                + "menuAt=Math.min(list.length-1,menuAt+1);show();paint();return;}"
+                + "var id=ids[focusAt];if(id==='ccBtn'||id==='setBtn'){"
+                + "if(!list.length)clickId(id);"
+                + "setTimeout(function(){var next=rows();if(!next.length)return;menuAt=0;show();paint();},80);}}"
+                + "if(m.cmd==='enter'){if(!chrome)return;if(menuAt>=0){var picked=rows();"
+                + "if(picked[menuAt])picked[menuAt].click();menuAt=-1;show();paint();return;}"
+                + "clickId(ids[focusAt]);show();paint();}"
+                + "});})();</script>";
     }
 
     /** Hits the play button VidSrc puts in the middle of a nested frame. */
@@ -597,6 +818,8 @@ public class MainActivity extends Activity {
 
     private void closePlayer(boolean notifyPage) {
         if (!playerVisible && playerWeb.getVisibility() != View.VISIBLE) return;
+        mainHandler.removeCallbacks(vidSrcHideTask);
+        vidSrcChrome = false;
         playerVisible = false;
         playerHost = null;
         playerWeb.stopLoading();
