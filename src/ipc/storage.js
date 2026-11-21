@@ -204,14 +204,16 @@ function register() {
       const backupDir = settings.path;
       if (!backupDir) return { ok: false, error: "No backup path set" };
 
-      fs.mkdirSync(backupDir, { recursive: true });
+      const resolvedDir = path.resolve(backupDir);
+
+      fs.mkdirSync(resolvedDir, { recursive: true });
 
       const timestamp = new Date()
         .toISOString()
         .replace(/[:.]/g, "-")
         .slice(0, 19);
       const filename = `streambert-backup-${timestamp}.json`;
-      const fullPath = path.join(backupDir, filename);
+      const fullPath = path.join(resolvedDir, filename);
       fs.writeFileSync(
         fullPath,
         JSON.stringify(
@@ -229,19 +231,19 @@ function register() {
 
       // Prune old backups
       const keepCount = Math.max(1, Number(settings.keepCount) || 5);
-      fs.readdirSync(backupDir)
+      fs.readdirSync(resolvedDir)
         .filter(
           (f) => f.startsWith("streambert-backup-") && f.endsWith(".json"),
         )
         .map((f) => ({
           name: f,
-          mtime: fs.statSync(path.join(backupDir, f)).mtimeMs,
+          mtime: fs.statSync(path.join(resolvedDir, f)).mtimeMs,
         }))
         .sort((a, b) => b.mtime - a.mtime)
         .slice(keepCount)
         .forEach(({ name }) => {
           try {
-            fs.unlinkSync(path.join(backupDir, name));
+            fs.unlinkSync(path.join(resolvedDir, name));
           } catch {}
         });
 

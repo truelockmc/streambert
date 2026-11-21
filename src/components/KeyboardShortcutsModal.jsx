@@ -29,20 +29,26 @@ export default function KeyboardShortcutsModal({ onClose }) {
           background: "var(--surface)",
           border: "1px solid var(--border)",
           borderRadius: 14,
-          padding: "36px 40px",
           minWidth: 380,
           maxWidth: 480,
           width: "90%",
+          // Fixed height cap
+          maxHeight: "85vh",
+          display: "flex",
+          flexDirection: "column",
           boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
+          overflow: "hidden",
         }}
       >
-        {/* Header */}
+        {/* Header (fixed, does not scroll) */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: 28,
+            flexShrink: 0,
+            padding: "28px 40px 20px",
+            borderBottom: "1px solid var(--border)",
           }}
         >
           <div
@@ -76,6 +82,14 @@ export default function KeyboardShortcutsModal({ onClose }) {
           </button>
         </div>
 
+        {/* Scrollable body */}
+        <div
+          style={{
+            overflowY: "auto",
+            minHeight: 0,
+            padding: "24px 40px 32px",
+          }}
+        >
         {/* Shortcut rows */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {shortcuts.map(({ keys, desc }, i) => (
@@ -113,6 +127,82 @@ export default function KeyboardShortcutsModal({ onClose }) {
                       color: "var(--text)",
                       fontFamily: "monospace",
                       minWidth: 28,
+                    }}
+                  >
+                    {k}
+                  </kbd>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Controller support */}
+        <div
+          style={{
+            marginTop: 24,
+            marginBottom: 4,
+            fontSize: 13,
+            fontWeight: 600,
+            letterSpacing: 0.5,
+            color: "var(--text3)",
+            textTransform: "uppercase",
+          }}
+        >
+          Controller
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            marginTop: 12,
+          }}
+        >
+          {[
+            { keys: ["D-Pad"], desc: "Navigate menus" },
+            { keys: ["A"], desc: "Select / Confirm" },
+            { keys: ["B"], desc: "Back / Close" },
+            { keys: ["Start"], desc: "Open search" },
+            {
+              keys: ["A / D-Pad / LB / RB"],
+              desc: "In player: play-pause, seek, volume, skip ±15s",
+            },
+          ].map(({ keys, desc }, i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+                padding: "10px 14px",
+                background: "var(--surface2)",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+              }}
+            >
+              <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                {desc}
+              </span>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                {keys.map((k, j) => (
+                  <kbd
+                    key={j}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "3px 9px",
+                      background: "var(--surface)",
+                      border: "1px solid var(--border)",
+                      borderBottom: "2px solid rgba(255,255,255,0.12)",
+                      borderRadius: 5,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "var(--text)",
+                      fontFamily: "monospace",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {k}
@@ -216,6 +306,7 @@ export default function KeyboardShortcutsModal({ onClose }) {
             Esc
           </kbd>{" "}
           to close
+        </div>
         </div>
       </div>
     </div>

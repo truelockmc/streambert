@@ -43,7 +43,7 @@ export default function WindowTitlebar() {
         height: 32,
         zIndex: 10000,
         background: "var(--bg)",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        borderBottom: "1px solid var(--border)",
         display: "flex",
         alignItems: "center",
         userSelect: "none",
@@ -58,7 +58,7 @@ export default function WindowTitlebar() {
           fontSize: 12,
           fontWeight: 700,
           letterSpacing: 2,
-          color: "rgba(255,255,255,0.35)",
+          color: "var(--text3)",
           fontFamily: "var(--font-display)",
           flexGrow: 1,
           overflow: "hidden",
@@ -80,7 +80,7 @@ export default function WindowTitlebar() {
         {/* Minimize */}
         <TitlebarBtn
           onClick={minimize}
-          hoverBg="rgba(255,255,255,0.08)"
+          hoverBg="color-mix(in srgb, var(--text) 10%, transparent)"
           title="Minimize"
         >
           <svg width="10" height="1" viewBox="0 0 10 1" fill="none">
@@ -91,7 +91,7 @@ export default function WindowTitlebar() {
         {/* Maximize / Restore */}
         <TitlebarBtn
           onClick={toggleMaximize}
-          hoverBg="rgba(255,255,255,0.08)"
+          hoverBg="color-mix(in srgb, var(--text) 10%, transparent)"
           title={maximized ? "Restore" : "Maximize"}
         >
           {maximized ? (
@@ -180,7 +180,7 @@ function TitlebarBtn({ children, onClick, hoverBg, title }) {
         background: hovered ? hoverBg : "transparent",
         border: "none",
         cursor: "default",
-        color: hovered ? "#fff" : "rgba(255,255,255,0.55)",
+        color: hovered ? "var(--text)" : "var(--text3)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

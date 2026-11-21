@@ -7,12 +7,23 @@ import {
   isElectron,
   clearAppCaches,
 } from "../utils/storage";
-import { ACCENT_PRESETS, applyAccentColor } from "../utils/appearance";
+import { clearTmdbCache } from "../utils/api";
+import {
+  ACCENT_PRESETS,
+  applyAccentColor,
+  THEME_PRESETS,
+  applyTheme,
+  DEFAULT_CUSTOM_VARS,
+} from "../utils/appearance";
 import { SUBTITLE_LANGUAGES } from "../utils/subtitles";
 import { DEFAULT_INVIDIOUS_BASE } from "../components/TrailerModal";
 import { RATING_COUNTRIES } from "../utils/ageRating";
 import { WarningIcon } from "../components/Icons";
-import { checkForUpdates } from "../utils/updates";
+import {
+  checkForUpdatesWithFallback,
+  UPDATE_SOURCES,
+  DEFAULT_UPDATE_SOURCE,
+} from "../utils/updates";
 import {
   HOME_ROWS,
   loadHomeLayout,
@@ -530,6 +541,9 @@ function VersionSection() {
   });
   const [autoSaved, setAutoSaved] = useState(false);
   const [currentVersion, setCurrentVersion] = useState("0.0.0");
+  const [updateSource, setUpdateSource] = useState(
+    () => storage.get(STORAGE_KEYS.UPDATE_SOURCE) || DEFAULT_UPDATE_SOURCE,
+  );
 
   useEffect(() => {
     if (window.electron?.getAppVersion) {
@@ -543,13 +557,23 @@ function VersionSection() {
     setChecking(true);
     setResult(null);
     try {
-      const r = await checkForUpdates();
+      const r = await checkForUpdatesWithFallback(updateSource);
       setResult(r);
     } catch (e) {
-      setResult({ error: e.message || "Could not reach GitHub." });
+      setResult({
+        error:
+          e.message ||
+          `Could not reach ${UPDATE_SOURCES[updateSource]?.label || "the update server"}.`,
+      });
     } finally {
       setChecking(false);
     }
+  };
+
+  const changeSource = (src) => {
+    setUpdateSource(src);
+    storage.set(STORAGE_KEYS.UPDATE_SOURCE, src);
+    setResult(null);
   };
 
   const toggleAuto = (val) => {
@@ -601,6 +625,37 @@ function VersionSection() {
           {checking ? "Checking…" : "Check for Updates"}
         </button>
 
+        {/* Update source toggle */}
+        <div
+          style={{
+            display: "inline-flex",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            overflow: "hidden",
+          }}
+        >
+          {Object.values(UPDATE_SOURCES).map((src) => (
+            <button
+              key={src.id}
+              onClick={() => changeSource(src.id)}
+              disabled={checking}
+              title={`Check for updates via ${src.label}`}
+              style={{
+                border: "none",
+                padding: "6px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: checking ? "not-allowed" : "pointer",
+                background:
+                  updateSource === src.id ? "var(--red)" : "var(--surface2)",
+                color: updateSource === src.id ? "#fff" : "var(--text3)",
+              }}
+            >
+              {src.label}
+            </button>
+          ))}
+        </div>
+
         {result && !result.error && result.hasUpdate && (
           <button
             onClick={() => setShowUpdateModal(true)}
@@ -627,6 +682,13 @@ function VersionSection() {
           >
             🎉 v{result.latest} available. Install Update
           </button>
+        )}
+
+        {result?.usedFallback && (
+          <span style={{ fontSize: 12, color: "var(--text3)" }}>
+            ({UPDATE_SOURCES[result.fallbackFrom]?.label || result.fallbackFrom}{" "}
+            unavailable, used {result.sourceLabel} instead)
+          </span>
         )}
 
         {result && !result.error && !result.hasUpdate && (
@@ -1203,27 +1265,264 @@ function AppearanceSection() {
   const [noAnim, setNoAnim] = useState(
     () => !!storage.get(STORAGE_KEYS.REDUCE_ANIMATIONS),
   );
+  const [gamepadEnabled, setGamepadEnabled] = useState(
+    () => storage.get(STORAGE_KEYS.GAMEPAD_ENABLED) !== false,
+  );
+  const [accentInPlayer, setAccentInPlayer] = useState(
+    () => storage.get(STORAGE_KEYS.ACCENT_IN_PLAYER) !== false,
+  );
+  const [theme, setTheme] = useState(
+    () => storage.get(STORAGE_KEYS.THEME) || "dark",
+  );
+  const [customVars, setCustomVars] = useState(
+    () =>
+      storage.get(STORAGE_KEYS.CUSTOM_THEME_VARS) || { ...DEFAULT_CUSTOM_VARS },
+  );
+  const [showCustomEditor, setShowCustomEditor] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Remember the committed (saved) values to revert on unmount if unsaved
+  const committedRef = useRef({
+    accent: storage.get(STORAGE_KEYS.ACCENT_COLOR) || "red",
+    theme: storage.get(STORAGE_KEYS.THEME) || "dark",
+    customVars: storage.get(STORAGE_KEYS.CUSTOM_THEME_VARS) || {
+      ...DEFAULT_CUSTOM_VARS,
+    },
+  });
+  const savedRef = useRef(false);
+
+  // Revert live preview when leaving without saving
+  useEffect(() => {
+    return () => {
+      if (!savedRef.current) {
+        const { accent, theme, customVars } = committedRef.current;
+        applyAccentColor(accent);
+        applyTheme(theme, theme === "custom" ? customVars : null);
+      }
+    };
+  }, []);
+
+  const handleThemeSelect = (id) => {
+    setTheme(id);
+    if (id !== "custom") {
+      applyTheme(id);
+    } else {
+      applyTheme("custom", customVars);
+      setShowCustomEditor(true);
+    }
+  };
+
+  const handleCustomVarChange = (prop, value) => {
+    const next = { ...customVars, [prop]: value };
+    setCustomVars(next);
+    applyTheme("custom", next);
+  };
 
   const handleSave = () => {
     storage.set(STORAGE_KEYS.ACCENT_COLOR, accent);
+    storage.set(STORAGE_KEYS.ACCENT_IN_PLAYER, accentInPlayer);
     storage.set(STORAGE_KEYS.FONT_SIZE, fontSize);
     storage.set(STORAGE_KEYS.COMPACT_MODE, compact ? 1 : 0);
     storage.set(STORAGE_KEYS.REDUCE_ANIMATIONS, noAnim ? 1 : 0);
+    storage.set(STORAGE_KEYS.GAMEPAD_ENABLED, gamepadEnabled);
+    window.dispatchEvent(new CustomEvent("streambert:gamepad-settings-changed"));
+    storage.set(STORAGE_KEYS.THEME, theme);
+    if (theme === "custom") {
+      storage.set(STORAGE_KEYS.CUSTOM_THEME_VARS, customVars);
+    }
     // Apply immediately
     applyAccentColor(accent);
+    applyTheme(theme, theme === "custom" ? customVars : null);
     const zoomMap = { sm: 0.85, normal: 1, lg: 1.15 };
     if (window.electron?.setZoomFactor)
       window.electron.setZoomFactor(zoomMap[fontSize] ?? 1);
     document.body.classList.toggle("compact-mode", compact);
     document.body.classList.toggle("no-anim", noAnim);
+    // Mark as saved so the cleanup effect doesn't revert
+    savedRef.current = true;
+    committedRef.current = { accent, theme, customVars };
+    // Notify App.jsx so playerSettings prop (accent + lang) is refreshed
+    window.dispatchEvent(new CustomEvent("streambert:player-settings-changed"));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const CUSTOM_VAR_LABELS = {
+    "--bg": "Background",
+    "--surface": "Surface",
+    "--surface2": "Surface 2",
+    "--surface3": "Surface 3",
+    "--border": "Border",
+    "--text": "Text",
+    "--text2": "Text 2",
+    "--text3": "Text 3",
   };
 
   return (
     <div style={{ marginBottom: 40 }}>
       <div className="settings-section-title">Appearance</div>
+
+      {/* Theme */}
+      <div style={{ marginBottom: 24 }}>
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: "var(--text2)",
+            marginBottom: 10,
+          }}
+        >
+          Theme
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {THEME_PRESETS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => handleThemeSelect(t.id)}
+              title={t.description}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 6,
+                padding: "10px 14px",
+                borderRadius: "var(--radius)",
+                background:
+                  theme === t.id
+                    ? "color-mix(in srgb, var(--red) 15%, var(--surface2))"
+                    : "var(--surface2)",
+                border:
+                  theme === t.id
+                    ? "1.5px solid var(--red)"
+                    : "1.5px solid var(--border)",
+                cursor: "pointer",
+                transition: "border-color 0.15s, background 0.15s",
+                minWidth: 70,
+              }}
+            >
+              {/* Mini preview swatch */}
+              <div
+                style={{
+                  width: 40,
+                  height: 28,
+                  borderRadius: 4,
+                  background:
+                    t.id === "custom"
+                      ? `linear-gradient(135deg, ${customVars["--bg"]} 50%, ${customVars["--surface2"]} 50%)`
+                      : t.vars
+                        ? `linear-gradient(135deg, ${t.vars["--bg"]} 50%, ${t.vars["--surface2"]} 50%)`
+                        : "var(--surface3)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: theme === t.id ? 600 : 400,
+                  color: theme === t.id ? "var(--text)" : "var(--text2)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {t.label}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>
+          {THEME_PRESETS.find((t) => t.id === theme)?.description}
+        </div>
+      </div>
+
+      {/* Custom theme editor */}
+      {theme === "custom" && (
+        <div style={{ marginBottom: 24 }}>
+          <button
+            onClick={() => setShowCustomEditor((v) => !v)}
+            className="btn btn-ghost"
+            style={{ fontSize: 12, padding: "5px 12px", marginBottom: 12 }}
+          >
+            {showCustomEditor ? "▲ Hide" : "▼ Edit"} custom colours
+          </button>
+          {showCustomEditor && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                gap: 12,
+                padding: 16,
+                background: "var(--surface2)",
+                borderRadius: "var(--radius)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              {Object.entries(CUSTOM_VAR_LABELS).map(([prop, label]) => (
+                <div
+                  key={prop}
+                  style={{ display: "flex", alignItems: "center", gap: 8 }}
+                >
+                  <input
+                    type="color"
+                    value={customVars[prop] || "#000000"}
+                    onChange={(e) =>
+                      handleCustomVarChange(prop, e.target.value)
+                    }
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 4,
+                      border: "1px solid var(--border)",
+                      cursor: "pointer",
+                      background: "none",
+                      padding: 2,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: "var(--text)",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {label}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text3)",
+                        fontFamily: "monospace",
+                      }}
+                    >
+                      {customVars[prop]}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  display: "flex",
+                  gap: 8,
+                  marginTop: 4,
+                }}
+              >
+                <button
+                  className="btn btn-ghost"
+                  style={{ fontSize: 12, padding: "5px 12px" }}
+                  onClick={() => {
+                    setCustomVars({ ...DEFAULT_CUSTOM_VARS });
+                    applyTheme("custom", DEFAULT_CUSTOM_VARS);
+                  }}
+                >
+                  Reset to defaults
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Accent Colour */}
       <div style={{ marginBottom: 24 }}>
@@ -1241,7 +1540,10 @@ function AppearanceSection() {
           {ACCENT_PRESETS.map((p) => (
             <button
               key={p.id}
-              onClick={() => setAccent(p.id)}
+              onClick={() => {
+                setAccent(p.id);
+                applyAccentColor(p.id);
+              }}
               title={p.label}
               style={{
                 width: 32,
@@ -1265,6 +1567,28 @@ function AppearanceSection() {
         <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>
           {ACCENT_PRESETS.find((p) => p.id === accent)?.label}, applied to
           buttons, highlights, and indicators.
+        </div>
+        {/* Accent in streaming player */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginTop: 14,
+          }}
+        >
+          <Toggle value={accentInPlayer} onChange={setAccentInPlayer} />
+          <div>
+            <div
+              style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}
+            >
+              Apply accent colour to streaming player
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
+              Passes the selected accent colour to the player source (Videasy,
+              Vidking). VidSrc does not support colour theming.
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1335,6 +1659,21 @@ function AppearanceSection() {
             </div>
             <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
               Disables transitions and hover effects throughout the app.
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Toggle value={gamepadEnabled} onChange={setGamepadEnabled} />
+          <div>
+            <div
+              style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}
+            >
+              Controller support
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
+              Navigate menus with a D-pad/stick and use A/B to select and go
+              back. In the player: A play/pause, D-pad seek/volume, LB/RB
+              skip ±15s, Y fullscreen, B exit.
             </div>
           </div>
         </div>
@@ -1513,6 +1852,85 @@ function StartPageSection() {
   );
 }
 
+// ── TMDB Metadata Language ────────────────────────────────────────────────────
+const TMDB_LANGUAGES = [
+  { value: "en-US", label: "English (en-US)" },
+  { value: "de-DE", label: "Deutsch (de-DE)" },
+  { value: "fr-FR", label: "Français (fr-FR)" },
+  { value: "es-ES", label: "Español (es-ES)" },
+  { value: "it-IT", label: "Italiano (it-IT)" },
+  { value: "pt-BR", label: "Português (Brasil) (pt-BR)" },
+  { value: "nl-NL", label: "Nederlands (nl-NL)" },
+  { value: "pl-PL", label: "Polski (pl-PL)" },
+  { value: "sv-SE", label: "Svenska (sv-SE)" },
+  { value: "nb-NO", label: "Norsk (nb-NO)" },
+  { value: "da-DK", label: "Dansk (da-DK)" },
+  { value: "fi-FI", label: "Suomi (fi-FI)" },
+  { value: "tr-TR", label: "Türkçe (tr-TR)" },
+  { value: "ru-RU", label: "Русский (ru-RU)" },
+  { value: "ja-JP", label: "日本語 (ja-JP)" },
+  { value: "ko-KR", label: "한국어 (ko-KR)" },
+  { value: "zh-CN", label: "中文 (简体) (zh-CN)" },
+  { value: "ar-SA", label: "العربية (ar-SA)" },
+];
+
+function TmdbLanguageSection() {
+  const [lang, setLang] = useState(
+    () => storage.get(STORAGE_KEYS.TMDB_LANG) || "en-US",
+  );
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    storage.set(STORAGE_KEYS.TMDB_LANG, lang);
+    // Clear in-memory cache
+    clearTmdbCache();
+    // Notify App.jsx to re-fetch trending data immediately.
+    window.dispatchEvent(new CustomEvent("streambert:tmdb-lang-changed"));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">Metadata Language</div>
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--text3)",
+          marginBottom: 16,
+          lineHeight: 1.6,
+        }}
+      >
+        Language used when fetching titles, descriptions, and other metadata
+        from TMDB. Changing this clears the metadata cache so updated content
+        loads immediately.
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <SettingsSelect
+          value={lang}
+          onChange={(v) => setLang(v)}
+          options={TMDB_LANGUAGES}
+        />
+        <button className="btn btn-primary" onClick={handleSave}>
+          Save
+        </button>
+        {saved && (
+          <span style={{ fontSize: 13, color: "#48c774" }}>
+            ✓ Saved, cache cleared
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Subtitle Settings ─────────────────────────────────────────────────────────
 function SubtitleSettingsSection() {
   const [enabled, setEnabled] = useState(
@@ -1528,8 +1946,6 @@ function SubtitleSettingsSection() {
   const [wyzieApiKey, setWyzieApiKey] = useState("");
   const [showWyzieKey, setShowWyzieKey] = useState(false);
   const [wyzieCopied, setWyzieCopied] = useState(false);
-  const [wyzieRedeeming, setWyzieRedeeming] = useState(false);
-  const [wyzieError, setWyzieError] = useState("");
   const [wyzieClearConfirm, setWyzieClearConfirm] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -1546,39 +1962,6 @@ function SubtitleSettingsSection() {
   const hasSubdlKey = subdlApiKey.trim().length > 0;
   const hasWyzieKey = wyzieApiKey.trim().length > 0;
 
-  const handleWyzieRedeem = async () => {
-    if (!window.electron) return;
-    setWyzieRedeeming(true);
-    setWyzieError("");
-    try {
-      const res = await window.electron.wyzieOpenRedeem();
-      if (res.cancelled) {
-        setWyzieRedeeming(false);
-        return;
-      }
-      if (res.timeout) {
-        setWyzieError(
-          "No key received within 10 seconds. Try again or enter it manually.",
-        );
-        setWyzieRedeeming(false);
-        return;
-      }
-      if (res.ok && res.key) {
-        // Key came from redirect URL — save directly, no extra validation
-        setWyzieApiKey(res.key);
-        await secureStorage.set(STORAGE_KEYS.WYZIE_API_KEY, res.key);
-        setWyzieError("");
-      } else {
-        setWyzieError(
-          "Could not extract key automatically. Try entering it manually.",
-        );
-      }
-    } catch (e) {
-      setWyzieError(e.message);
-    }
-    setWyzieRedeeming(false);
-  };
-
   const handleWyzieCopy = () => {
     navigator.clipboard.writeText(wyzieApiKey.trim()).then(() => {
       setWyzieCopied(true);
@@ -1591,6 +1974,8 @@ function SubtitleSettingsSection() {
     storage.set(STORAGE_KEYS.SUBTITLE_LANG, lang);
     secureStorage.set(STORAGE_KEYS.SUBDL_API_KEY, subdlApiKey.trim());
     secureStorage.set(STORAGE_KEYS.WYZIE_API_KEY, wyzieApiKey.trim());
+    // refresh playerSettings prop (subtitle lang)
+    window.dispatchEvent(new CustomEvent("streambert:player-settings-changed"));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -1717,7 +2102,26 @@ function SubtitleSettingsSection() {
                 lineHeight: 1.5,
               }}
             >
-              Required for Wyzie Subs. Claim a free key, no account needed.
+              Required for Wyzie Subs. Get a free key by following the tutorial.{" "}
+              <button
+                className="btn btn-ghost"
+                style={{
+                  display: "inline",
+                  padding: 0,
+                  fontSize: 12,
+                  color: "var(--red)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+                onClick={() =>
+                  window.electron?.openExternal(
+                    "https://codeberg.org/truelockmc/streambert/src/branch/main/wyzie-tutorial.md",
+                  )
+                }
+              >
+                How to get a key ↗
+              </button>
             </div>
             <div
               style={{
@@ -1758,47 +2162,15 @@ function SubtitleSettingsSection() {
                   style={{ padding: "6px 12px", fontSize: 12 }}
                   onClick={() =>
                     window.electron?.openExternal(
-                      `https://sub.wyzie.io/notice?key=${wyzieApiKey.trim()}`,
+                      `https://store.wyzie.io/dashboard?key=${wyzieApiKey.trim()}`,
                     )
                   }
-                  title="Open notice page for this key"
+                  title="Open your wyzie dashboard"
                 >
-                  Notice ↗
+                  Dashboard ↗
                 </button>
               )}
-              {wyzieRedeeming ? (
-                <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                  Opening redeem page…
-                </span>
-              ) : !hasWyzieKey ? (
-                <button
-                  className="btn btn-ghost"
-                  style={{
-                    padding: "6px 12px",
-                    fontSize: 12,
-                    color: "var(--accent)",
-                  }}
-                  onClick={handleWyzieRedeem}
-                >
-                  Get free key ↗
-                </button>
-              ) : null}
             </div>
-            {wyzieError && (
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 12,
-                  color: "#ff6060",
-                  padding: "6px 10px",
-                  borderRadius: 6,
-                  background: "rgba(255,80,80,0.08)",
-                  border: "1px solid rgba(255,80,80,0.2)",
-                }}
-              >
-                {wyzieError}
-              </div>
-            )}
           </div>
 
           {/* SubDL API key */}
@@ -1993,6 +2365,131 @@ function NotificationsSection() {
 }
 
 // ── Section Group Header ──────────────────────────────────────────────────────
+function DiscordRpcSection() {
+  const [enabled, setEnabledState] = useState(
+    () => !!storage.get(STORAGE_KEYS.DISCORD_RPC_ENABLED),
+  );
+  const [showCover, setShowCover] = useState(
+    () => storage.get(STORAGE_KEYS.DISCORD_RPC_SHOW_COVER) !== false,
+  );
+  const [showTimestamp, setShowTimestamp] = useState(
+    () => storage.get(STORAGE_KEYS.DISCORD_RPC_SHOW_TIMESTAMP) !== false,
+  );
+  const [showButton, setShowButton] = useState(
+    () => storage.get(STORAGE_KEYS.DISCORD_RPC_SHOW_BUTTON) !== false,
+  );
+  const [saved, setSaved] = useState(false);
+
+  const saveSettings = () => {
+    storage.set(STORAGE_KEYS.DISCORD_RPC_ENABLED, enabled);
+    storage.set(STORAGE_KEYS.DISCORD_RPC_SHOW_COVER, showCover);
+    storage.set(STORAGE_KEYS.DISCORD_RPC_SHOW_TIMESTAMP, showTimestamp);
+    storage.set(STORAGE_KEYS.DISCORD_RPC_SHOW_BUTTON, showButton);
+    window.dispatchEvent(
+      new CustomEvent("streambert:discord-rpc-settings-changed"),
+    );
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const ToggleRow = ({ label, description, value, onChange, disabled }) => (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 14,
+        padding: "16px 0",
+        borderBottom: "1px solid var(--border)",
+        opacity: disabled ? 0.45 : 1,
+        pointerEvents: disabled ? "none" : "auto",
+      }}
+    >
+      <Toggle value={value} onChange={onChange} />
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>
+          {label}
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            color: "var(--text3)",
+            marginTop: 3,
+            lineHeight: 1.5,
+          }}
+        >
+          {description}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">Discord Rich Presence</div>
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--text3)",
+          marginBottom: 16,
+          lineHeight: 1.6,
+        }}
+      >
+        Shows what you're currently watching on your Discord profile (title +
+        cover, or "Idling" when nothing is open). Off by default. Requires
+        the Discord desktop client to be running.
+      </div>
+
+      <div
+        style={{
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: 10,
+          padding: "0 16px",
+          marginBottom: 20,
+        }}
+      >
+        <ToggleRow
+          label="Enable Discord Rich Presence"
+          description="Connects to your local Discord client and updates your status automatically."
+          value={enabled}
+          onChange={setEnabledState}
+        />
+        <ToggleRow
+          label="Show cover art"
+          description="Uses the movie/show poster as the large image. When off, only the Streambert icon is shown."
+          value={showCover}
+          onChange={setShowCover}
+          disabled={!enabled}
+        />
+        <ToggleRow
+          label="Show elapsed time"
+          description="Displays how long you've been on the current title's page."
+          value={showTimestamp}
+          onChange={setShowTimestamp}
+          disabled={!enabled}
+        />
+        <ToggleRow
+          label="Show GitHub button"
+          description="Adds a button linking to the Streambert GitHub repository."
+          value={showButton}
+          onChange={setShowButton}
+          disabled={!enabled}
+        />
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button className="btn btn-primary" onClick={saveSettings}>
+          Save
+        </button>
+        {saved && (
+          <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Section Group Header ─────────────────────────────────────────────────────
 function SectionGroupHeader({ title, subtitle }) {
   return (
     <div style={{ marginBottom: 32, marginTop: 4 }}>
@@ -2056,6 +2553,12 @@ const SECTION_NAV = [
       "startup",
       "auto",
       "app",
+      "language",
+      "metadata",
+      "locale",
+      "german",
+      "french",
+      "spanish",
     ],
   },
   {
@@ -2138,6 +2641,21 @@ const SECTION_NAV = [
       "watchlist",
       "new episode",
       "release",
+    ],
+  },
+  {
+    id: "discordRpc",
+    label: "Discord Rich Presence",
+    icon: "🎮",
+    keywords: [
+      "discord",
+      "rich presence",
+      "rpc",
+      "status",
+      "activity",
+      "watching",
+      "idling",
+      "presence",
     ],
   },
   {
@@ -2830,6 +3348,15 @@ export default function SettingsPage({
   const [introSkipMode, setIntroSkipMode] = useState(
     () => storage.get(STORAGE_KEYS.INTRO_SKIP_MODE) || "off",
   );
+  const [autoplayNextEnabled, setAutoplayNextEnabled] = useState(
+    () => storage.get(STORAGE_KEYS.AUTOPLAY_NEXT_ENABLED) ?? true,
+  );
+  const [autoplayNextDuration, setAutoplayNextDuration] = useState(
+    () => storage.get(STORAGE_KEYS.AUTOPLAY_NEXT_DURATION) ?? 5,
+  );
+  const [autoplayNextLayout, setAutoplayNextLayout] = useState(
+    () => storage.get(STORAGE_KEYS.AUTOPLAY_NEXT_LAYOUT) || "right",
+  );
   const [saved, setSaved] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetHovered, setResetHovered] = useState(false);
@@ -2843,6 +3370,7 @@ export default function SettingsPage({
   const secSubtitles = useRef(null);
   const secDownloads = useRef(null);
   const secNotifications = useRef(null);
+  const secDiscordRpc = useRef(null);
   const secInterface = useRef(null);
   const secLibrary = useRef(null);
   const secBackup = useRef(null);
@@ -2855,6 +3383,7 @@ export default function SettingsPage({
     subtitles: secSubtitles,
     downloads: secDownloads,
     notifications: secNotifications,
+    discordRpc: secDiscordRpc,
     interface: secInterface,
     library: secLibrary,
     backup: secBackup,
@@ -3113,7 +3642,7 @@ export default function SettingsPage({
         <div ref={secUpdates} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
             title="General"
-            subtitle="App version, updates, and API credentials"
+            subtitle="App version, updates, API credentials and Languages"
           />
 
           {/* Version & Updates */}
@@ -3160,6 +3689,10 @@ export default function SettingsPage({
               </button>
             </div>
           </div>
+
+          <Divider />
+
+          <TmdbLanguageSection />
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
@@ -3400,6 +3933,160 @@ export default function SettingsPage({
             )}
           </div>
 
+          <Divider />
+
+          {/* Autoplay Next Episode */}
+          <div style={{ marginBottom: 40 }}>
+            <div className="settings-section-title">Autoplay Next Episode</div>
+            <div
+              style={{
+                fontSize: 13,
+                color: "var(--text3)",
+                marginBottom: 16,
+                lineHeight: 1.6,
+              }}
+            >
+              Configure how the player behaves when an episode finishes.
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Enable/Disable Toggle */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Toggle
+                  value={autoplayNextEnabled}
+                  onChange={(val) => {
+                    setAutoplayNextEnabled(val);
+                    storage.set(STORAGE_KEYS.AUTOPLAY_NEXT_ENABLED, val);
+                    flash();
+                  }}
+                />
+                <div>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 500,
+                      color: "var(--text)",
+                    }}
+                  >
+                    Enable Autoplay Next
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text3)",
+                      marginTop: 2,
+                    }}
+                  >
+                    Automatically play the next episode when the current one
+                    ends.
+                  </div>
+                </div>
+              </div>
+
+              {autoplayNextEnabled && (
+                <>
+                  {/* Duration input */}
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      marginTop: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "var(--text2)",
+                      }}
+                    >
+                      Countdown Duration
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text3)",
+                        marginBottom: 4,
+                      }}
+                    >
+                      Number of seconds to display the countdown. Set to 0 to
+                      only show the buttons and not autoplay automatically.
+                    </div>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 12 }}
+                    >
+                      <input
+                        type="number"
+                        min={0}
+                        max={60}
+                        className="apikey-input"
+                        style={{ width: 90, marginBottom: 0 }}
+                        value={autoplayNextDuration}
+                        onChange={(e) =>
+                          setAutoplayNextDuration(e.target.value)
+                        }
+                        onBlur={() => {
+                          const num = Math.max(
+                            0,
+                            Math.min(
+                              60,
+                              parseInt(autoplayNextDuration, 10) || 0,
+                            ),
+                          );
+                          setAutoplayNextDuration(num);
+                          storage.set(STORAGE_KEYS.AUTOPLAY_NEXT_DURATION, num);
+                          flash();
+                        }}
+                      />
+                      <span style={{ fontSize: 14, color: "var(--text2)" }}>
+                        seconds
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Overlay Layout selection */}
+                  <div style={{ marginTop: 16 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "var(--text2)",
+                        marginBottom: 8,
+                      }}
+                    >
+                      Overlay Position
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text3)",
+                        marginBottom: 12,
+                      }}
+                    >
+                      Choose which side of the player the next episode thumbnail
+                      and details are shown.
+                    </div>
+                    <SettingsSelect
+                      value={autoplayNextLayout}
+                      onChange={(val) => {
+                        setAutoplayNextLayout(val);
+                        storage.set(STORAGE_KEYS.AUTOPLAY_NEXT_LAYOUT, val);
+                        flash();
+                      }}
+                      options={[
+                        { value: "left", label: "Left Side" },
+                        { value: "right", label: "Right Side" },
+                      ]}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <Divider />
+
           {/* Intro Skip */}
           <div style={{ marginBottom: 40 }}>
             <div className="settings-section-title">Anime Intro Skip</div>
@@ -3418,7 +4105,7 @@ export default function SettingsPage({
               to detect and skip opening/ending segments. Only active for animes
               and when using{" "}
               <span style={{ color: "var(--text)", fontWeight: 600 }}>
-                AllManga
+                HiAnime
               </span>{" "}
               as source.
             </div>
@@ -3586,7 +4273,7 @@ export default function SettingsPage({
             )}
             {!downloadPath && (
               <div style={{ marginTop: 10, fontSize: 13, color: "var(--red)" }}>
-                ⚠ No download folder set — videos cannot be downloaded until you
+                ⚠ No download folder set - videos cannot be downloaded until you
                 set one.
               </div>
             )}
@@ -3602,6 +4289,17 @@ export default function SettingsPage({
             subtitle="Desktop alerts for downloads and new episode releases"
           />
           <NotificationsSection />
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* GROUP: DISCORD RICH PRESENCE                                       */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <div ref={secDiscordRpc} style={{ scrollMarginTop: 80 }}>
+          <SectionGroupHeader
+            title="Discord Rich Presence"
+            subtitle="Show what you're watching on your Discord profile"
+          />
+          <DiscordRpcSection />
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════ */}

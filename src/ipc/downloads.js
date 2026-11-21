@@ -21,6 +21,10 @@ const downloadsFile = () =>
 // Track running child processes by download id
 const activeProcs = new Map();
 
+// ── Trusted binary registry ───────────────────────────────────────────────────
+// Maps session tokens (returned to the Renderer)
+const trustedBinaryPaths = new Map(); // token (uuid) → absolute binary path
+
 let _getMainWindow = () => null;
 
 function sendProgress(update) {
@@ -178,23 +182,38 @@ function register(getMainWindow) {
 
   // ── downloader binary detection ──────────────────────────────────────────
   ipcMain.handle("check-downloader", (_, folderPath) => {
-    if (!folderPath) return { exists: false };
+    if (!folderPath) return { exists: false, reason: "no_folder" };
+    let entries;
     try {
-      const entries = fs.readdirSync(folderPath);
-      if (!entries.includes("_internal")) return { exists: false };
-      const binary = entries.find((e) => {
-        if (e === "_internal" || e.startsWith(".")) return false;
-        try {
-          return fs.statSync(path.join(folderPath, e)).isFile();
-        } catch {
-          return false;
-        }
-      });
-      const binaryPath = binary ? path.join(folderPath, binary) : null;
-      return { exists: !!binaryPath, binaryPath };
-    } catch {
-      return { exists: false };
+      entries = fs.readdirSync(folderPath);
+    } catch (e) {
+      const reason =
+        e.code === "EACCES" ? "folder_permission" : "folder_unreadable";
+      return { exists: false, reason };
     }
+    if (!entries.includes("_internal")) {
+      return { exists: false, reason: "no_internal" };
+    }
+    const binary = entries.find((e) => {
+      if (e === "_internal" || e.startsWith(".")) return false;
+      try {
+        const stat = fs.statSync(path.join(folderPath, e));
+        if (!stat.isFile()) return false;
+        return process.platform === "win32"
+          ? e.endsWith(".exe")
+          : !!(stat.mode & 0o111);
+      } catch {
+        return false;
+      }
+    });
+    if (!binary) return { exists: false, reason: "no_executable" };
+
+    // Store the validated path in the Main process only and hand a token to
+    // the Renderer.  The Renderer passes the token back when starting a
+    // download; the real path is never exposed outside the Main process.
+    const token = crypto.randomUUID();
+    trustedBinaryPaths.set(token, path.join(folderPath, binary));
+    return { exists: true, token };
   });
 
   // ── start download ────────────────────────────────────────────────────────
@@ -203,7 +222,7 @@ function register(getMainWindow) {
     (
       _,
       {
-        binaryPath,
+        token,
         m3u8Url,
         name,
         downloadPath,
@@ -217,6 +236,11 @@ function register(getMainWindow) {
       },
     ) => {
       try {
+        // Resolve the binary path from trusted registry.
+        const binaryPath = trustedBinaryPaths.get(token);
+        if (!binaryPath) {
+          return { ok: false, error: "Invalid or unknown downloader token" };
+        }
         const id = crypto.randomUUID();
         const logPath = path.join(os.tmpdir(), `streambert_dl_${id}.log`);
 
@@ -482,6 +506,23 @@ function register(getMainWindow) {
             appendLog(l);
             handleLine(l);
           });
+        });
+
+        proc.on("error", (err) => {
+          activeProcs.delete(id);
+          const idx = downloads.findIndex((d) => d.id === id);
+          if (idx === -1) return;
+          const msg =
+            err.code === "EACCES"
+              ? `Permission denied, binary is not executable: ${binaryPath}`
+              : err.code === "ENOENT"
+                ? `Binary not found: ${binaryPath}`
+                : `Failed to start downloader: ${err.message}`;
+          downloads[idx].status = "error";
+          downloads[idx].completedAt = Date.now();
+          downloads[idx].lastMessage = msg;
+          appendLog(msg);
+          sendProgress({ id, status: "error", lastMessage: msg });
         });
 
         proc.on("close", (code) => {
@@ -774,7 +815,12 @@ function register(getMainWindow) {
   });
 
   ipcMain.handle("open-external", (_, url) => {
-    shell.openExternal(url);
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        shell.openExternal(url);
+      }
+    } catch {}
   });
   ipcMain.handle("open-path", (_, filePath) => {
     // If the path points to a file (e.g. an .asar archive or an executable),

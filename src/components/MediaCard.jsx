@@ -143,7 +143,9 @@ const MediaCard = memo(function MediaCard({
             {title}
           </div>
           <div className="card-year">
-            {year} · {isTV ? "Series" : "Movie"}
+            {isTV && item.season != null && item.episode != null
+              ? `S${item.season}E${item.episode}${item.episodeName ? ` · ${item.episodeName}` : ""}`
+              : `${year} · ${isTV ? "Series" : "Movie"}`}
           </div>
         </div>
         <span

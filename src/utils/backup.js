@@ -15,15 +15,19 @@ export const BACKUP_KEYS = [
   // UI / layout preferences
   "homeRowOrder",
   "homeRowVisible",
+  "homeViewMode",
   "startPage",
   // Player preferences
   "playerSource",
-  "allmangaDubMode",
+  "hianimeDubMode",
   "introSkipMode",
   // Other Stuff
   "ageLimit",
   "ratingCountry",
   "watchedThreshold",
+  "autoplayNextEnabled",
+  "autoplayNextDuration",
+  "autoplayNextLayout",
   // Subtitles
   "subtitleDownload",
   "subtitleLang",
@@ -42,6 +46,8 @@ export const BACKUP_KEYS = [
   "reduceAnimations",
   "librarySort",
   "historyEnabled",
+  // TMDB metadata language (e.g. "de-DE")
+  "tmdbLang",
   // Notification preferences
   "notifyDownloadComplete",
   "notifyNewEpisode",

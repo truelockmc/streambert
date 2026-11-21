@@ -11,16 +11,28 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
 import WindowTitlebar from "./components/WindowTitlebar";
 import { storage, secureStorage, STORAGE_KEYS } from "./utils/storage";
-import { applyAccentColor } from "./utils/appearance";
+import {
+  applyAccentColor,
+  applyTheme,
+  ACCENT_PRESETS,
+} from "./utils/appearance";
 import { collectBackupData } from "./utils/backup";
-import { tmdbFetch, setApiErrorHandlers } from "./utils/api";
+import { tmdbFetch, setApiErrorHandlers, imgUrl } from "./utils/api";
 import { clearAppCaches } from "./utils/storage";
+import {
+  readDiscordRpcSettings,
+  applyDiscordRpcEnabled,
+  sendWatchingActivity,
+  sendIdleActivity,
+  clearActivity as clearDiscordActivity,
+} from "./utils/discordPresence";
 
 import Sidebar from "./components/Sidebar";
 import SearchModal from "./components/SearchModal";
 import SetupScreen from "./components/SetupScreen";
 import CloseConfirmModal from "./components/CloseConfirmModal";
 import UpdateModal from "./components/UpdateModal";
+import { useGamepadNav } from "./utils/useGamepadNav";
 
 // Lazy-loaded pages: each chunk is only downloaded when the user first visits
 const HomePage = lazy(() => import("./pages/HomePage"));
@@ -29,7 +41,10 @@ const TVPage = lazy(() => import("./pages/TVPage"));
 const LibraryPage = lazy(() => import("./pages/LibraryPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const DownloadsPage = lazy(() => import("./pages/DownloadsPage"));
-import { checkForUpdates } from "./utils/updates";
+import {
+  checkForUpdatesWithFallback,
+  DEFAULT_UPDATE_SOURCE,
+} from "./utils/updates";
 
 export default function App() {
   // apiKey loaded async from secure storage (OS keychain)
@@ -70,6 +85,30 @@ export default function App() {
   const [loadingHome, setLoadingHome] = useState(false);
   const [offline, setOffline] = useState(() => !navigator.onLine);
 
+  // ── Player accent + subtitle lang ─────────────────────────────────────────
+  // Computed once here and passed as a prop to MoviePage / TVPage so neither
+  // page needs to touch storage.  Refreshed via "streambert:player-settings-changed".
+  const readPlayerSettings = () => {
+    const accentId = storage.get(STORAGE_KEYS.ACCENT_COLOR) || "red";
+    const inPlayer = storage.get(STORAGE_KEYS.ACCENT_IN_PLAYER) !== false; // default true
+    const accentHex = inPlayer
+      ? (ACCENT_PRESETS.find((p) => p.id === accentId)?.color ?? null)
+      : null;
+    const subtitleLang = storage.get(STORAGE_KEYS.SUBTITLE_LANG) || null;
+    return { accentColor: accentHex, subtitleLang };
+  };
+  const [playerSettings, setPlayerSettings] = useState(readPlayerSettings);
+
+  // ── Discord Rich Presence ──────────────────────────────────────────────────
+  // Off by default. `watchingEpisode` is filled in by TVPage (season/episode
+  // of whatever is currently open) via onEpisodeChange; MoviePage needs no
+  // extra data since title/poster already live on `selected`.
+  const [discordSettings, setDiscordSettings] = useState(
+    readDiscordRpcSettings,
+  );
+  const [watchingEpisode, setWatchingEpisode] = useState(null);
+  const watchStartRef = useRef(null);
+
   // ── Scheduled backup: run on startup if due ─────────────────────────────────
   useEffect(() => {
     if (!window.electron?.onScheduledBackupRequested) return;
@@ -103,7 +142,9 @@ export default function App() {
   // ── Startup update check ─────────────────────────────────────────────────
   useEffect(() => {
     if (!storage.get("autoCheckUpdates")) return;
-    checkForUpdates()
+    const source =
+      storage.get(STORAGE_KEYS.UPDATE_SOURCE) || DEFAULT_UPDATE_SOURCE;
+    checkForUpdatesWithFallback(source)
       .then((r) => {
         if (r.hasUpdate) setUpdateBanner(r);
       })
@@ -123,7 +164,7 @@ export default function App() {
     let cancelled = false;
 
     async function checkNewEpisodes() {
-      // Small grace period so the UI has fully painted before we start
+      // Small grace period so the UI has fully painted before start
       await new Promise((r) => setTimeout(r, 1200));
       if (cancelled) return;
 
@@ -199,7 +240,7 @@ export default function App() {
                 }
               } else {
                 // Subsequent checks: notify when last_episode_to_air changed
-                // (new episode aired) compared to what we cached.
+                // (new episode aired) compared to what got cached.
                 // Migration: old cache entries only have nextEpDate, not lastEpDate.
                 // In that case treat as first check to avoid false positives.
                 const prevLastDate = prev.lastEpDate ?? null;
@@ -463,11 +504,19 @@ export default function App() {
   // ── Trending, single shared fetch fn avoids code duplication ────────────
   // Results are cached in localStorage for 30 min to avoid redundant API calls
   // and to keep trending data out of RAM between restarts.
+  // The cache stores the active metadata language; if it differs from the
+  // current setting the cache is treated as stale and data is re-fetched.
   const fetchTrending = useCallback(() => {
     if (!apiKey) return;
     const cached = storage.get("trendingCache");
     const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-    if (cached && cached.ts && Date.now() - cached.ts < CACHE_TTL) {
+    const currentLang = storage.get(STORAGE_KEYS.TMDB_LANG) || "en-US";
+    if (
+      cached &&
+      cached.ts &&
+      cached.lang === currentLang &&
+      Date.now() - cached.ts < CACHE_TTL
+    ) {
       setTrending(cached.movies || []);
       setTrendingTV(cached.tv || []);
       return;
@@ -482,7 +531,12 @@ export default function App() {
         const tv = t.results || [];
         setTrending(movies);
         setTrendingTV(tv);
-        storage.set("trendingCache", { movies, tv, ts: Date.now() });
+        storage.set("trendingCache", {
+          movies,
+          tv,
+          ts: Date.now(),
+          lang: currentLang,
+        });
       })
       .catch(() => {})
       .finally(() => setLoadingHome(false));
@@ -504,10 +558,75 @@ export default function App() {
     return () =>
       window.removeEventListener("streambert:library-sort-changed", handler);
   }, []);
+
+  // ── Re-fetch trending immediately when metadata language changes ──────────
+  useEffect(() => {
+    const handler = () => fetchTrending();
+    window.addEventListener("streambert:tmdb-lang-changed", handler);
+    return () =>
+      window.removeEventListener("streambert:tmdb-lang-changed", handler);
+  }, [fetchTrending]);
+
+  // ── Refresh player settings (accent + subtitle lang) after save ───────────
+  useEffect(() => {
+    const handler = () => setPlayerSettings(readPlayerSettings());
+    window.addEventListener("streambert:player-settings-changed", handler);
+    return () =>
+      window.removeEventListener("streambert:player-settings-changed", handler);
+  }, []);
+
+  // ── Discord Rich Presence: sync settings + connect/disconnect ─────────────
+  useEffect(() => {
+    applyDiscordRpcEnabled(discordSettings.enabled);
+    if (!discordSettings.enabled) clearDiscordActivity();
+  }, [discordSettings.enabled]);
+
+  useEffect(() => {
+    const handler = () => setDiscordSettings(readDiscordRpcSettings());
+    window.addEventListener("streambert:discord-rpc-settings-changed", handler);
+    return () =>
+      window.removeEventListener(
+        "streambert:discord-rpc-settings-changed",
+        handler,
+      );
+  }, []);
+
+  // Reset episode info + elapsed-time anchor whenever the open title changes
+  useEffect(() => {
+    setWatchingEpisode(null);
+    watchStartRef.current = Date.now();
+  }, [selected?.id, selected?.media_type]);
+
+  // Push the current activity to Discord whenever what's on screen changes
+  useEffect(() => {
+    if (!discordSettings.enabled) return;
+    if ((page === "movie" || page === "tv") && selected) {
+      const title = selected.title || selected.name || "";
+      let subtitle = page === "movie" ? "Movie" : "Series";
+      if (page === "tv" && watchingEpisode) {
+        subtitle = `S${watchingEpisode.season} · E${watchingEpisode.episode}`;
+      }
+      sendWatchingActivity(
+        {
+          title,
+          subtitle,
+          posterUrl: imgUrl(selected.poster_path, "w500"),
+          startedAt: watchStartRef.current,
+        },
+        discordSettings,
+      );
+    } else {
+      sendIdleActivity(discordSettings);
+    }
+  }, [page, selected, watchingEpisode, discordSettings]);
   useEffect(() => {
     // Accent colour
     const accent = storage.get(STORAGE_KEYS.ACCENT_COLOR) || "red";
     applyAccentColor(accent);
+    // Theme
+    const theme = storage.get(STORAGE_KEYS.THEME) || "dark";
+    const customVars = storage.get(STORAGE_KEYS.CUSTOM_THEME_VARS) || null;
+    applyTheme(theme, customVars);
     // Font size
     const font = storage.get(STORAGE_KEYS.FONT_SIZE) || "normal";
     const zoomMap = { sm: 0.85, normal: 1, lg: 1.15 };
@@ -606,6 +725,38 @@ export default function App() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [navigateBack]);
+
+  // ── Controller / gamepad navigation ─────────────────────────────────────
+  const [gamepadEnabled, setGamepadEnabled] = useState(
+    () => storage.get(STORAGE_KEYS.GAMEPAD_ENABLED) !== false, // default on
+  );
+  useEffect(() => {
+    const handler = () =>
+      setGamepadEnabled(storage.get(STORAGE_KEYS.GAMEPAD_ENABLED) !== false);
+    window.addEventListener("streambert:gamepad-settings-changed", handler);
+    return () =>
+      window.removeEventListener(
+        "streambert:gamepad-settings-changed",
+        handler,
+      );
+  }, []);
+  const gamepadToastedRef = useRef(false);
+  const { connected: gamepadConnected } = useGamepadNav({
+    enabled: gamepadEnabled,
+    onBack: navigateBack,
+    onOpenSearch: () => setShowSearch(true),
+  });
+  useEffect(() => {
+    if (!gamepadEnabled) return;
+    if (gamepadConnected && !gamepadToastedRef.current) {
+      gamepadToastedRef.current = true;
+      // showToast is defined further below in this component; effects only
+      // run after the full render, so it's already initialized by then.
+      showToast("Controller connected");
+    }
+    if (!gamepadConnected) gamepadToastedRef.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gamepadConnected, gamepadEnabled]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const toastTimerRef = useRef(null);
@@ -710,10 +861,16 @@ export default function App() {
     };
     // Functional update - never reads stale history from closure
     setHistory((prev) => {
-      const filtered = prev.filter(
-        (h) => !(h.id === entry.id && h.media_type === entry.media_type),
-      );
-      const next = [entry, ...filtered].slice(0, 50);
+      // For TV: dedupe per episode (same show+season+episode).
+      // For movies: dedupe by id+media_type as before.
+      const filtered = prev.filter((h) => {
+        if (h.id !== entry.id || h.media_type !== entry.media_type) return true;
+        if (entry.media_type === "tv") {
+          return !(h.season === entry.season && h.episode === entry.episode);
+        }
+        return false;
+      });
+      const next = [entry, ...filtered].slice(0, 100);
       storage.set("history", next);
       return next;
     });
@@ -744,6 +901,20 @@ export default function App() {
       const next = { ...prev };
       delete next[key];
       storage.set("watched", next);
+      return next;
+    });
+  }, []);
+
+  const removeHistory = useCallback((item) => {
+    setHistory((prev) => {
+      const next = prev.filter((h) => {
+        if (h.id !== item.id || h.media_type !== item.media_type) return true;
+        if (item.media_type === "tv") {
+          return !(h.season === item.season && h.episode === item.episode);
+        }
+        return false;
+      });
+      storage.set("history", next);
       return next;
     });
   }, []);
@@ -902,6 +1073,7 @@ export default function App() {
               <MoviePage
                 item={selected}
                 apiKey={apiKey}
+                playerSettings={playerSettings}
                 onSave={() => toggleSave(selected)}
                 isSaved={isSaved(selected)}
                 onHistory={addHistory}
@@ -924,6 +1096,7 @@ export default function App() {
               <TVPage
                 item={selected}
                 apiKey={apiKey}
+                playerSettings={playerSettings}
                 onSave={() => toggleSave(selected)}
                 isSaved={isSaved(selected)}
                 onHistory={addHistory}
@@ -939,6 +1112,7 @@ export default function App() {
                 onMarkUnwatched={markUnwatched}
                 downloads={downloads}
                 onGoToDownloads={handleGoToDownloads}
+                onEpisodeChange={setWatchingEpisode}
               />
             )}
             {page === "history" && (
@@ -951,6 +1125,7 @@ export default function App() {
                 watched={watched}
                 onMarkWatched={markWatched}
                 onMarkUnwatched={markUnwatched}
+                onRemoveHistory={removeHistory}
               />
             )}
             {page === "settings" && (

@@ -1,5 +1,4 @@
-name: Build & Upload Artifacts
-
+name: Build & Upload MacOS Artifacts
 on:
   workflow_dispatch:
 
@@ -27,11 +26,7 @@ jobs:
 
       - name: Install deps
         run: npm ci
-
-      - name: Build renderer (Vite)
-        run: npx cross-env ELECTRON_DIST=1 vite build
-
-      - name: Build macOS
+      - name: Build macOS (universal)
         run: npm run dist:mac
 
       - name: Upload macOS artifacts

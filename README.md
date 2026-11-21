@@ -1,12 +1,18 @@
-[![Downloads@latest](https://img.shields.io/github/downloads/truelockmc/streambert/latest/total?style=for-the-badge)](https://github.com/truelockmc/streambert/releases/latest/)
+[![Downloads@latest](https://img.shields.io/github/downloads/truelockmc/streambert/latest/total?style=for-the-badge)](https://codeberg.org/truelockmc/streambert/releases/latest/)
 [![Release Version Badge](https://img.shields.io/github/v/release/truelockmc/streambert?style=for-the-badge)](https://github.com/truelockmc/streambert/releases)
 [![Issues Badge](https://img.shields.io/github/issues/truelockmc/streambert?style=for-the-badge)](https://github.com/truelockmc/streambert/issues)
 [![Closed Issues Badge](https://img.shields.io/github/issues-closed/truelockmc/streambert?color=%238256d0&style=for-the-badge)](https://github.com/truelockmc/streambert/issues?q=is%3Aissue+is%3Aclosed)<br>
 
+[![GitHub](https://img.shields.io/badge/GitHub-truelockmc%2Fstreambert-181717?style=for-the-badge&logo=github)](https://github.com/truelockmc/streambert)
+[![Codeberg](https://img.shields.io/badge/Codeberg-truelockmc%2Fstreambert-2185D0?style=for-the-badge&logo=codeberg)](https://codeberg.org/truelockmc/streambert)
+[![AUR Version](https://img.shields.io/aur/version/streambert-bin?style=for-the-badge&logo=archlinux)](https://aur.archlinux.org/packages/streambert-bin)
 # Streambert
-A cross-platform Electron Desktop App to stream and download any Movie, TV Series or Anime in the World. Zero Ads and Tracking <br></br>
+A cross-platform Electron Desktop App to stream and download any Movie, TV Series or Anime in the World. Zero Ads and Tracking[*](#privacy-disclaimer) <br></br>
+<a href="https://trendshift.io/repositories/31115" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/31115" alt="truelockmc%2Fstreambert | Trendshift" width="250" height="55"/></a>
+
 ![Logo](public/logo.svg)
-[Installation](https://github.com/truelockmc/streambert?tab=readme-ov-file#requirements)
+
+[Installation](#requirements)
 
 ## Why Streambert?
 - 🎦 **Streaming:** Stream any Movie, Anime or TV Series from around the World.
@@ -31,7 +37,7 @@ A cross-platform Electron Desktop App to stream and download any Movie, TV Serie
 [![Stargazers](https://reporoster.com/stars/dark/truelockmc/streambert)](https://github.com/truelockmc/streambert/stargazers)
 ---
 ## Streaming
-The Application mainly gets Video Streams from VidSrc (you can also Stream from videasy.net and 2Embed). <br></br>
+The Application gets video streams from different hosters/aggregators, see [PLAYER_SOURCES](src/utils/api.js). <br></br>
 It fetches Information for Images, Info Texts, Search and Homepage from [tmdb](https://www.themoviedb.org/).
 
 ---
@@ -49,7 +55,7 @@ Media Files for Animes are scraped from AllManga.to (i stole this mechanic from 
 
 ## Requirements
 
-- [Node.js](https://nodejs.org/) (>=22.12.0) installed (only if you aren't using [prebuilt Binaries](https://github.com/truelockmc/streambert/releases/latest))
+- [Node.js](https://nodejs.org/) (>=22.12.0) installed (only if you aren't using [prebuilt Binaries](https://codeberg.org/truelockmc/streambert/releases/latest))
 - A free TMDB API Read Access Token ([Guide on how to get one](tmdb-tutorial.md))
 - For downloading, [this Program](https://github.com/truelockmc/vid-dl-cli-only/releases/latest) somewhere on your PC and [ffmpeg](https://ffmpeg.org/download.html) installed
 
@@ -60,7 +66,7 @@ It's saved locally, you only need to do this once.
 
 ### Linux, Manual (.deb / .AppImage / .pacman)
 
-Download the latest `.deb` `.pacman` or `.AppImage` from the [Releases](https://github.com/truelockmc/streambert/releases/latest) page.
+Download the latest `.deb` `.pacman` or `.AppImage` from the [Releases](https://codeberg.org/truelockmc/streambert/releases/latest) page.
 ```bash
 # .deb
 sudo dpkg -i streambert_*.deb
@@ -74,7 +80,10 @@ chmod +x Streambert-x64.AppImage && ./Streambert-x64.AppImage
 
 ### Windows
 
-Download the latest `Streambert Setup *.exe` from the [Releases](https://github.com/truelockmc/streambert/releases/latest) page and run it.
+Download the latest `Streambert Setup *.exe` from the [Releases](https://codeberg.org/truelockmc/streambert/releases/latest) page and run it.
+
+### macOS
+Download the latest `Streambert-*-universal.dmg` from the [Releases](https://codeberg.org/truelockmc/streambert/releases/latest) page, open it and drag Streambert to your Applications folder.
 
 ---
 
@@ -86,11 +95,11 @@ npm install
 ```
 2. Build
 ```bash
-npm run dist:win
+npm run dist:win   
 ```
 or
 ```bash
-npm run dist:linux
+npm run dist:linux 
 ```
 or (for Arch Linux)
 ```bash
@@ -100,11 +109,42 @@ or (for an AppImage only)
 ```bash
 npm run dist:appimage
 ```
+or (for a .deb only)
+```bash
+npm run dist:deb
+```
+or (for a .rpm only)
+```bash
+npm run dist:rpm
+```
+or (for macOS)
+```bash
+npm run dist:mac
+```
+or (build all platforms at once)
+```bash
+npm run dist
+```
 
 > [!IMPORTANT]
 > If you are building/installing on Arch Linux and encounter errors, you may need these libraries:
 > - **libcrypt.so.1 error:** `sudo pacman -S libxcrypt-compat`
 > - **http-parser dependency error:** `yay -S http-parser` (from AUR)
+
+## License
+This project is open-source software licensed under the GNU General Public License v3.0 [(GPL-3.0)](LICENSE).
+
+Forks may be created but they MUST stay open-sourced.
+
+## Contributing
+Everyone is welcome to contribute to this project.
+Before contributing please make sure to read the [Contributing Guidelines](CONTRIBUTING.md) and act accordingly.
+
+## Privacy Disclaimer
+Streambert itself does not collect ANY data. There is no centralized service which the app relies on.
+However, the streaming sources and github (for downloading updates in-app) may still collect your data.
+
+Streambert has built-in tracker/- and adblocking, but obviously that is not perfect.
 
 ## Legal Disclaimer
 
@@ -127,8 +167,11 @@ This application is provided "as is" for educational purposes. The developer:
 - Does not control third-party content providers
 - Encourages users to support content creators through legal means
 
----
-## Project Structure
+[![RepoStars](https://repostars.dev/api/embed?repo=truelockmc%2Fstreambert&theme=dark)](https://repostars.dev/?repos=truelockmc%2Fstreambert&theme=dark)
+
+<details>
+    <summary>Project Structure</summary>
+    
 ```
 Project Root
 ├── index.html
@@ -212,3 +255,4 @@ Project Root
         ├── useBlockedStats.js
         └── useRatings.js
 ```
+</details>

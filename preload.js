@@ -1,6 +1,9 @@
 const { contextBridge, ipcRenderer, webFrame } = require("electron");
 
 contextBridge.exposeInMainWorld("electron", {
+  // Cleaned Chromium UA (no Electron/app tokens)
+  cleanUserAgent: ipcRenderer.sendSync("get-clean-user-agent"),
+
   // m3u8 capture
   onM3u8Found: (cb) => {
     const h = (_, url) => cb(url);
@@ -46,6 +49,7 @@ contextBridge.exposeInMainWorld("electron", {
       seconds,
       subtitlePaths,
     }),
+  openStreamExternal: (args) => ipcRenderer.invoke("open-stream-external", args),
   pruneSubtitlePaths: (downloadId) =>
     ipcRenderer.invoke("prune-subtitle-paths", { downloadId }),
 
@@ -59,9 +63,16 @@ contextBridge.exposeInMainWorld("electron", {
   respondClose: (confirm) => ipcRenderer.send("close-response", confirm),
 
   // anime episode resolver (main-process HTTP, bypasses CORS/bot-check)
-  resolveAllManga: (args) => ipcRenderer.invoke("resolve-allmanga", args),
+  resolveHiAnime: (args) => ipcRenderer.invoke("resolve-hianime", args),
   setPlayerVideo: (args) => ipcRenderer.invoke("set-player-video", args),
-  debugAllManga: (args) => ipcRenderer.invoke("debug-allmanga", args),
+  // progress of the HiAnime lookup (stage: "search" | "episodes" | "stream");
+  // returns an unsubscribe function
+  onHiAnimeProgress: (cb) => {
+    const h = (_, data) => cb(data?.stage);
+    ipcRenderer.on("hianime-progress", h);
+    return () => ipcRenderer.removeListener("hianime-progress", h);
+  },
+  debugHiAnime: (args) => ipcRenderer.invoke("debug-hianime", args),
 
   // App version (from package.json via Electron)
   getAppVersion: () => ipcRenderer.invoke("get-app-version"),
@@ -127,8 +138,8 @@ contextBridge.exposeInMainWorld("electron", {
   secureSet: (key, value) =>
     ipcRenderer.invoke("secure-store-set", { key, value }),
   // Picture-in-Picture pop-out (full player UI, only one stream active at a time)
-  openPipWindow: (url, title) =>
-    ipcRenderer.invoke("open-pip-window", { url, title }),
+  openPipWindow: (url, title, userAgent = null) =>
+    ipcRenderer.invoke("open-pip-window", { url, title, userAgent }),
   closePipWindow: () => ipcRenderer.invoke("close-pip-window"),
   getPipWebContentsId: () => ipcRenderer.invoke("get-pip-webcontents-id"),
   onPipOpened: (cb) => {
@@ -184,4 +195,19 @@ contextBridge.exposeInMainWorld("electron", {
   },
   offScheduledBackupRequested: (h) =>
     ipcRenderer.removeListener("scheduled-backup-requested", h),
+
+  fetchReleaseImage: (url) =>
+    ipcRenderer.invoke("fetch-release-image", { url }),
+
+  // Discord Rich Presence (off by default, toggled in Settings)
+  discordRpcSetEnabled: (enabled) =>
+    ipcRenderer.invoke("discord-rpc-set-enabled", enabled),
+  discordRpcUpdateActivity: (activity) =>
+    ipcRenderer.invoke("discord-rpc-update-activity", activity),
 });
+
+if (process.platform === "darwin") {
+  navigator.mediaDevices?.addEventListener("devicechange", () => {
+    ipcRenderer.send("audio-device-changed");
+  });
+}
