@@ -10,6 +10,7 @@
   "main": "index.js",
   "private": true,
   "scripts": {
+    "build": "vite build",
     "dev": "vite build --watch",
     "start": "vite build && electron .",
     "dist": "cross-env ELECTRON_DIST=1 vite build && npm run dist:linux && npm run dist:win && npm run dist:mac",
