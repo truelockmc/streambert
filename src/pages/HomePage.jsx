@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import MediaCard from "../components/MediaCard";
+import BrandMasthead from "../components/BrandMasthead";
 import TrendingCarousel from "../components/TrendingCarousel";
 import { PlayIcon, StarIcon } from "../components/Icons";
 import { imgUrl, tmdbFetch } from "../utils/api";
@@ -37,6 +38,7 @@ export default function HomePage({
   trendingTV,
   loading,
   onSelect,
+  onSearch,
   progress,
   inProgress,
   offline,
@@ -208,7 +210,8 @@ export default function HomePage({
 
   return (
     <div className="fade-in">
-      <div className="discover-intro"><div><span>THE BIG PICTURE</span><h1>Find your next favorite.</h1><p>All the stories you love, in one place.</p></div><div className="discover-intro-mark">✳ <span>YOUR PERSONAL<br />SCREENING ROOM</span></div></div>
+      <BrandMasthead onExplore={onSearch} />
+      {!loading && hero && <div className="frame-heading"><div><span>THE FRAME EDIT &nbsp; / &nbsp; 01</span><h2>In the spotlight<span>.</span></h2></div><p>A STORY WORTH YOUR TIME &nbsp; ↘</p></div>}
       {/* ── Offline ── */}
       {offline && (
         <div

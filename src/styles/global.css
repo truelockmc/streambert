@@ -4311,3 +4311,22 @@ button:focus-visible, [role="button"]:focus-visible, input:focus-visible { outli
 .apikey-box { border-radius:20px; box-shadow:0 25px 80px #0005; }.apikey-logo { width:64px; height:64px; filter:none; }.apikey-title { font-size:38px; font-weight:600; letter-spacing:-1px; text-transform:lowercase; }
 @media(max-width:850px) { .detail-hero { margin-left:24px; margin-right:24px; }.detail-content { padding:28px; gap:24px; }.detail-poster { width:150px; }.dl-page { padding:32px 24px; } }
 @media(max-width:560px) { .detail-content { display:block; }.detail-poster { width:100px; margin-bottom:20px; }.library-header,.library-section { padding-left:24px; padding-right:24px; } }
+
+/* Frame's opening sequence: an editorial, film-inspired brand world. */
+.brand-masthead { position:relative; min-height:390px; margin:28px 40px 54px; overflow:hidden; border:1px solid #674439; border-radius:4px; color:#f8eee2; background:#211712 url('../../public/frame-atmosphere.jpg') center/cover no-repeat; }
+.brand-masthead::before { content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(24,16,15,.97) 0%,rgba(24,16,15,.82) 35%,rgba(24,16,15,.07) 76%),linear-gradient(0deg,rgba(24,16,15,.55),transparent 30%); }
+.brand-masthead-copy { position:relative; z-index:1; padding:52px 50px 62px; max-width:570px; }
+.brand-masthead-label { display:flex; align-items:center; gap:10px; color:#e8a184; font-size:9px; letter-spacing:2px; font-weight:600; }.brand-masthead-label span { width:24px; height:1px; background:#e8a184; }
+.brand-masthead h1 { margin:22px 0 15px; color:#f8eee2; font:400 clamp(45px,5.4vw,74px)/.99 Georgia,serif; letter-spacing:-2.8px; }.brand-masthead h1 em { color:#e8a184; font-weight:400; }
+.brand-masthead p { color:#d2c5bc; font-size:13px; line-height:1.7; max-width:320px; }
+.brand-masthead-button { display:inline-flex; align-items:center; justify-content:space-between; gap:28px; padding:13px 16px; margin-top:25px; border:0; border-radius:3px; background:#e8a184; color:#211712; font:600 12px var(--font-body); cursor:pointer; }.brand-masthead-button:hover { background:#f4b89d; }.brand-masthead-button span { font-size:17px; }
+.brand-masthead-side { position:absolute; z-index:1; right:22px; top:24px; display:flex; gap:10px; align-items:center; color:#f4d7c4; font-size:9px; font-weight:600; letter-spacing:1.4px; }.brand-masthead-side i { width:25px; height:1px; background:#efbda6; }
+.brand-masthead-bottom { position:absolute; bottom:17px; left:50px; right:22px; z-index:1; display:flex; justify-content:space-between; color:#ddc6b9; font-size:8px; font-weight:600; letter-spacing:1.3px; }
+.frame-heading { display:flex; justify-content:space-between; align-items:end; margin:0 40px 20px; }.frame-heading > div > span { color:var(--red); font-size:9px; letter-spacing:1.7px; font-weight:600; }.frame-heading h2 { margin-top:7px; font:400 32px/1.1 Georgia,serif; letter-spacing:-.8px; }.frame-heading h2 span { color:var(--red); }.frame-heading p { color:var(--text3); font-size:9px; letter-spacing:1.2px; }
+.sidebar-brand-copy strong { font-family:Georgia,serif; font-weight:400; letter-spacing:-1.5px; font-size:25px; }.sidebar-logo { border-radius:11px; }
+.app-header-location span { color:var(--red); }.app-header { height:70px; }.sidebar-btn.active { border-left:2px solid var(--red); border-radius:3px 8px 8px 3px; }
+.hero { border-radius:5px; height:380px; }.hero-title { font-family:Georgia,serif; font-weight:400; letter-spacing:-1.5px; }.hero-content { padding:36px; }.hero-type { letter-spacing:1.8px; }
+.section-title,.library-section-title,.demo-collection-heading h2 { font:400 28px/1.1 Georgia,serif; letter-spacing:-.6px; }.demo-collection-heading h2 { margin-top:8px; }.card-poster,.demo-title-poster { border-radius:4px; }.demo-title-action { border-radius:3px; }
+.demo-footer > span { font-family:Georgia,serif; font-weight:400; font-size:24px; }
+@media(max-width:850px) { .brand-masthead { margin:24px 24px 40px; }.brand-masthead-copy { padding:45px 30px 65px; }.brand-masthead-bottom { left:30px; }.frame-heading { margin-left:24px; margin-right:24px; } }
+@media(max-width:560px) { .brand-masthead { min-height:370px; }.brand-masthead::before { background:linear-gradient(90deg,rgba(24,16,15,.96),rgba(24,16,15,.52)); }.brand-masthead h1 { font-size:48px; }.brand-masthead-side,.brand-masthead-bottom span:last-child,.frame-heading p { display:none; }.frame-heading h2 { font-size:28px; } }

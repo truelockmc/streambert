@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import BrandMasthead from "./components/BrandMasthead";
 import {
   BookmarkIcon,
   HomeIcon,
@@ -73,12 +74,12 @@ const series = [
     poster: "/fqldf2t8ztc9aiwn3k6mlX3tvRT.jpg",
   },
   {
-    id: 94997,
-    title: "House of the Dragon",
-    year: "2022",
-    genre: "Drama · Fantasy",
-    rating: "8.4",
-    poster: "/z2yahl2uefxDla0eaRKeK7J3V6m.jpg",
+    id: 66732,
+    title: "Stranger Things",
+    year: "2016",
+    genre: "Drama · Mystery",
+    rating: "8.6",
+    poster: "/49WJfeN0moxb9IPfGn8AIqMGskD.jpg",
   },
   {
     id: 119051,
@@ -139,7 +140,8 @@ export default function DemoApp() {
       <header className="app-header"><div className="app-header-location"><span>YOUR SPACE</span><strong>{({discover:"Discover", library:"My library", series:"Series", settings:"About preview"})[active]}</strong></div><label className="demo-search-new"><SearchIcon /><input id="demo-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search movies & series" aria-label="Search movies and series" /><kbd>⌘ K</kbd></label></header>
       {search.trim() ? <div className="demo-page"><div className="demo-page-heading"><span>EXPLORE FRAME</span><h1>Search results</h1><p>{results.length} titles for “{search}”</p></div><div className="demo-title-grid">{results.map(item => <PosterCard key={item.id} item={item} onSelect={select} />)}</div>{!results.length && <div className="demo-empty">No matching titles in this preview.</div>}</div> : <>
       {active === "discover" && <>
-        <div className="discover-intro"><div><span>THE BIG PICTURE</span><h1>Find your next favorite.</h1><p>All the stories you love, in one place.</p></div><div className="discover-intro-mark">✳ <span>YOUR PERSONAL<br />SCREENING ROOM</span></div></div>
+        <BrandMasthead onExplore={() => document.getElementById("demo-search")?.focus()} />
+        <div className="frame-heading"><div><span>THE FRAME EDIT &nbsp; / &nbsp; 01</span><h2>In the spotlight<span>.</span></h2></div><p>A STORY WORTH YOUR TIME &nbsp; ↘</p></div>
         <section className="hero demo-new-hero"><div className="hero-bg demo-new-hero-bg" /><div className="hero-gradient" /><div className="hero-content"><div className="hero-type">IN THE SPOTLIGHT &nbsp;/&nbsp; TRENDING MOVIE</div><div className="hero-title">Dune: Part Two</div><div className="hero-meta"><span className="hero-rating">★ 8.7</span><span>2024</span><span>Science fiction · Adventure</span></div><p className="hero-overview">Paul Atreides unites with Chani and the Fremen while seeking revenge against the conspirators who destroyed his family.</p><div className="hero-actions"><button className="btn btn-primary" onClick={() => select(movies[0])}><PlayIcon /> Explore title</button><button className="btn btn-secondary" onClick={() => setActive("library")}>My library ↗</button></div></div><div className="hero-index">01 <span>/</span> THE SPOTLIGHT</div></section>
         <section className="demo-collection"><div className="demo-collection-heading"><div><span>THE WEEKLY EDIT</span><h2>Trending movies</h2></div><span>CURATED FOR YOU &nbsp; ↗</span></div><div className="demo-title-grid">{movies.map(item => <PosterCard key={item.id} item={item} onSelect={select} />)}</div></section>
         <section className="demo-collection"><div className="demo-collection-heading"><div><span>ONE MORE EPISODE</span><h2>Series to get lost in</h2></div><button onClick={() => setActive("series")}>EXPLORE SERIES &nbsp; ↗</button></div><div className="demo-title-grid">{series.map(item => <PosterCard key={item.id} item={item} onSelect={select} />)}</div></section>

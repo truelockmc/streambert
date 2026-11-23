@@ -1062,6 +1062,7 @@ export default function App() {
                 trendingTV={trendingTV}
                 loading={loadingHome}
                 onSelect={handleSelectResult}
+                onSearch={() => setShowSearch(true)}
                 progress={progress}
                 inProgress={inProgress}
                 offline={offline}
