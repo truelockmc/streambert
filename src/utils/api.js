@@ -236,6 +236,7 @@ export const PLAYER_SOURCES = [
   },
   {
     id: "devideosrc",
+    audioLang: "de", // audio (dub) language this source serves
     label: "DeVideoSrc",
     tag: null,
     note: "🇩🇪",
@@ -256,6 +257,7 @@ export const PLAYER_SOURCES = [
   },
   {
     id: "frembed",
+    audioLang: "fr", // audio (dub) language this source serves
     label: "Frembed",
     tag: null, // movies, TV and anime (anime uses the normal movie/serie endpoints)
     note: "🇫🇷",
@@ -271,6 +273,7 @@ export const PLAYER_SOURCES = [
   },
   {
     id: "kinohub",
+    audioLang: "ru", // audio (dub) language this source serves
     label: "KinoHub",
     tag: null,
     note: "🇷🇺",
@@ -725,6 +728,39 @@ export const isAnimeContent = (item, details) => {
 // Default sources
 export const ANIME_DEFAULT_SOURCE = "hianime";
 export const NON_ANIME_DEFAULT_SOURCE = "vidrift";
+
+// ── Preferred audio (dub) language ────────────────────────────────────────────
+// Embedded players don't expose their audio tracks, so the dub language is
+// chosen via the source: each source with `audioLang` serves that language.
+// English has no dedicated source (the regular sources are English already);
+// for anime it switches the sub/dub mode to "dub" instead.
+export const AUDIO_LANGUAGES = [
+  { code: "", label: "Off (use the selected source)" },
+  { code: "de", label: "German" },
+  { code: "en", label: "English (anime: dub)" },
+  { code: "fr", label: "French" },
+  { code: "ru", label: "Russian (movies only)" },
+];
+
+export const audioLangLabel = (code) =>
+  AUDIO_LANGUAGES.find((l) => l.code === code)?.label.split(" (")[0] ?? code;
+
+/**
+ * What to change to get the preferred audio language for a title.
+ * @param {string|null} lang  ISO 639-1 code from AUDIO_LANGUAGES
+ * @param {"movie"|"tv"} type
+ * @param {boolean} isAnime
+ * @returns {{sourceId?: string, dubMode?: "dub"}|null} null = nothing to do
+ */
+export const getAudioLangAttempt = (lang, type, isAnime) => {
+  if (!lang) return null;
+  const src = PLAYER_SOURCES.find(
+    (s) => s.audioLang === lang && (type === "movie" || !s.movieOnly),
+  );
+  if (src) return { sourceId: src.id };
+  if (lang === "en" && isAnime) return { dubMode: "dub" };
+  return null;
+};
 
 // ── Episode Group fetch (localStorage + in-memory cache, 7-day TTL) ─────────
 // Episode groups almost never change -> cache aggressively across sessions.

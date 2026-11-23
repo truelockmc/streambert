@@ -63,6 +63,9 @@ export const STORAGE_KEYS = {
   // Subtitle settings
   SUBTITLE_ENABLED: "subtitleDownload",
   SUBTITLE_LANG: "subtitleLang",
+  // Preferred audio (dub) language + per-title availability cache
+  PREFERRED_AUDIO_LANG: "preferredAudioLang",
+  AUDIO_LANG_CACHE: "audioLangCache",
   // NOTE: SUBDL_API_KEY, WYZIE_API_KEY and API_KEY are stored encrypted via secureStorage
   SUBDL_API_KEY: "subdlApiKey",
   WYZIE_API_KEY: "wyzieApiKey",

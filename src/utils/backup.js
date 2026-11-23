@@ -20,6 +20,7 @@ export const BACKUP_KEYS = [
   // Player preferences
   "playerSource",
   "hianimeDubMode",
+  "preferredAudioLang",
   "introSkipMode",
   // Other Stuff
   "ageLimit",
