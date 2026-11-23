@@ -21,7 +21,7 @@ A cross-platform Electron Desktop App to stream and download any Movie, TV Serie
 - ⚙️ **Customizability:** Customize the Interface and Features to your unique needs.
 - 📚 **Library:** Track what you watched, save stuff you want to watch and manage your Downloads.
 - ✨ **Trending:** Discover new things to Watch every Day.
-- 🛡️ **Privacy:** Completely Ads and Tracker free, forever.
+- 🛡️ **Privacy:** Completely Ad- and Tracker-free, forever.
 - ⚡ **Speed:** Stream faster than any Browser can, download with multithreading.
 
 ![Explore new Stuff](screenshots/trending.png)
@@ -37,20 +37,20 @@ A cross-platform Electron Desktop App to stream and download any Movie, TV Serie
 [![Stargazers](https://reporoster.com/stars/dark/truelockmc/streambert)](https://github.com/truelockmc/streambert/stargazers)
 ---
 ## Streaming
-The Application gets video streams from different hosters/aggregators, see [PLAYER_SOURCES](src/utils/api.js). <br></br>
+The Application gets video streams from different hosters/aggregators; see [PLAYER_SOURCES](src/utils/api.js). <br></br>
 It fetches Information for Images, Info Texts, Search and Homepage from [tmdb](https://www.themoviedb.org/).
 
 ---
 
 ## Downloading
 You can download those Video Streams because the Program sources Links to their .m3u8 Playlist Files ([similar to this Browser Extension](https://addons.mozilla.org/en-US/firefox/addon/m3u8-link-finder/)). <br></br>
-Once you click 'Download' these Links are used to download the Full Movie/TV Episode using [this Program](https://github.com/truelockmc/vid-dl-cli-only). You can then watch them In-App or take the Files on any Storage Medium you want.
+Once you click 'Download', these Links are used to download the Full Movie/TV Episode using [this Program](https://github.com/truelockmc/vid-dl-cli-only). You can then watch them In-App or take the Files on any Storage Medium you want.
 
 ---
 
 ## Anime
 You can also watch Anime, the App checks if a Movie or Series is an Anime and then sources its Metadata from [AniList](https://anilist.co/) instead of [tmdb](https://www.themoviedb.org/). <br></br>
-Media Files for Animes are scraped from AllManga.to (i stole this mechanic from [ani-cli](https://github.com/pystardust/ani-cli)). The App directly gets .mp4 Files and doesnt evem show you the AllManga website, you can also download these Files, just like any other Content.
+Media Files for Anime are scraped from AllManga.to (I stole this mechanic from [ani-cli](https://github.com/pystardust/ani-cli)). The App directly gets .mp4 Files and doesn't even show you the AllManga website, you can also download these Files, just like any other Content.
 
 
 ## Requirements
@@ -62,11 +62,11 @@ Media Files for Animes are scraped from AllManga.to (i stole this mechanic from 
 ---
 ## Installation
 On first launch you'll be prompted to enter your TMDB API key. ([Guide on how to get one](tmdb-tutorial.md))
-It's saved locally, you only need to do this once.
+It's saved locally; you only need to do this once.
 
 ### Linux, Manual (.deb / .AppImage / .pacman)
 
-Download the latest `.deb` `.pacman` or `.AppImage` from the [Releases](https://codeberg.org/truelockmc/streambert/releases/latest) page.
+Download the latest `.deb`, `.pacman`, or `.AppImage` from the [Releases](https://codeberg.org/truelockmc/streambert/releases/latest) page.
 ```bash
 # .deb
 sudo dpkg -i streambert_*.deb
@@ -134,17 +134,17 @@ npm run dist
 ## License
 This project is open-source software licensed under the GNU General Public License v3.0 [(GPL-3.0)](LICENSE).
 
-Forks may be created but they MUST stay open-sourced.
+Forks may be created, but they MUST stay open-sourced.
 
 ## Contributing
 Everyone is welcome to contribute to this project.
-Before contributing please make sure to read the [Contributing Guidelines](CONTRIBUTING.md) and act accordingly.
+Before contributing, please make sure to read the [Contributing Guidelines](CONTRIBUTING.md) and act accordingly.
 
 ## Privacy Disclaimer
 Streambert itself does not collect ANY data. There is no centralized service which the app relies on.
-However, the streaming sources and github (for downloading updates in-app) may still collect your data.
+However, the streaming sources and GitHub (for downloading updates in-app) may still collect your data.
 
-Streambert has built-in tracker/- and adblocking, but obviously that is not perfect.
+Streambert has built-in tracker- and adblocking, but obviously that is not perfect.
 
 ## Legal Disclaimer
 
