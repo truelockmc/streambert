@@ -98,177 +98,58 @@ const series = [
   },
 ];
 
-function PosterCard({ item, progress, onSelect }) {
-  return (
-    <button className="demo-card" onClick={() => onSelect(item)} type="button">
-      <span className="demo-card-poster">
-        <img src={image(item.poster, "w342")} alt="" />
-        <span className="demo-card-sheen" />
-        <span className="demo-card-play">
-          <PlayIcon />
-        </span>
-        <span className="demo-card-rating">
-          <StarIcon size={12} /> {item.rating}
-        </span>
-        {progress && (
-          <span className="demo-progress">
-            <span style={{ width: `${progress}%` }} />
-          </span>
-        )}
-      </span>
-      <span className="demo-card-title">{item.title}</span>
-      <span className="demo-card-meta">
-        {item.year} <i /> {item.genre.split(" · ")[0]}
-      </span>
-    </button>
-  );
-}
-
-function DemoIconButton({ active, children, label, onClick }) {
-  return (
-    <button
-      className={`demo-nav-button${active ? " is-active" : ""}`}
-      onClick={onClick}
-      title={label}
-      type="button"
-    >
-      {children}
-      <span>{label}</span>
-    </button>
-  );
+function PosterCard({ item, onSelect }) {
+  return <button className="demo-title-card" onClick={() => onSelect(item)}>
+    <span className="demo-title-poster"><img src={image(item.poster, "w342")} alt="" /><span className="demo-title-action">↗</span></span>
+    <strong>{item.title}</strong><small>{item.year} <span>·</span> {item.genre.split(" · ")[0]}</small>
+  </button>;
 }
 
 export default function DemoApp() {
-  const [active, setActive] = useState("home");
+  const [active, setActive] = useState("discover");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
   const [saved, setSaved] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("streambert-demo-saved") || "[]"); }
-    catch { return []; }
+    try { const value = JSON.parse(localStorage.getItem("streambert-demo-saved") || "[]"); return Array.isArray(value) ? value : []; } catch { return []; }
   });
-  useEffect(() => {
-    try { localStorage.setItem("streambert-demo-saved", JSON.stringify(saved)); } catch { /* storage may be unavailable */ }
-  }, [saved]);
+  useEffect(() => { try { localStorage.setItem("streambert-demo-saved", JSON.stringify(saved)); } catch {} }, [saved]);
   useEffect(() => {
     const onKey = (event) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        document.getElementById("demo-search")?.focus();
-      }
+      if ((event.metaKey || event.ctrlKey) && ["k", "f"].includes(event.key.toLowerCase())) { event.preventDefault(); document.getElementById("demo-search")?.focus(); }
       if (event.key === "Escape") { setSelected(null); setSearch(""); }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
   }, []);
-
-  const results = useMemo(() => {
-    const all = [...movies, ...series];
-    if (!search.trim()) return [];
-    return all.filter((item) =>
-      item.title.toLowerCase().includes(search.toLowerCase()),
-    );
-  }, [search]);
-
-  const select = (item) => {
-    setSelected(item);
-    setSearch("");
-  };
-
-  return (
-    <div className="demo-app">
-      <aside className="demo-sidebar">
-        <div className="demo-brand">
-          <img src="./logo.svg" alt="Streambert" />
-          <span>STREAMBERT</span>
-        </div>
-        <nav className="demo-nav">
-          <DemoIconButton active={active === "home"} label="Discover" onClick={() => setActive("home")}>
-            <HomeIcon />
-          </DemoIconButton>
-          <DemoIconButton active={active === "library"} label="My library" onClick={() => setActive("library")}>
-            <BookmarkIcon />
-          </DemoIconButton>
-          <DemoIconButton active={active === "series"} label="Series" onClick={() => setActive("series")}>
-            <TVIcon />
-          </DemoIconButton>
-        </nav>
-        <div className="demo-sidebar-bottom">
-          <span className="demo-sync"><i /> UI preview</span>
-          <DemoIconButton active={active === "settings"} label="Settings" onClick={() => setActive("settings")}>
-            <SettingsIcon />
-          </DemoIconButton>
-        </div>
-      </aside>
-
-      <main className="demo-main">
-        <header className="demo-header">
-          <div className="demo-breadcrumb"><span>Streambert</span><b>/</b> {active === "home" ? "Discover" : active}</div>
-          <div className="demo-header-actions">
-            <label className="demo-search">
-              <SearchIcon />
-              <input
-                id="demo-search"
-                aria-label="Search titles"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search movies, series..."
-              />
-              <kbd>⌘ K</kbd>
-            </label>
-            <span className="demo-preview-badge">PREVIEW</span>
-          </div>
-        </header>
-
-        <div className="demo-content">
-          {active === "home" && <><section className="demo-hero">
-            <div className="demo-hero-art" />
-            <div className="demo-hero-copy">
-              <span className="demo-eyebrow"><i /> Featured this week</span>
-              <h1>Stories worth<br /><em>staying up for.</em></h1>
-              <p>A little less scrolling, a lot more watching. Discover something great and keep your favorites close.</p>
-              <div className="demo-hero-actions">
-                <button className="demo-primary" onClick={() => select(movies[0])} type="button"><PlayIcon /> Explore featured</button>
-                <button className="demo-secondary" onClick={() => setActive("library")} type="button">Explore library <span>↗</span></button>
-              </div>
-            </div>
-            <div className="demo-hero-note">YOUR NEXT FAVORITE AWAITS</div>
-          </section>
-
-          <section className="demo-section">
-            <div className="demo-section-heading"><div><span className="demo-kicker">Popular right now</span><h2>Trending movies</h2></div></div>
-            <div className="demo-row">{movies.map((item) => <PosterCard key={item.id} item={item} onSelect={select} />)}</div>
-          </section>
-
-          <section className="demo-section demo-last">
-            <div className="demo-section-heading"><div><span className="demo-kicker">Keep exploring</span><h2>Top series</h2></div></div>
-            <div className="demo-row">{series.slice(0, 4).map((item) => <PosterCard key={item.id} item={item} onSelect={select} />)}</div>
-          </section></>}
-          {active === "library" && <section className="demo-section demo-subpage">
-            <span className="demo-kicker">Made for you</span><h1>My library</h1>
-            <p>Your saved titles stay in this browser. This preview does not download video.</p>
-            {saved.length ? <div className="demo-row">{[...movies, ...series].filter(item => saved.includes(item.id)).map(item => <PosterCard key={item.id} item={item} onSelect={select} />)}</div> : <div className="demo-empty">Your library is empty. Explore a title and save it for later.<br /><button className="demo-primary" onClick={() => setActive("home")}>Discover titles →</button></div>}
-          </section>}
-          {active === "series" && <section className="demo-section demo-subpage"><span className="demo-kicker">Find your next obsession</span><h1>Series</h1><p>A few favorites to explore in the UI preview.</p><div className="demo-row">{series.map(item => <PosterCard key={item.id} item={item} onSelect={select} />)}</div></section>}
-          {active === "settings" && <section className="demo-section demo-subpage"><span className="demo-kicker">Good to know</span><h1>About this preview</h1><div className="demo-empty"><h2>A look at Streambert</h2><p>This is a visual preview with sample titles, not the desktop player. Playback, downloads, and desktop settings are available in the desktop app.</p><p>The desktop app saves playback progress for supported sources and offers downloads for supported sources. Availability depends on the provider and your downloader setup.</p></div></section>}
-        </div>
-      </main>
-
-      {search && (
-        <div className="demo-search-results">
-          <span className="demo-kicker">Search results</span>
-          {results.length ? results.map((item) => <button key={`${item.id}-${item.title}`} onClick={() => select(item)} type="button"><img src={image(item.poster, "w92")} alt="" /><span>{item.title}<small>{item.year} · {item.genre}</small></span><b>→</b></button>) : <p>No titles found</p>}
-        </div>
-      )}
-
-      {selected && (
-        <div className="demo-detail-backdrop" onClick={() => setSelected(null)}>
-          <article className="demo-detail" onClick={(event) => event.stopPropagation()}>
-            <button className="demo-close" onClick={() => setSelected(null)} aria-label="Close details" type="button">×</button>
-            <img src={image(selected.poster, "w500")} alt="" />
-            <div><span className="demo-kicker">Now selected</span><h2>{selected.title}</h2><p>{selected.year} · {selected.genre}</p><div className="demo-detail-rating"><StarIcon size={14} /> {selected.rating} audience rating</div><div className="demo-hero-actions"><button className={`demo-secondary${saved.includes(selected.id) ? " is-liked" : ""}`} onClick={() => setSaved(value => value.includes(selected.id) ? value.filter(id => id !== selected.id) : [...value, selected.id])} type="button">{saved.includes(selected.id) ? "✓ Saved to library" : "+ Save to library"}</button></div><p className="demo-detail-note">UI preview only · Playback is available in the desktop app.</p></div>
-          </article>
-        </div>
-      )}
-    </div>
-  );
+  const all = useMemo(() => [...movies, ...series], []);
+  const results = all.filter(item => item.title.toLowerCase().includes(search.trim().toLowerCase()));
+  const select = item => { setSelected(item); setSearch(""); };
+  const nav = (id, label, icon) => <button className={`sidebar-btn ${active === id ? "active" : ""}`} onClick={() => { setActive(id); setSearch(""); }} title={label}>{icon}<span className="sidebar-btn-label">{label}</span></button>;
+  return <div className="frame-demo">
+    <aside className="sidebar">
+      <button className="sidebar-brand" onClick={() => setActive("discover")}><span className="sidebar-logo"><img src="./logo.svg" alt="" /></span><span className="sidebar-brand-copy"><strong>frame<span>.</span></strong><small>YOUR SCREEN, YOUR SPACE</small></span></button>
+      <div className="sidebar-group-label">MENU</div>
+      {nav("discover", "Discover", <HomeIcon />)}
+      {nav("library", "My library", <BookmarkIcon />)}
+      {nav("series", "Series", <TVIcon />)}
+      <div className="sidebar-group-label sidebar-saved-label">YOUR SAVED TITLES</div>
+      <div className="sidebar-saved demo-saved">{all.filter(item => saved.includes(item.id)).map(item => <button key={item.id} onClick={() => select(item)} title={item.title}><img src={image(item.poster, "w92")} alt={item.title} /></button>)}</div>
+      <div className="sidebar-bottom">{nav("settings", "About preview", <SettingsIcon />)}<div className="demo-status"><i /> BROWSER PREVIEW</div></div>
+    </aside>
+    <main className="main">
+      <header className="app-header"><div className="app-header-location"><span>YOUR SPACE</span><strong>{({discover:"Discover", library:"My library", series:"Series", settings:"About preview"})[active]}</strong></div><label className="demo-search-new"><SearchIcon /><input id="demo-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search movies & series" aria-label="Search movies and series" /><kbd>⌘ K</kbd></label></header>
+      {search.trim() ? <div className="demo-page"><div className="demo-page-heading"><span>EXPLORE FRAME</span><h1>Search results</h1><p>{results.length} titles for “{search}”</p></div><div className="demo-title-grid">{results.map(item => <PosterCard key={item.id} item={item} onSelect={select} />)}</div>{!results.length && <div className="demo-empty">No matching titles in this preview.</div>}</div> : <>
+      {active === "discover" && <>
+        <div className="discover-intro"><div><span>THE BIG PICTURE</span><h1>Find your next favorite.</h1><p>All the stories you love, in one place.</p></div><div className="discover-intro-mark">✳ <span>YOUR PERSONAL<br />SCREENING ROOM</span></div></div>
+        <section className="hero demo-new-hero"><div className="hero-bg demo-new-hero-bg" /><div className="hero-gradient" /><div className="hero-content"><div className="hero-type">IN THE SPOTLIGHT &nbsp;/&nbsp; TRENDING MOVIE</div><div className="hero-title">Dune: Part Two</div><div className="hero-meta"><span className="hero-rating">★ 8.7</span><span>2024</span><span>Science fiction · Adventure</span></div><p className="hero-overview">Paul Atreides unites with Chani and the Fremen while seeking revenge against the conspirators who destroyed his family.</p><div className="hero-actions"><button className="btn btn-primary" onClick={() => select(movies[0])}><PlayIcon /> Explore title</button><button className="btn btn-secondary" onClick={() => setActive("library")}>My library ↗</button></div></div><div className="hero-index">01 <span>/</span> THE SPOTLIGHT</div></section>
+        <section className="demo-collection"><div className="demo-collection-heading"><div><span>THE WEEKLY EDIT</span><h2>Trending movies</h2></div><span>CURATED FOR YOU &nbsp; ↗</span></div><div className="demo-title-grid">{movies.map(item => <PosterCard key={item.id} item={item} onSelect={select} />)}</div></section>
+        <section className="demo-collection"><div className="demo-collection-heading"><div><span>ONE MORE EPISODE</span><h2>Series to get lost in</h2></div><button onClick={() => setActive("series")}>EXPLORE SERIES &nbsp; ↗</button></div><div className="demo-title-grid">{series.map(item => <PosterCard key={item.id} item={item} onSelect={select} />)}</div></section>
+      </>}
+      {active === "library" && <div className="demo-page"><div className="demo-page-heading"><span>YOUR COLLECTION</span><h1>My library.</h1><p>Your saved titles, all together.</p></div>{saved.length ? <div className="demo-title-grid">{all.filter(item => saved.includes(item.id)).map(item => <PosterCard key={item.id} item={item} onSelect={select} />)}</div> : <div className="demo-empty">Nothing saved yet. Discover a title and add it to your library.<br /><button className="btn btn-primary" onClick={() => setActive("discover")}>Explore titles →</button></div>}</div>}
+      {active === "series" && <div className="demo-page"><div className="demo-page-heading"><span>FIND YOUR NEXT OBSESSION</span><h1>Series.</h1><p>Great stories are worth another episode.</p></div><div className="demo-title-grid">{series.map(item => <PosterCard key={item.id} item={item} onSelect={select} />)}</div></div>}
+      {active === "settings" && <div className="demo-page"><div className="demo-page-heading"><span>GOOD TO KNOW</span><h1>About this preview.</h1><p>A little look at your new screening room.</p></div><div className="demo-empty"><h2>Meet Frame.</h2><p>This browser preview uses sample titles. Playback, downloads and settings are available in the desktop app, not on this page.</p><p>Saved titles in this preview stay in this browser. The desktop app saves progress and offers downloads for supported sources; it does not automatically record streams.</p></div></div>}
+      </>}
+      <footer className="demo-footer"><span>frame<span>.</span></span><p>YOUR SCREEN, YOUR SPACE &nbsp; / &nbsp; UI PREVIEW</p></footer>
+    </main>
+    {selected && <div className="demo-detail-backdrop" onClick={() => setSelected(null)}><article className="demo-detail" role="dialog" aria-modal="true" aria-label={`${selected.title} details`} onClick={e => e.stopPropagation()}><button className="demo-close" onClick={() => setSelected(null)} aria-label="Close details">×</button><img src={image(selected.poster, "w500")} alt="" /><div><span className="demo-kicker">A CLOSER LOOK</span><h2>{selected.title}</h2><p>{selected.year} · {selected.genre}</p><div className="demo-detail-rating"><StarIcon size={14} /> {selected.rating} audience rating</div><div className="demo-hero-actions"><button className="btn btn-primary" onClick={() => setSaved(value => value.includes(selected.id) ? value.filter(id => id !== selected.id) : [...value, selected.id])}>{saved.includes(selected.id) ? "✓ Saved to library" : "+ Save to library"}</button></div><p className="demo-detail-note">Preview only. Playback is available in the desktop app.</p></div></article></div>}
+  </div>;
 }

@@ -1009,6 +1009,10 @@ export default function App() {
         />
 
         <div className="main">
+          <header className="app-header">
+            <div className="app-header-location"><span>YOUR SPACE</span><strong>{({ home: "Discover", history: "My library", downloads: "Downloads", settings: "Settings", movie: "Movie", tv: "Series" })[page] || "Discover"}</strong></div>
+            <button className="app-search-trigger" onClick={() => setShowSearch(true)}><span>⌕</span> Search movies & series <kbd>⌘ F</kbd></button>
+          </header>
           {/* ── API key status banner ── */}
           {/* Suspense boundary: lazy page chunks are fetched on first visit */}
           {apiKeyStatus === "invalid_token" && (
@@ -1192,7 +1196,7 @@ export default function App() {
               color: "#fff",
             }}
           >
-            <span>🎉 Streambert v{updateBanner.latest} is available!</span>
+            <span>🎉 Frame v{updateBanner.latest} is available!</span>
             <button
               onClick={() => setShowUpdateModal(true)}
               style={{

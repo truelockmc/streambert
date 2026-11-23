@@ -102,15 +102,11 @@ export default function Sidebar({
 
   return (
     <div className="sidebar">
-      <div
-        className="sidebar-logo"
-        onClick={() => onNavigate("home")}
-        title="Streambert"
-        style={{ position: "relative" }}
-      >
-        <StreambertLogo />
-        {seasonalEvent && seasonalEvent.render()}
-      </div>
+      <button className="sidebar-brand" onClick={() => onNavigate("home")} aria-label="Frame home">
+        <span className="sidebar-logo"><StreambertLogo />{seasonalEvent && seasonalEvent.render()}</span>
+        <span className="sidebar-brand-copy"><strong>frame<span>.</span></strong><small>YOUR SCREEN, YOUR SPACE</small></span>
+      </button>
+      <div className="sidebar-group-label">MENU</div>
 
       {canGoBack && (
         <SideBtn onClick={onBack} icon={<BackIcon />} label="Back (Ctrl+Z)" />
@@ -137,7 +133,7 @@ export default function Sidebar({
         badge={activeDownloads > 0 ? activeDownloads : null}
       />
 
-      <div className="sidebar-sep" />
+      <div className="sidebar-group-label sidebar-saved-label">YOUR SAVED TITLES</div>
 
       <div className="sidebar-saved">
         {savedList.map((item, index) => {
@@ -235,7 +231,7 @@ export default function Sidebar({
           style={{ color: "#e53e3e", marginTop: 4 }}
         >
           <QuitIcon />
-          <span className="tooltip">Quit App</span>
+          <span className="sidebar-btn-label">Quit app</span>
         </button>
       </div>
     </div>
@@ -250,7 +246,7 @@ function SideBtn({ active, onClick, icon, label, badge }) {
       style={{ position: "relative" }}
     >
       {icon}
-      <span className="tooltip">{label}</span>
+      <span className="sidebar-btn-label">{label.replace(/\s*\(.*\)/, "")}</span>
       {badge && (
         <span
           style={{

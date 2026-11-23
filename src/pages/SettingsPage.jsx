@@ -226,7 +226,7 @@ function ResetConfirmDialog({ onConfirm, onCancel }) {
             marginBottom: 10,
           }}
         >
-          RESET STREAMBERT?
+          RESET FRAME?
         </div>
         <div
           style={{
@@ -1822,7 +1822,7 @@ function StartPageSection() {
           lineHeight: 1.6,
         }}
       >
-        Choose which page opens when you launch Streambert.
+        Choose which page opens when you launch Frame.
       </div>
       <div
         style={{
@@ -2456,7 +2456,7 @@ function DiscordRpcSection() {
         />
         <ToggleRow
           label="Show cover art"
-          description="Uses the movie/show poster as the large image. When off, only the Streambert icon is shown."
+          description="Uses the movie/show poster as the large image. When off, only the Frame icon is shown."
           value={showCover}
           onChange={setShowCover}
           disabled={!enabled}
@@ -2470,7 +2470,7 @@ function DiscordRpcSection() {
         />
         <ToggleRow
           label="Show GitHub button"
-          description="Adds a button linking to the Streambert GitHub repository."
+          description="Adds a button linking to the Frame GitHub repository."
           value={showButton}
           onChange={setShowButton}
           disabled={!enabled}
@@ -3591,7 +3591,7 @@ export default function SettingsPage({
       {showDeleteDlConfirm && (
         <ConfirmDialog
           title="DELETE ALL DOWNLOADS?"
-          description="This will permanently delete all video files downloaded through Streambert and remove them from the download list."
+          description="This will permanently delete all video files downloaded through Frame and remove them from the download list."
           confirmLabel="Yes, Delete All"
           onConfirm={async () => {
             setShowDeleteDlConfirm(false);
@@ -3625,15 +3625,16 @@ export default function SettingsPage({
         <div
           style={{
             fontFamily: "var(--font-display)",
-            fontSize: 48,
-            letterSpacing: 1,
+            fontSize: 38,
+            fontWeight: 600,
+            letterSpacing: -1.5,
             marginBottom: 6,
           }}
         >
-          SETTINGS
+          Settings
         </div>
         <div style={{ color: "var(--text3)", fontSize: 14, marginBottom: 48 }}>
-          App configuration for Streambert
+          App configuration for Frame
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
@@ -4240,7 +4241,7 @@ export default function SettingsPage({
               }}
             >
               Downloaded videos will be saved here. Make sure the folder exists
-              and Streambert has write access to it.
+              and Frame has write access to it.
             </div>
             <div
               style={{
@@ -4360,7 +4361,7 @@ export default function SettingsPage({
             <div style={{ padding: "22px 24px" }}>
               <CleanRow
                 title="Install Location"
-                description="Opens the folder where Streambert is installed."
+                description="Opens the folder where Frame is installed."
                 buttonLabel="Open Folder"
                 onAction={async () => {
                   const p = await window.electron?.getInstallPath?.();
@@ -4406,7 +4407,7 @@ export default function SettingsPage({
             <div style={{ padding: "22px 24px" }}>
               <CleanRow
                 title="Delete All Downloads"
-                description="Permanently deletes all video files that were downloaded through Streambert and removes them from the download list. Only files downloaded through the app will be deleted, nothing else in your folder is touched."
+                description="Permanently deletes all video files that were downloaded through Frame and removes them from the download list. Only files downloaded through the app will be deleted, nothing else in your folder is touched."
                 buttonLabel="Delete All"
                 onAction={() =>
                   new Promise((resolve) => {
@@ -4472,7 +4473,7 @@ export default function SettingsPage({
                       lineHeight: 1.6,
                     }}
                   >
-                    Completely resets Streambert to factory defaults, clears all
+                    Completely resets Frame to factory defaults, clears all
                     settings, API Token, saved library, watch history/progress,
                     and all cached data. Your downloaded video files will not be
                     touched.

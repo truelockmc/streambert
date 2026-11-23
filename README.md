@@ -269,3 +269,9 @@ The desktop app automatically saves playback progress for supported sources and
 has a Downloads page for supported providers. Offline video is not automatically
 recorded: embedded or protected third-party streams may not expose downloadable
 media, and availability depends on the provider and downloader configuration.
+
+### Frame visual identity
+
+The interface is being rebranded as **Frame**. Existing internal storage keys,
+application identifiers, update endpoints and backup names remain unchanged for
+compatibility with existing installations and saved data.

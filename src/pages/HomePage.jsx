@@ -208,6 +208,7 @@ export default function HomePage({
 
   return (
     <div className="fade-in">
+      <div className="discover-intro"><div><span>THE BIG PICTURE</span><h1>Find your next favorite.</h1><p>All the stories you love, in one place.</p></div><div className="discover-intro-mark">✳ <span>YOUR PERSONAL<br />SCREENING ROOM</span></div></div>
       {/* ── Offline ── */}
       {offline && (
         <div
@@ -256,7 +257,7 @@ export default function HomePage({
           />
           <div className="hero-gradient" />
           <div className="hero-content">
-            <div className="hero-type">Trending · Movie</div>
+            <div className="hero-type">IN THE SPOTLIGHT  /  TRENDING MOVIE</div>
             <div className="hero-title">{hero.title || hero.name}</div>
             <div className="hero-meta">
               <span className="hero-rating">
@@ -270,7 +271,7 @@ export default function HomePage({
                 className="btn btn-primary"
                 onClick={() => onSelect(hero)}
               >
-                <PlayIcon /> Watch Now
+                <PlayIcon /> Explore title
               </button>
               <button
                 className="btn btn-secondary"

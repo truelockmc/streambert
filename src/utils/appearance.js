@@ -5,11 +5,11 @@
 export const ACCENT_PRESETS = [
   {
     id: "red",
-    label: "Red",
-    color: "#e50914",
-    color2: "#ff1a24",
-    dim: "rgba(229,9,20,0.15)",
-    glow: "0 0 30px rgba(229,9,20,0.3)",
+    label: "Coral",
+    color: "#dc755e",
+    color2: "#ec8b76",
+    dim: "rgba(220,117,94,0.15)",
+    glow: "0 0 30px rgba(220,117,94,0.18)",
   },
   {
     id: "blue",
@@ -75,11 +75,11 @@ export const THEME_PRESETS = [
     label: "Dark",
     description: "Default dark theme",
     vars: {
-      "--bg": "#0a0a0a",
-      "--surface": "#111111",
-      "--surface2": "#1a1a1a",
-      "--surface3": "#222222",
-      "--border": "#2a2a2a",
+      "--bg": "#111211",
+      "--surface": "#191b19",
+      "--surface2": "#222421",
+      "--surface3": "#2b2d29",
+      "--border": "#343730",
       "--text": "#f0f0f0",
       "--text2": "#c0c0c0",
       "--text3": "#909090",
