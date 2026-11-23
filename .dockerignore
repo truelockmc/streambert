@@ -1,0 +1,13 @@
+node_modules
+dist
+temp
+screenshots
+.git
+.github
+*.zip
+*secret.txt
+download_config.ini
+Dockerfile
+docker-compose.yml
+config
+downloads
