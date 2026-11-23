@@ -4057,3 +4057,58 @@ html[data-win-titlebar][data-maximized] .main {
 .episode-check-item:hover {
     color: var(--text) !important;
 }
+
+/* ── Advanced search filters ───────────────────────────────────────────── */
+.search-filter-toggle {
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.search-filter-toggle--on {
+    color: var(--red);
+}
+
+.search-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.search-filter-select {
+    flex: 1 1 140px;
+    min-width: 0;
+    padding: 7px 10px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+}
+
+.search-filter-select:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.search-filter-year {
+    flex: 0 1 90px;
+}
+
+.search-filter-reset {
+    padding: 7px 12px;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text3);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.search-filter-reset:hover {
+    color: var(--text);
+}
