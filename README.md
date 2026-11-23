@@ -256,3 +256,16 @@ Project Root
         └── useRatings.js
 ```
 </details>
+
+### UI preview on GitHub Pages
+
+The Pages workflow builds a browser-only preview with sample titles (`VITE_DEMO=true`).
+It is not the Electron app: playback, downloads, and desktop settings are not available
+on Pages. Saved preview titles are stored in the current browser only. The workflow
+runs on pushes to `main` and can also be started manually from another branch.
+Set GitHub Pages' source to **GitHub Actions** to enable deployment.
+
+The desktop app automatically saves playback progress for supported sources and
+has a Downloads page for supported providers. Offline video is not automatically
+recorded: embedded or protected third-party streams may not expose downloadable
+media, and availability depends on the provider and downloader configuration.

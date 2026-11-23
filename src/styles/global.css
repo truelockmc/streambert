@@ -4189,3 +4189,48 @@ html[data-win-titlebar][data-maximized] .main {
 .episode-check-item:hover {
     color: var(--text) !important;
 }
+
+/* Refreshed interface: softer surfaces and more deliberate typography. */
+:root {
+    --bg: #101114;
+    --surface: #181a1e;
+    --surface2: #22252a;
+    --surface3: #2c2f35;
+    --border: #34363c;
+    --radius: 12px;
+}
+.sidebar { background: #141518; border-color: rgba(255,255,255,.07); }
+.sidebar-btn { border-radius: 12px; }
+.sidebar-btn:hover, .sidebar-btn.active { box-shadow: none; }
+.card-poster { border-radius: 12px; overflow: hidden; }
+.btn { border-radius: 9px; }
+.demo-app { height: 100%; background: #101114; }
+.demo-sidebar { background: #151619; }
+.demo-brand { margin-bottom: 62px; font-size: 12px; }
+.demo-hero { border: 1px solid rgba(255,255,255,.07); border-radius: 20px; }
+.demo-hero h1 { font-family: var(--font-body); font-weight: 600; letter-spacing: -2.5px; line-height: 1.08; }
+.demo-hero h1 em { color: #f3a89a; }
+.demo-section-heading h2, .demo-detail h2 { font-family: var(--font-body); font-weight: 600; letter-spacing: -.8px; }
+.demo-card-poster { border-radius: 12px; }
+.demo-preview-badge { color:#b4b0ab; border:1px solid #414146; border-radius:20px; padding:7px 10px; font-size:9px; letter-spacing:1px; }
+.demo-subpage { padding-top:65px; }
+.demo-subpage h1 { font-size:42px; letter-spacing:-1.5px; margin:10px 0; }
+.demo-subpage > p { color:#a4a4a4; margin:0 0 32px; line-height:1.7; }
+.demo-empty { max-width:650px; padding:30px; border:1px solid var(--demo-line); border-radius:14px; color:#aaa; background:#191a1e; line-height:1.7; font-size:14px; }
+.demo-empty h2 { color:#f4f1eb; margin-bottom:12px; }
+.demo-empty p + p { margin-top:14px; }
+.demo-empty .demo-primary { margin-top:20px; }
+.demo-detail-note { margin-top:18px; line-height:1.5; }
+.demo-app button:focus-visible, .demo-search:focus-within { outline:2px solid #f3a89a; outline-offset:3px; }
+@media (max-width:850px) {
+    .demo-search { width:min(260px, 48vw); border:1px solid var(--demo-line); }
+    .demo-search input { display:block; }
+    .demo-search kbd { display:none; }
+    .demo-row .demo-card:nth-child(n+4) { display:block; }
+}
+@media (max-width:560px) {
+    .demo-row { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .demo-hero h1 { font-size:38px; letter-spacing:-1.5px; }
+    .demo-search-results { right:12px; width:min(340px, calc(100vw - 90px)); }
+    .demo-detail { max-height:90vh; overflow:auto; }
+}

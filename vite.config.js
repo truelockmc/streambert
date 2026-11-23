@@ -5,6 +5,7 @@ export default defineConfig(({ mode }) => {
   const isDist = process.env.ELECTRON_DIST === "1";
   return {
     plugins: [react()],
+    server: { allowedHosts: [".e2b.app"] },
     base: "./",
     build: {
       minify: "terser",
