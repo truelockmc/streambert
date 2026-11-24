@@ -73,6 +73,7 @@ import {
   GAMEPAD_CLEANUP_JS,
 } from "../utils/playerGamepadScript";
 import { useSourceId } from "../utils/useSourceId";
+import { useImdbRatings, getImdbRatingForItem } from "../utils/useRatings";
 import { setPlayerGamepadActive } from "../utils/gamepadPlayerState";
 import HiAnimeLoader from "../components/HiAnimeLoader";
 
@@ -211,6 +212,18 @@ export default function MoviePage({
   const ageLimitSetting = useMemo(() => getAgeLimitSetting(storage), []);
   const ratingCountry = useMemo(() => getRatingCountry(storage), []);
   const restricted = isRestricted(rating.minAge, ageLimitSetting);
+  const imdbItems = useMemo(
+    () => [
+      { ...item, media_type: "movie" },
+      ...(collection?.parts || []),
+    ],
+    [item, collection?.parts],
+  );
+  const imdbRatings = useImdbRatings(imdbItems, apiKey);
+  const imdbRating = getImdbRatingForItem(
+    { ...item, media_type: "movie" },
+    imdbRatings,
+  );
 
   const progressKey = `movie_${item.id}`;
   const pct = progress[progressKey] || 0;
@@ -852,6 +865,11 @@ export default function MoviePage({
                   <StarIcon /> {displayScore}
                 </span>
               )}
+              {imdbRating != null && (
+                <span className="detail-rating" title="IMDb rating">
+                  IMDb ★ {imdbRating.toFixed(1)}
+                </span>
+              )}
               {year && <span>{year}</span>}
               {d.runtime && <span>{d.runtime} min</span>}
               {d.original_language && (
@@ -1362,6 +1380,7 @@ export default function MoviePage({
                   watched={watched}
                   onMarkWatched={onMarkWatched}
                   onMarkUnwatched={onMarkUnwatched}
+                  imdbRating={getImdbRatingForItem(part, imdbRatings)}
                 />
               );
             })}
@@ -1426,6 +1445,7 @@ const CollectionCard = memo(function CollectionCard({
   watched,
   onMarkWatched,
   onMarkUnwatched,
+  imdbRating,
 }) {
   const handleClick = useCallback(() => onSelect(part), [onSelect, part]);
   return (
@@ -1442,6 +1462,7 @@ const CollectionCard = memo(function CollectionCard({
         watched={watched}
         onMarkWatched={onMarkWatched}
         onMarkUnwatched={onMarkUnwatched}
+        imdbRating={imdbRating}
       />
     </div>
   );

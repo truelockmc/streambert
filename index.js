@@ -46,6 +46,7 @@ const subtitlesIpc = require("./src/ipc/subtitles");
 const hianimeIpc = require("./src/ipc/hianime");
 const playerIpc = require("./src/ipc/player");
 const discordRpc = require("./src/ipc/discordRpc");
+const imdbIpc = require("./src/ipc/imdb");
 
 // -- Ad/tracker block list -----------------------------------------------------
 const BLOCKED_HOSTS = [
@@ -615,6 +616,7 @@ function createWindow() {
 
 // -- Register all IPC modules --------------------------------------------------
 storageIpc.register();
+imdbIpc.register();
 downloadsIpc.register(getMainWindow);
 subtitlesIpc.register({
   getDownloads: downloadsIpc.getDownloads,

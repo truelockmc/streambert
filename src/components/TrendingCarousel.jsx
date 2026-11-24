@@ -42,6 +42,7 @@ const CarouselSlot = memo(function CarouselSlot({
   animating,
   ageRating,
   restricted,
+  imdbRating,
   isAnime,
 }) {
   if (!item) return null;
@@ -123,6 +124,9 @@ const CarouselSlot = memo(function CarouselSlot({
             <RatingBadge cert={ageRating} restricted={restricted} />
           </div>
         )}
+        {isCenter && imdbRating != null && (
+          <div className="carousel-imdb-rating">IMDb ★ {imdbRating.toFixed(1)}</div>
+        )}
         {isCenter && isAnime && (
           <div className="carousel-anime-badge">ANIME</div>
         )}
@@ -153,6 +157,7 @@ export default function TrendingCarousel({
   title,
   titleHighlight,
   ratingsMap = {},
+  imdbRatings = {},
 }) {
   const count = items.length;
   const activeRef = useRef(0);
@@ -413,6 +418,7 @@ export default function TrendingCarousel({
                 animating={animating}
                 ageRating={isCenter ? ratingData.cert : null}
                 restricted={isCenter ? ratingData.restricted : false}
+                imdbRating={isCenter ? imdbRatings[activeRatingKey] : null}
                 isAnime={isCenter ? isAnimeContent(items[idx]) : false}
               />
             );

@@ -2,7 +2,12 @@ import { useCallback, useMemo, useState, useEffect } from "react";
 import MediaCard from "../components/MediaCard";
 import { imgUrl } from "../utils/api";
 import { EyeIcon, WatchedIcon } from "../components/Icons";
-import { useRatings, getRatingForItem } from "../utils/useRatings";
+import {
+  useRatings,
+  getRatingForItem,
+  useImdbRatings,
+  getImdbRatingForItem,
+} from "../utils/useRatings";
 import { isRestricted } from "../utils/ageRating";
 import { storage, STORAGE_KEYS } from "../utils/storage";
 
@@ -22,6 +27,7 @@ export default function LibraryPage({
     [inProgress, saved],
   );
   const { ratingsMap, ageLimitSetting } = useRatings(allItems);
+  const imdbRatings = useImdbRatings(allItems);
 
   const [sort, setSort] = useState(
     () => storage.get(STORAGE_KEYS.LIBRARY_SORT) || "manual",
@@ -80,6 +86,7 @@ export default function LibraryPage({
                   onMarkUnwatched={onMarkUnwatched}
                   ageRating={r.cert}
                   restricted={restr}
+                  imdbRating={getImdbRatingForItem(item, imdbRatings)}
                 />
               );
             })}
@@ -118,6 +125,7 @@ export default function LibraryPage({
                   onMarkUnwatched={onMarkUnwatched}
                   ageRating={r.cert}
                   restricted={restr}
+                  imdbRating={getImdbRatingForItem(item, imdbRatings)}
                 />
               );
             })}

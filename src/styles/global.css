@@ -593,6 +593,24 @@ body.no-anim *::after {
     color: var(--text3);
 }
 
+.card-imdb-rating {
+    margin-top: 4px;
+    font-size: 10px;
+    color: var(--text2);
+}
+
+.carousel-imdb-rating {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.72);
+    color: #f5c518;
+    font-size: 10px;
+    font-weight: 700;
+}
+
 .card-badge {
     position: absolute;
     top: 8px;

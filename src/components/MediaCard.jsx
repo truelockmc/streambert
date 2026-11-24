@@ -18,6 +18,7 @@ const MediaCard = memo(function MediaCard({
   onMarkUnwatched,
   ageRating,
   restricted,
+  imdbRating,
 }) {
   const title = item.title || item.name;
   const year = (item.release_date || item.first_air_date || "").slice(0, 4);
@@ -147,6 +148,9 @@ const MediaCard = memo(function MediaCard({
               ? `S${item.season}E${item.episode}${item.episodeName ? ` · ${item.episodeName}` : ""}`
               : `${year} · ${isTV ? "Series" : "Movie"}`}
           </div>
+          {imdbRating != null && (
+            <div className="card-imdb-rating">IMDb ★ {imdbRating.toFixed(1)}</div>
+          )}
         </div>
         <span
           className={`card-badge${isUnreleased ? " card-badge--unreleased" : ""}${isAnime && !isUnreleased ? " card-badge--anime" : ""}`}

@@ -66,6 +66,7 @@ export const STORAGE_KEYS = {
   // NOTE: SUBDL_API_KEY, WYZIE_API_KEY and API_KEY are stored encrypted via secureStorage
   SUBDL_API_KEY: "subdlApiKey",
   WYZIE_API_KEY: "wyzieApiKey",
+  OMDB_API_KEY: "omdbApiKey",
   // Appearance & behaviour
   ACCENT_COLOR: "accentColor",
   ACCENT_IN_PLAYER: "accentInPlayer",
