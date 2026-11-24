@@ -49,6 +49,10 @@ The Electron app is packaged on the build machine's own architecture, so that
 step is fast. `vid-dl` is built from source for the target architecture. On a
 cross-build this step runs under QEMU and takes a few extra minutes.
 
+`vid-dl` is built from its latest release. A rebuild reuses the cached copy
+until a new release comes out. To pin a version, pass
+`--build-arg VID_DL_VERSION=v.2.3.3`.
+
 ## Notes
 
 - **Updates:** the app's built-in updater doesn't work in the container. To

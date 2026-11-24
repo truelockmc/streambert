@@ -7,7 +7,8 @@
 #
 # See docker/README.md for running instructions.
 
-ARG VID_DL_VERSION=v.2.3.3
+# vid-dl release to build: "latest" (default) or a tag such as v.2.3.3
+ARG VID_DL_VERSION=latest
 
 # ── Stage 1: build + package the Electron app ────────────────────────────────
 # Runs on the build host's native arch. The app has no native node modules, so
@@ -39,7 +40,18 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends binutils curl ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
-RUN curl -fsSL "https://github.com/truelockmc/vid-dl-cli-only/archive/refs/tags/${VID_DL_VERSION}.tar.gz" \
+# The releases feed only changes when a release is published, so this keeps the
+# cached build until a new vid-dl comes out, then rebuilds it.
+ADD https://github.com/truelockmc/vid-dl-cli-only/releases.atom /tmp/vid-dl-releases.atom
+RUN tag="$VID_DL_VERSION"; \
+    if [ "$tag" = latest ]; then \
+      tag=$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+              https://github.com/truelockmc/vid-dl-cli-only/releases/latest); \
+      tag=${tag##*/}; \
+    fi; \
+    [ -n "$tag" ] && [ "$tag" != latest ] || { echo "could not resolve vid-dl release" >&2; exit 1; }; \
+    echo "Building vid-dl $tag"; \
+    curl -fsSL "https://github.com/truelockmc/vid-dl-cli-only/archive/refs/tags/${tag}.tar.gz" \
       | tar xz --strip-components=1 \
  && pip install --no-cache-dir -r requirements.txt pyinstaller \
  && python -m PyInstaller --noconfirm --onedir --clean --noupx \
