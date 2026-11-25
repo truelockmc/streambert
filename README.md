@@ -140,6 +140,10 @@ Forks may be created but they MUST stay open-sourced.
 Everyone is welcome to contribute to this project.
 Before contributing please make sure to read the [Contributing Guidelines](CONTRIBUTING.md) and act accordingly.
 
+You can also help translating this app into your language on [weblate](https://hosted.weblate.org/projects/streambert/)!
+
+[![Translation status](https://hosted.weblate.org/widget/streambert/desktop-app/horizontal-auto.svg?sort=percent)](https://hosted.weblate.org/engage/streambert/)
+
 ## Privacy Disclaimer
 Streambert itself does not collect ANY data. There is no centralized service which the app relies on.
 However, the streaming sources and github (for downloading updates in-app) may still collect your data.
