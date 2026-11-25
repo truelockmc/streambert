@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { useTranslation, Trans } from "react-i18next";
+import { UI_LANGUAGES, resolveLanguage } from "../i18n";
 import UpdateModal from "../components/UpdateModal";
 import {
   storage,
@@ -164,19 +166,20 @@ function SettingsSelect({ value, onChange, options, style }) {
 
 // Age limit options: null = none, or specific ages
 const AGE_LIMIT_OPTIONS = [
-  { value: "", label: "No restriction" },
-  { value: "0", label: "0 — All audiences (G / FSK 0)" },
-  { value: "7", label: "7 — Family friendly (PG / FSK 6)" },
-  { value: "12", label: "12 — Teens and up" },
-  { value: "13", label: "13 — PG-13 and equivalent" },
-  { value: "15", label: "15 — Older teens" },
-  { value: "16", label: "16 — FSK 16 and equivalent" },
-  { value: "17", label: "17 — R / 17+ and equivalent" },
-  { value: "18", label: "18 — Adults only (NC-17 / FSK 18)" },
+  { value: "", labelKey: "settings.ageLimit.none" },
+  { value: "0", labelKey: "settings.ageLimit.a0" },
+  { value: "7", labelKey: "settings.ageLimit.a7" },
+  { value: "12", labelKey: "settings.ageLimit.a12" },
+  { value: "13", labelKey: "settings.ageLimit.a13" },
+  { value: "15", labelKey: "settings.ageLimit.a15" },
+  { value: "16", labelKey: "settings.ageLimit.a16" },
+  { value: "17", labelKey: "settings.ageLimit.a17" },
+  { value: "18", labelKey: "settings.ageLimit.a18" },
 ];
 
 // ── Confirmation Dialog ───────────────────────────────────────────────────────
 function ResetConfirmDialog({ onConfirm, onCancel }) {
+  const { t } = useTranslation();
   return (
     <div
       style={{
@@ -226,7 +229,7 @@ function ResetConfirmDialog({ onConfirm, onCancel }) {
             marginBottom: 10,
           }}
         >
-          RESET STREAMBERT?
+          {t("settings.reset.title")}
         </div>
         <div
           style={{
@@ -236,15 +239,16 @@ function ResetConfirmDialog({ onConfirm, onCancel }) {
             marginBottom: 28,
           }}
         >
-          This will permanently delete all your settings, watch history, saved
-          titles, progress data, and cached data. Your downloaded video files
-          will{" "}
-          <span style={{ color: "var(--text)", fontWeight: 600 }}>not</span> be
-          deleted.
+          <Trans
+            i18nKey="settings.reset.description"
+            components={{
+              hl: <span style={{ color: "var(--text)", fontWeight: 600 }} />,
+            }}
+          />
           <br />
           <br />
           <span style={{ color: "var(--red)" }}>
-            This action cannot be undone.
+            {t("settings.common.cannotBeUndone")}
           </span>
         </div>
 
@@ -254,7 +258,7 @@ function ResetConfirmDialog({ onConfirm, onCancel }) {
             style={{ flex: 1 }}
             onClick={onCancel}
           >
-            Cancel
+            {t("settings.common.cancel")}
           </button>
           <button
             className="btn"
@@ -267,7 +271,7 @@ function ResetConfirmDialog({ onConfirm, onCancel }) {
             }}
             onClick={onConfirm}
           >
-            Yes, Reset Everything
+            {t("settings.reset.confirm")}
           </button>
         </div>
       </div>
@@ -279,10 +283,11 @@ function ResetConfirmDialog({ onConfirm, onCancel }) {
 function ConfirmDialog({
   title,
   description,
-  confirmLabel = "Confirm",
+  confirmLabel,
   onConfirm,
   onCancel,
 }) {
+  const { t } = useTranslation();
   return (
     <div
       style={{
@@ -344,7 +349,7 @@ function ConfirmDialog({
           <br />
           <br />
           <span style={{ color: "var(--red)" }}>
-            This action cannot be undone.
+            {t("settings.common.cannotBeUndone")}
           </span>
         </div>
         <div style={{ display: "flex", gap: 12 }}>
@@ -353,7 +358,7 @@ function ConfirmDialog({
             style={{ flex: 1 }}
             onClick={onCancel}
           >
-            Cancel
+            {t("settings.common.cancel")}
           </button>
           <button
             className="btn"
@@ -366,7 +371,7 @@ function ConfirmDialog({
             }}
             onClick={onConfirm}
           >
-            {confirmLabel}
+            {confirmLabel ?? t("settings.common.confirm")}
           </button>
         </div>
       </div>
@@ -436,6 +441,7 @@ function CleanRow({
   danger,
   sizeLabel,
 }) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(null);
   const [hovered, setHovered] = useState(false);
@@ -449,10 +455,10 @@ function CleanRow({
         // User dismissed the confirm dialog
         return;
       }
-      setStatus(result?.msg || "✓ Done");
+      setStatus(result?.msg || t("settings.common.doneStatus"));
       setTimeout(() => setStatus(null), 4000);
     } catch (e) {
-      setStatus("✕ " + (e.message || "Something went wrong"));
+      setStatus("✕ " + (e.message || t("settings.common.somethingWrong")));
       setTimeout(() => setStatus(null), 4000);
     } finally {
       setBusy(false);
@@ -523,7 +529,7 @@ function CleanRow({
               : { opacity: busy ? 0.5 : 1 }
           }
         >
-          {busy ? "Working…" : buttonLabel}
+          {busy ? t("settings.common.working") : buttonLabel}
         </button>
       </div>
     </div>
@@ -532,6 +538,7 @@ function CleanRow({
 
 // ── Version & Update Section ──────────────────────────────────────────────────
 function VersionSection() {
+  const { t } = useTranslation();
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState(null); // { latest, current, url, hasUpdate } | { error }
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -563,7 +570,11 @@ function VersionSection() {
       setResult({
         error:
           e.message ||
-          `Could not reach ${UPDATE_SOURCES[updateSource]?.label || "the update server"}.`,
+          t("settings.version.couldNotReach", {
+            name:
+              UPDATE_SOURCES[updateSource]?.label ||
+              t("settings.version.theUpdateServer"),
+          }),
       });
     } finally {
       setChecking(false);
@@ -585,7 +596,9 @@ function VersionSection() {
 
   return (
     <div style={{ marginBottom: 40 }}>
-      <div className="settings-section-title">App Version</div>
+      <div className="settings-section-title">
+        {t("settings.version.title")}
+      </div>
 
       {/* Version row */}
       <div
@@ -599,7 +612,7 @@ function VersionSection() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 13, color: "var(--text3)" }}>
-            Current version
+            {t("settings.version.current")}
           </span>
           <code
             style={{
@@ -622,7 +635,7 @@ function VersionSection() {
           onClick={runCheck}
           style={{ opacity: checking ? 0.6 : 1 }}
         >
-          {checking ? "Checking…" : "Check for Updates"}
+          {checking ? t("settings.version.checking") : t("settings.version.check")}
         </button>
 
         {/* Update source toggle */}
@@ -639,7 +652,7 @@ function VersionSection() {
               key={src.id}
               onClick={() => changeSource(src.id)}
               disabled={checking}
-              title={`Check for updates via ${src.label}`}
+              title={t("settings.version.checkVia", { source: src.label })}
               style={{
                 border: "none",
                 padding: "6px 12px",
@@ -680,20 +693,24 @@ function VersionSection() {
               (e.currentTarget.style.background = "rgba(229,9,20,0.12)")
             }
           >
-            🎉 v{result.latest} available. Install Update
+            {t("settings.version.available", { version: result.latest })}
           </button>
         )}
 
         {result?.usedFallback && (
           <span style={{ fontSize: 12, color: "var(--text3)" }}>
-            ({UPDATE_SOURCES[result.fallbackFrom]?.label || result.fallbackFrom}{" "}
-            unavailable, used {result.sourceLabel} instead)
+            {t("settings.version.fallback", {
+              from:
+                UPDATE_SOURCES[result.fallbackFrom]?.label ||
+                result.fallbackFrom,
+              used: result.sourceLabel,
+            })}
           </span>
         )}
 
         {result && !result.error && !result.hasUpdate && (
           <span style={{ fontSize: 13, color: "#48c774", fontWeight: 500 }}>
-            ✓ You're up to date
+            {t("settings.version.upToDate")}
           </span>
         )}
 
@@ -723,19 +740,24 @@ function VersionSection() {
         <Toggle
           value={autoCheck}
           onChange={toggleAuto}
-          title={autoCheck ? "Disable auto-check" : "Enable auto-check"}
+          title={
+            autoCheck
+              ? t("settings.version.disableAutoCheck")
+              : t("settings.version.enableAutoCheck")
+          }
         />
         <div>
           <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>
-            Check for updates on startup
+            {t("settings.version.autoCheckTitle")}
           </div>
           <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
-            Shows a notification banner if a new version is available. Turned on
-            by default.
+            {t("settings.version.autoCheckDesc")}
           </div>
         </div>
         {autoSaved && (
-          <span style={{ fontSize: 12, color: "#48c774" }}>✓ Saved</span>
+          <span style={{ fontSize: 12, color: "#48c774" }}>
+            {t("settings.common.savedCheck")}
+          </span>
         )}
       </div>
     </div>
@@ -744,6 +766,7 @@ function VersionSection() {
 
 // ── Home Layout Section ───────────────────────────────────────────────────────
 function HomeLayoutSection() {
+  const { t } = useTranslation();
   const [order, setOrder] = useState(() => {
     const { order: o } = loadHomeLayout();
     return o;
@@ -784,11 +807,15 @@ function HomeLayoutSection() {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const rowLabels = Object.fromEntries(HOME_ROWS.map((r) => [r.id, r.label]));
+  const rowLabels = Object.fromEntries(
+    HOME_ROWS.map((r) => [r.id, r.labelKey ? t(r.labelKey) : r.label]),
+  );
 
   return (
     <div style={{ marginBottom: 40 }}>
-      <div className="settings-section-title">Home Page Layout</div>
+      <div className="settings-section-title">
+        {t("settings.homeLayout.title")}
+      </div>
       <div
         style={{
           fontSize: 13,
@@ -797,8 +824,7 @@ function HomeLayoutSection() {
           lineHeight: 1.6,
         }}
       >
-        Choose which rows appear on the Home page and drag to reorder them. The
-        hero banner is always shown at the top.
+        {t("settings.homeLayout.description")}
       </div>
 
       {/* ── View mode selector ── */}
@@ -813,19 +839,19 @@ function HomeLayoutSection() {
             letterSpacing: "0.05em",
           }}
         >
-          Row display style
+          {t("settings.homeLayout.rowStyle")}
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           {[
             {
               value: "carousel",
-              label: "Carousel",
-              desc: "Scrollable spotlight with featured poster",
+              label: t("settings.homeLayout.carousel"),
+              desc: t("settings.homeLayout.carouselDesc"),
             },
             {
               value: "list",
-              label: "⊞ Grid",
-              desc: "Compact grid of all items",
+              label: t("settings.homeLayout.grid"),
+              desc: t("settings.homeLayout.gridDesc"),
             },
           ].map(({ value, label, desc }) => (
             <button
@@ -916,7 +942,11 @@ function HomeLayoutSection() {
             <Toggle
               value={visible[id]}
               onChange={() => toggleVisible(id)}
-              title={visible[id] ? "Hide row" : "Show row"}
+              title={
+                visible[id]
+                  ? t("settings.homeLayout.hideRow")
+                  : t("settings.homeLayout.showRow")
+              }
             />
           </div>
         ))}
@@ -931,10 +961,12 @@ function HomeLayoutSection() {
         }}
       >
         <button className="btn btn-primary" onClick={handleSave}>
-          Save Layout
+          {t("settings.homeLayout.save")}
         </button>
         {saved && (
-          <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
+          <span style={{ fontSize: 13, color: "#48c774" }}>
+            {t("settings.common.savedCheck")}
+          </span>
         )}
       </div>
     </div>
@@ -943,13 +975,14 @@ function HomeLayoutSection() {
 
 // ── Scheduled Backup Section ──────────────────────────────────────────────────
 const FREQUENCY_OPTIONS = [
-  { value: "startup", label: "On App Start" },
-  { value: "daily", label: "Daily" },
-  { value: "weekly", label: "Weekly" },
-  { value: "monthly", label: "Monthly" },
+  { value: "startup", labelKey: "settings.backup.onStart" },
+  { value: "daily", labelKey: "settings.backup.daily" },
+  { value: "weekly", labelKey: "settings.backup.weekly" },
+  { value: "monthly", labelKey: "settings.backup.monthly" },
 ];
 
 function ScheduledBackupSection() {
+  const { t } = useTranslation();
   const [enabled, setEnabled] = useState(false);
   const [backupPath, setBackupPath] = useState("");
   const [keepCount, setKeepCount] = useState(5);
@@ -1020,10 +1053,10 @@ function ScheduledBackupSection() {
         <Toggle value={enabled} onChange={setEnabled} />
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
-            Scheduled Backups
+            {t("settings.backup.scheduled")}
           </div>
           <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
-            Automatically save a backup file on a schedule
+            {t("settings.backup.scheduledDesc")}
           </div>
         </div>
       </div>
@@ -1040,7 +1073,7 @@ function ScheduledBackupSection() {
                 marginBottom: 6,
               }}
             >
-              Backup Folder
+              {t("settings.backup.folder")}
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input
@@ -1055,7 +1088,7 @@ function ScheduledBackupSection() {
                 style={{ padding: "7px 14px", fontSize: 13 }}
                 onClick={pickFolder}
               >
-                Browse…
+                {t("settings.backup.browse")}
               </button>
             </div>
           </div>
@@ -1078,12 +1111,15 @@ function ScheduledBackupSection() {
                   marginBottom: 6,
                 }}
               >
-                Frequency
+                {t("settings.backup.frequency")}
               </div>
               <SettingsSelect
                 value={frequency}
                 onChange={(v) => setFrequency(v)}
-                options={FREQUENCY_OPTIONS}
+                options={FREQUENCY_OPTIONS.map((o) => ({
+                  value: o.value,
+                  label: t(o.labelKey),
+                }))}
                 style={{ width: "100%" }}
               />
             </div>
@@ -1097,7 +1133,7 @@ function ScheduledBackupSection() {
                   marginBottom: 6,
                 }}
               >
-                Keep Last N Backups
+                {t("settings.backup.keepLast")}
               </div>
               <input
                 type="number"
@@ -1113,10 +1149,12 @@ function ScheduledBackupSection() {
 
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button className="btn btn-primary" onClick={handleSave}>
-              Save
+              {t("settings.common.save")}
             </button>
             {saved && (
-              <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
+              <span style={{ fontSize: 13, color: "#48c774" }}>
+                {t("settings.common.savedCheck")}
+              </span>
             )}
           </div>
         </>
@@ -1135,6 +1173,7 @@ function ScheduledBackupSection() {
 
 // ── Backup & Restore ─────────────────────────────────────────────────────────
 function BackupRestoreSection({ onRestored }) {
+  const { t } = useTranslation();
   const [restoreStatus, setRestoreStatus] = useState(null);
 
   const handleExport = () => {
@@ -1162,13 +1201,15 @@ function BackupRestoreSection({ onRestored }) {
       try {
         const backup = JSON.parse(ev.target.result);
         if (!backup?.data)
-          throw new Error("Invalid backup file, missing data field.");
+          throw new Error(t("settings.backup.invalidFile"));
         restoreBackupData(backup.data);
-        setRestoreStatus("✓ Backup restored: reloading…");
+        setRestoreStatus(t("settings.backup.restored"));
         setTimeout(() => window.location.reload(), 1200);
         onRestored?.();
       } catch (err) {
-        setRestoreStatus("✕ " + (err.message || "Could not read backup file."));
+        setRestoreStatus(
+          "✕ " + (err.message || t("settings.backup.couldNotRead")),
+        );
         setTimeout(() => setRestoreStatus(null), 4000);
       }
     };
@@ -1179,7 +1220,9 @@ function BackupRestoreSection({ onRestored }) {
 
   return (
     <div style={{ marginBottom: 40 }}>
-      <div className="settings-section-title">Backup &amp; Restore</div>
+      <div className="settings-section-title">
+        {t("settings.backup.title")}
+      </div>
       <div
         style={{
           fontSize: 13,
@@ -1188,9 +1231,7 @@ function BackupRestoreSection({ onRestored }) {
           lineHeight: 1.6,
         }}
       >
-        Export your watchlist, watch history, progress, and all settings to a
-        JSON file. Import it later to restore everything, useful before
-        reinstalling or switching devices.
+        {t("settings.backup.description")}
       </div>
       <div
         style={{
@@ -1201,7 +1242,7 @@ function BackupRestoreSection({ onRestored }) {
         }}
       >
         <button className="btn btn-primary" onClick={handleExport}>
-          ⬆ Export Backup
+          {t("settings.backup.export")}
         </button>
         <label
           style={{
@@ -1225,7 +1266,7 @@ function BackupRestoreSection({ onRestored }) {
             (e.currentTarget.style.background = "var(--surface2)")
           }
         >
-          ⬇ Import Backup
+          {t("settings.backup.import")}
           <input
             type="file"
             accept=".json,application/json"
@@ -1253,6 +1294,7 @@ function BackupRestoreSection({ onRestored }) {
 // ── Start Page Section ────────────────────────────────────────────────────────
 // ── Appearance Section ────────────────────────────────────────────────────────
 function AppearanceSection() {
+  const { t } = useTranslation();
   const [accent, setAccent] = useState(
     () => storage.get(STORAGE_KEYS.ACCENT_COLOR) || "red",
   );
@@ -1348,19 +1390,21 @@ function AppearanceSection() {
   };
 
   const CUSTOM_VAR_LABELS = {
-    "--bg": "Background",
-    "--surface": "Surface",
-    "--surface2": "Surface 2",
-    "--surface3": "Surface 3",
-    "--border": "Border",
-    "--text": "Text",
-    "--text2": "Text 2",
-    "--text3": "Text 3",
+    "--bg": t("settings.appearance.varBg"),
+    "--surface": t("settings.appearance.varSurface"),
+    "--surface2": t("settings.appearance.varSurface2"),
+    "--surface3": t("settings.appearance.varSurface3"),
+    "--border": t("settings.appearance.varBorder"),
+    "--text": t("settings.appearance.varText"),
+    "--text2": t("settings.appearance.varText2"),
+    "--text3": t("settings.appearance.varText3"),
   };
 
   return (
     <div style={{ marginBottom: 40 }}>
-      <div className="settings-section-title">Appearance</div>
+      <div className="settings-section-title">
+        {t("settings.appearance.title")}
+      </div>
 
       {/* Theme */}
       <div style={{ marginBottom: 24 }}>
@@ -1372,14 +1416,14 @@ function AppearanceSection() {
             marginBottom: 10,
           }}
         >
-          Theme
+          {t("settings.appearance.theme")}
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          {THEME_PRESETS.map((t) => (
+          {THEME_PRESETS.map((tp) => (
             <button
-              key={t.id}
-              onClick={() => handleThemeSelect(t.id)}
-              title={t.description}
+              key={tp.id}
+              onClick={() => handleThemeSelect(tp.id)}
+              title={t(`settings.appearance.themes.${tp.id}.description`)}
               style={{
                 display: "flex",
                 flexDirection: "column",
@@ -1388,11 +1432,11 @@ function AppearanceSection() {
                 padding: "10px 14px",
                 borderRadius: "var(--radius)",
                 background:
-                  theme === t.id
+                  theme === tp.id
                     ? "color-mix(in srgb, var(--red) 15%, var(--surface2))"
                     : "var(--surface2)",
                 border:
-                  theme === t.id
+                  theme === tp.id
                     ? "1.5px solid var(--red)"
                     : "1.5px solid var(--border)",
                 cursor: "pointer",
@@ -1407,10 +1451,10 @@ function AppearanceSection() {
                   height: 28,
                   borderRadius: 4,
                   background:
-                    t.id === "custom"
+                    tp.id === "custom"
                       ? `linear-gradient(135deg, ${customVars["--bg"]} 50%, ${customVars["--surface2"]} 50%)`
-                      : t.vars
-                        ? `linear-gradient(135deg, ${t.vars["--bg"]} 50%, ${t.vars["--surface2"]} 50%)`
+                      : tp.vars
+                        ? `linear-gradient(135deg, ${tp.vars["--bg"]} 50%, ${tp.vars["--surface2"]} 50%)`
                         : "var(--surface3)",
                   border: "1px solid rgba(255,255,255,0.08)",
                   flexShrink: 0,
@@ -1419,18 +1463,18 @@ function AppearanceSection() {
               <span
                 style={{
                   fontSize: 12,
-                  fontWeight: theme === t.id ? 600 : 400,
-                  color: theme === t.id ? "var(--text)" : "var(--text2)",
+                  fontWeight: theme === tp.id ? 600 : 400,
+                  color: theme === tp.id ? "var(--text)" : "var(--text2)",
                   whiteSpace: "nowrap",
                 }}
               >
-                {t.label}
+                {t(`settings.appearance.themes.${tp.id}.label`)}
               </span>
             </button>
           ))}
         </div>
         <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>
-          {THEME_PRESETS.find((t) => t.id === theme)?.description}
+          {theme && t(`settings.appearance.themes.${theme}.description`)}
         </div>
       </div>
 
@@ -1442,7 +1486,9 @@ function AppearanceSection() {
             className="btn btn-ghost"
             style={{ fontSize: 12, padding: "5px 12px", marginBottom: 12 }}
           >
-            {showCustomEditor ? "▲ Hide" : "▼ Edit"} custom colours
+            {showCustomEditor
+              ? t("settings.appearance.hideCustom")
+              : t("settings.appearance.editCustom")}
           </button>
           {showCustomEditor && (
             <div
@@ -1516,7 +1562,7 @@ function AppearanceSection() {
                     applyTheme("custom", DEFAULT_CUSTOM_VARS);
                   }}
                 >
-                  Reset to defaults
+                  {t("settings.appearance.resetDefaults")}
                 </button>
               </div>
             </div>
@@ -1534,7 +1580,7 @@ function AppearanceSection() {
             marginBottom: 10,
           }}
         >
-          Accent Colour
+          {t("settings.appearance.accentColour")}
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {ACCENT_PRESETS.map((p) => (
@@ -1544,7 +1590,7 @@ function AppearanceSection() {
                 setAccent(p.id);
                 applyAccentColor(p.id);
               }}
-              title={p.label}
+              title={t(`settings.appearance.accents.${p.id}`)}
               style={{
                 width: 32,
                 height: 32,
@@ -1565,8 +1611,9 @@ function AppearanceSection() {
           ))}
         </div>
         <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>
-          {ACCENT_PRESETS.find((p) => p.id === accent)?.label}, applied to
-          buttons, highlights, and indicators.
+          {t("settings.appearance.accentApplied", {
+            colour: t(`settings.appearance.accents.${accent}`),
+          })}
         </div>
         {/* Accent in streaming player */}
         <div
@@ -1582,11 +1629,10 @@ function AppearanceSection() {
             <div
               style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}
             >
-              Apply accent colour to streaming player
+              {t("settings.appearance.accentInPlayer")}
             </div>
             <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
-              Passes the selected accent colour to the player source (Videasy,
-              Vidking). VidSrc does not support colour theming.
+              {t("settings.appearance.accentInPlayerDesc")}
             </div>
           </div>
         </div>
@@ -1602,13 +1648,13 @@ function AppearanceSection() {
             marginBottom: 10,
           }}
         >
-          Font Size
+          {t("settings.appearance.fontSize")}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           {[
-            { id: "sm", label: "Small" },
-            { id: "normal", label: "Normal" },
-            { id: "lg", label: "Large" },
+            { id: "sm", label: t("settings.appearance.fontSmall") },
+            { id: "normal", label: t("settings.appearance.fontNormal") },
+            { id: "lg", label: t("settings.appearance.fontLarge") },
           ].map((o) => (
             <button
               key={o.id}
@@ -1642,10 +1688,10 @@ function AppearanceSection() {
             <div
               style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}
             >
-              Compact card grid
+              {t("settings.appearance.compact")}
             </div>
             <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
-              Shows more titles per row by reducing card size.
+              {t("settings.appearance.compactDesc")}
             </div>
           </div>
         </div>
@@ -1655,10 +1701,10 @@ function AppearanceSection() {
             <div
               style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}
             >
-              Reduce animations
+              {t("settings.appearance.reduceAnim")}
             </div>
             <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
-              Disables transitions and hover effects throughout the app.
+              {t("settings.appearance.reduceAnimDesc")}
             </div>
           </div>
         </div>
@@ -1668,12 +1714,10 @@ function AppearanceSection() {
             <div
               style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}
             >
-              Controller support
+              {t("settings.appearance.controller")}
             </div>
             <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
-              Navigate menus with a D-pad/stick and use A/B to select and go
-              back. In the player: A play/pause, D-pad seek/volume, LB/RB
-              skip ±15s, Y fullscreen, B exit.
+              {t("settings.appearance.controllerDesc")}
             </div>
           </div>
         </div>
@@ -1681,10 +1725,12 @@ function AppearanceSection() {
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <button className="btn btn-primary" onClick={handleSave}>
-          Save
+          {t("settings.common.save")}
         </button>
         {saved && (
-          <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
+          <span style={{ fontSize: 13, color: "#48c774" }}>
+            {t("settings.common.savedCheck")}
+          </span>
         )}
       </div>
     </div>
@@ -1693,6 +1739,7 @@ function AppearanceSection() {
 
 // ── Library & Privacy Section ─────────────────────────────────────────────────
 function LibraryPrivacySection() {
+  const { t } = useTranslation();
   const [sort, setSort] = useState(
     () => storage.get(STORAGE_KEYS.LIBRARY_SORT) || "manual",
   );
@@ -1713,15 +1760,17 @@ function LibraryPrivacySection() {
   };
 
   const SORT_OPTIONS = [
-    { value: "manual", label: "Custom order" },
-    { value: "title", label: "Title A-Z" },
-    { value: "rating", label: "Top rated" },
-    { value: "year", label: "Newest first" },
+    { value: "manual", label: t("settings.library.sortManual") },
+    { value: "title", label: t("settings.library.sortTitle") },
+    { value: "rating", label: t("settings.library.sortRating") },
+    { value: "year", label: t("settings.library.sortYear") },
   ];
 
   return (
     <div style={{ marginBottom: 40 }}>
-      <div className="settings-section-title">Library & Privacy</div>
+      <div className="settings-section-title">
+        {t("settings.library.title")}
+      </div>
 
       {/* Watchlist Sort */}
       <div style={{ marginBottom: 24 }}>
@@ -1733,7 +1782,7 @@ function LibraryPrivacySection() {
             marginBottom: 8,
           }}
         >
-          Watchlist sort order
+          {t("settings.library.sortOrder")}
         </div>
         <div
           style={{
@@ -1743,8 +1792,7 @@ function LibraryPrivacySection() {
             lineHeight: 1.6,
           }}
         >
-          How titles in your watchlist are sorted. "Custom order" keeps your
-          drag-and-drop arrangement.
+          {t("settings.library.sortOrderDesc")}
         </div>
         <SettingsSelect
           value={sort}
@@ -1761,11 +1809,10 @@ function LibraryPrivacySection() {
             <div
               style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}
             >
-              Record watch history
+              {t("settings.library.recordHistory")}
             </div>
             <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
-              When off, nothing you watch will be added to history or "Continue
-              Watching".
+              {t("settings.library.recordHistoryDesc")}
             </div>
           </div>
         </div>
@@ -1781,18 +1828,19 @@ function LibraryPrivacySection() {
               padding: "10px 14px",
             }}
           >
-            ⚠ Watch history is disabled. Progress tracking and "Continue
-            Watching" will not work.
+            {t("settings.library.historyDisabled")}
           </div>
         )}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <button className="btn btn-primary" onClick={handleSave}>
-          Save
+          {t("settings.common.save")}
         </button>
         {saved && (
-          <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
+          <span style={{ fontSize: 13, color: "#48c774" }}>
+            {t("settings.common.savedCheck")}
+          </span>
         )}
       </div>
     </div>
@@ -1800,6 +1848,7 @@ function LibraryPrivacySection() {
 }
 
 function StartPageSection() {
+  const { t } = useTranslation();
   const [startPage, setStartPage] = useState(
     () => storage.get(STORAGE_KEYS.START_PAGE) || "home",
   );
@@ -1813,7 +1862,9 @@ function StartPageSection() {
 
   return (
     <div style={{ marginBottom: 40 }}>
-      <div className="settings-section-title">Start Page</div>
+      <div className="settings-section-title">
+        {t("settings.startPage.title")}
+      </div>
       <div
         style={{
           fontSize: 13,
@@ -1822,7 +1873,7 @@ function StartPageSection() {
           lineHeight: 1.6,
         }}
       >
-        Choose which page opens when you launch Streambert.
+        {t("settings.startPage.description")}
       </div>
       <div
         style={{
@@ -1836,18 +1887,58 @@ function StartPageSection() {
           value={startPage}
           onChange={(v) => setStartPage(v)}
           options={[
-            { value: "home", label: "🏠  Home" },
-            { value: "history", label: "🕐  Library / History" },
-            { value: "downloads", label: "⬇  Downloads" },
+            { value: "home", label: t("settings.startPage.home") },
+            { value: "history", label: t("settings.startPage.history") },
+            { value: "downloads", label: t("settings.startPage.downloads") },
           ]}
         />
         <button className="btn btn-primary" onClick={handleSave}>
-          Save
+          {t("settings.common.save")}
         </button>
         {saved && (
-          <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
+          <span style={{ fontSize: 13, color: "#48c774" }}>
+            {t("settings.common.savedCheck")}
+          </span>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── UI Language ───────────────────────────────────────────────────────────────
+function UiLanguageSection() {
+  const { t, i18n } = useTranslation();
+  const [pref, setPref] = useState(
+    () => storage.get(STORAGE_KEYS.UI_LANG) || "system",
+  );
+
+  const handleChange = (value) => {
+    setPref(value);
+    storage.set(STORAGE_KEYS.UI_LANG, value);
+    i18n.changeLanguage(resolveLanguage(value));
+  };
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">{t("settings.uiLanguage.title")}</div>
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--text3)",
+          marginBottom: 16,
+          lineHeight: 1.6,
+        }}
+      >
+        {t("settings.uiLanguage.description")}
+      </div>
+      <SettingsSelect
+        value={pref}
+        onChange={handleChange}
+        options={[
+          { value: "system", label: t("settings.uiLanguage.system") },
+          ...UI_LANGUAGES,
+        ]}
+      />
     </div>
   );
 }
@@ -1875,6 +1966,7 @@ const TMDB_LANGUAGES = [
 ];
 
 function TmdbLanguageSection() {
+  const { t } = useTranslation();
   const [lang, setLang] = useState(
     () => storage.get(STORAGE_KEYS.TMDB_LANG) || "en-US",
   );
@@ -1892,7 +1984,9 @@ function TmdbLanguageSection() {
 
   return (
     <div style={{ marginBottom: 40 }}>
-      <div className="settings-section-title">Metadata Language</div>
+      <div className="settings-section-title">
+        {t("settings.tmdbLanguage.title")}
+      </div>
       <div
         style={{
           fontSize: 13,
@@ -1901,9 +1995,7 @@ function TmdbLanguageSection() {
           lineHeight: 1.6,
         }}
       >
-        Language used when fetching titles, descriptions, and other metadata
-        from TMDB. Changing this clears the metadata cache so updated content
-        loads immediately.
+        {t("settings.tmdbLanguage.description")}
       </div>
       <div
         style={{
@@ -1919,11 +2011,11 @@ function TmdbLanguageSection() {
           options={TMDB_LANGUAGES}
         />
         <button className="btn btn-primary" onClick={handleSave}>
-          Save
+          {t("settings.common.save")}
         </button>
         {saved && (
           <span style={{ fontSize: 13, color: "#48c774" }}>
-            ✓ Saved, cache cleared
+            {t("settings.tmdbLanguage.savedCleared")}
           </span>
         )}
       </div>
@@ -1933,6 +2025,7 @@ function TmdbLanguageSection() {
 
 // ── Subtitle Settings ─────────────────────────────────────────────────────────
 function SubtitleSettingsSection() {
+  const { t } = useTranslation();
   const [enabled, setEnabled] = useState(
     () =>
       storage.get(STORAGE_KEYS.SUBTITLE_ENABLED) !== 0 &&
@@ -1982,7 +2075,9 @@ function SubtitleSettingsSection() {
 
   return (
     <div style={{ marginBottom: 40 }}>
-      <div className="settings-section-title">Subtitle Downloads</div>
+      <div className="settings-section-title">
+        {t("settings.subtitles.title")}
+      </div>
 
       {/* Source info */}
       <div
@@ -1993,24 +2088,24 @@ function SubtitleSettingsSection() {
           lineHeight: 1.7,
         }}
       >
-        <span style={{ color: "var(--text)", fontWeight: 600 }}>
-          Wyzie Subs
-        </span>{" "}
-        is used by default and requires a free API key (no account needed).
-        Optionally add a{" "}
-        <span
-          style={{
-            color: "var(--red)",
-            cursor: "pointer",
-            textDecoration: "underline",
+        <Trans
+          i18nKey="settings.subtitles.sourceInfo"
+          components={{
+            hl: <span style={{ color: "var(--text)", fontWeight: 600 }} />,
+            link: (
+              <span
+                style={{
+                  color: "var(--red)",
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                }}
+                onClick={() =>
+                  window.electron?.openExternal("https://subdl.com/settings")
+                }
+              />
+            ),
           }}
-          onClick={() =>
-            window.electron?.openExternal("https://subdl.com/settings")
-          }
-        >
-          SubDL API key
-        </span>{" "}
-        (free), to use SubDL as the primary source instead.
+        />
         {hasSubdlKey && (
           <span
             style={{
@@ -2025,7 +2120,7 @@ function SubtitleSettingsSection() {
               border: "1px solid rgba(99,149,255,0.3)",
             }}
           >
-            SubDL ACTIVE
+            {t("settings.subtitles.subdlActive")}
           </span>
         )}
       </div>
@@ -2047,8 +2142,8 @@ function SubtitleSettingsSection() {
           }}
         >
           {enabled
-            ? "Auto-download subtitles when downloading videos"
-            : "Subtitle download disabled"}
+            ? t("settings.subtitles.autoDownload")
+            : t("settings.subtitles.downloadDisabled")}
         </span>
       </div>
 
@@ -2059,7 +2154,7 @@ function SubtitleSettingsSection() {
             <div
               style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}
             >
-              Default language
+              {t("settings.subtitles.defaultLanguage")}
             </div>
             <SettingsSelect
               value={lang}
@@ -2076,7 +2171,7 @@ function SubtitleSettingsSection() {
             <div
               style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}
             >
-              Wyzie API key{" "}
+              {t("settings.subtitles.wyzieKey")}{" "}
               <span
                 style={{
                   marginLeft: 8,
@@ -2091,7 +2186,9 @@ function SubtitleSettingsSection() {
                   border: `1px solid ${hasWyzieKey ? "rgba(99,202,183,0.25)" : "rgba(255,180,80,0.25)"}`,
                 }}
               >
-                {hasWyzieKey ? "SET" : "REQUIRED"}
+                {hasWyzieKey
+                  ? t("settings.subtitles.keySet")
+                  : t("settings.subtitles.keyRequired")}
               </span>
             </div>
             <div
@@ -2102,7 +2199,7 @@ function SubtitleSettingsSection() {
                 lineHeight: 1.5,
               }}
             >
-              Required for Wyzie Subs. Get a free key by following the tutorial.{" "}
+              {t("settings.subtitles.wyzieKeyDesc")}{" "}
               <button
                 className="btn btn-ghost"
                 style={{
@@ -2120,7 +2217,7 @@ function SubtitleSettingsSection() {
                   )
                 }
               >
-                How to get a key ↗
+                {t("settings.subtitles.howToGetKey")}
               </button>
             </div>
             <div
@@ -2144,16 +2241,20 @@ function SubtitleSettingsSection() {
                 style={{ padding: "6px 12px", fontSize: 12 }}
                 onClick={() => setShowWyzieKey((v) => !v)}
               >
-                {showWyzieKey ? "Hide" : "Show"}
+                {showWyzieKey
+                  ? t("settings.subtitles.hide")
+                  : t("settings.subtitles.show")}
               </button>
               {hasWyzieKey && (
                 <button
                   className="btn btn-ghost"
                   style={{ padding: "6px 12px", fontSize: 12 }}
                   onClick={handleWyzieCopy}
-                  title="Copy key"
+                  title={t("settings.subtitles.copyKey")}
                 >
-                  {wyzieCopied ? "Copied!" : "Copy"}
+                  {wyzieCopied
+                    ? t("settings.subtitles.copied")
+                    : t("settings.subtitles.copy")}
                 </button>
               )}
               {hasWyzieKey && (
@@ -2165,9 +2266,9 @@ function SubtitleSettingsSection() {
                       `https://store.wyzie.io/dashboard?key=${wyzieApiKey.trim()}`,
                     )
                   }
-                  title="Open your wyzie dashboard"
+                  title={t("settings.subtitles.openDashboard")}
                 >
-                  Dashboard ↗
+                  {t("settings.subtitles.dashboard")}
                 </button>
               )}
             </div>
@@ -2178,7 +2279,7 @@ function SubtitleSettingsSection() {
             <div
               style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}
             >
-              SubDL API key{" "}
+              {t("settings.subtitles.subdlKey")}{" "}
               <span
                 style={{
                   color: "var(--text3)",
@@ -2189,7 +2290,7 @@ function SubtitleSettingsSection() {
                   window.electron?.openExternal("https://subdl.com/settings")
                 }
               >
-                (free, register at subdl.com ↗)
+                {t("settings.subtitles.subdlRegister")}
               </span>
               <span
                 style={{
@@ -2203,7 +2304,7 @@ function SubtitleSettingsSection() {
                   border: "1px solid rgba(99,202,183,0.25)",
                 }}
               >
-                OPTIONAL
+                {t("settings.subtitles.keyOptional")}
               </span>
             </div>
             <div
@@ -2214,17 +2315,19 @@ function SubtitleSettingsSection() {
                 lineHeight: 1.5,
               }}
             >
-              Leave empty to use{" "}
-              <strong style={{ color: "var(--text)" }}>Wyzie Subs</strong>{" "}
-              (default, requires Wyzie API key above). Add a SubDL key to switch
-              to SubDL as the primary source.
+              <Trans
+                i18nKey="settings.subtitles.subdlKeyDesc"
+                components={{
+                  strong: <strong style={{ color: "var(--text)" }} />,
+                }}
+              />
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input
                 className="apikey-input"
                 style={{ flex: 1, maxWidth: 400, marginBottom: 0 }}
                 type={showSubdlKey ? "text" : "password"}
-                placeholder="SubDL API key, leave empty to use Wyzie"
+                placeholder={t("settings.subtitles.subdlPlaceholder")}
                 value={subdlApiKey}
                 onChange={(e) => setSubdlApiKey(e.target.value)}
               />
@@ -2233,7 +2336,9 @@ function SubtitleSettingsSection() {
                 style={{ padding: "6px 12px", fontSize: 12 }}
                 onClick={() => setShowSubdlKey((v) => !v)}
               >
-                {showSubdlKey ? "Hide" : "Show"}
+                {showSubdlKey
+                  ? t("settings.subtitles.hide")
+                  : t("settings.subtitles.show")}
               </button>
               {subdlApiKey.trim() && (
                 <button
@@ -2244,9 +2349,9 @@ function SubtitleSettingsSection() {
                     color: "var(--text3)",
                   }}
                   onClick={() => setSubdlApiKey("")}
-                  title="Clear key (revert to Wyzie)"
+                  title={t("settings.subtitles.clearKey")}
                 >
-                  Clear
+                  {t("settings.subtitles.clear")}
                 </button>
               )}
             </div>
@@ -2258,10 +2363,12 @@ function SubtitleSettingsSection() {
         style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}
       >
         <button className="btn btn-primary" onClick={handleSave}>
-          Save
+          {t("settings.common.save")}
         </button>
         {saved && (
-          <span style={{ fontSize: 13, color: "#4caf50" }}>✓ Saved</span>
+          <span style={{ fontSize: 13, color: "#4caf50" }}>
+            {t("settings.common.savedCheck")}
+          </span>
         )}
       </div>
     </div>
@@ -2270,6 +2377,7 @@ function SubtitleSettingsSection() {
 
 // ── Notifications Section ─────────────────────────────────────────────────────
 function NotificationsSection() {
+  const { t } = useTranslation();
   const [notifyDownload, setNotifyDownload] = useState(
     () => storage.get(STORAGE_KEYS.NOTIFY_DOWNLOAD_COMPLETE) !== false,
   );
@@ -2317,7 +2425,9 @@ function NotificationsSection() {
 
   return (
     <div style={{ marginBottom: 40 }}>
-      <div className="settings-section-title">Desktop Notifications</div>
+      <div className="settings-section-title">
+        {t("settings.notifications.title")}
+      </div>
       <div
         style={{
           fontSize: 13,
@@ -2326,7 +2436,7 @@ function NotificationsSection() {
           lineHeight: 1.6,
         }}
       >
-        Control which events trigger a desktop notification.
+        {t("settings.notifications.description")}
       </div>
 
       <div
@@ -2339,14 +2449,14 @@ function NotificationsSection() {
         }}
       >
         <ToggleRow
-          label="Notify when a download completes"
-          description="Shows a desktop notification when an item finishes downloading."
+          label={t("settings.notifications.downloadLabel")}
+          description={t("settings.notifications.downloadDesc")}
           value={notifyDownload}
           onChange={setNotifyDownload}
         />
         <ToggleRow
-          label="Notify about new episodes on startup"
-          description="On startup, checks every TV series you have saved for newly released episodes and notifies you if any aired since the last check."
+          label={t("settings.notifications.episodeLabel")}
+          description={t("settings.notifications.episodeDesc")}
           value={notifyEpisode}
           onChange={setNotifyEpisode}
         />
@@ -2354,10 +2464,12 @@ function NotificationsSection() {
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <button className="btn btn-primary" onClick={saveSettings}>
-          Save
+          {t("settings.common.save")}
         </button>
         {saved && (
-          <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
+          <span style={{ fontSize: 13, color: "#48c774" }}>
+            {t("settings.common.savedCheck")}
+          </span>
         )}
       </div>
     </div>
@@ -2366,6 +2478,7 @@ function NotificationsSection() {
 
 // ── Section Group Header ──────────────────────────────────────────────────────
 function DiscordRpcSection() {
+  const { t } = useTranslation();
   const [enabled, setEnabledState] = useState(
     () => !!storage.get(STORAGE_KEYS.DISCORD_RPC_ENABLED),
   );
@@ -2425,7 +2538,9 @@ function DiscordRpcSection() {
 
   return (
     <div style={{ marginBottom: 40 }}>
-      <div className="settings-section-title">Discord Rich Presence</div>
+      <div className="settings-section-title">
+        {t("settings.discord.title")}
+      </div>
       <div
         style={{
           fontSize: 13,
@@ -2434,9 +2549,7 @@ function DiscordRpcSection() {
           lineHeight: 1.6,
         }}
       >
-        Shows what you're currently watching on your Discord profile (title +
-        cover, or "Idling" when nothing is open). Off by default. Requires
-        the Discord desktop client to be running.
+        {t("settings.discord.description")}
       </div>
 
       <div
@@ -2449,28 +2562,28 @@ function DiscordRpcSection() {
         }}
       >
         <ToggleRow
-          label="Enable Discord Rich Presence"
-          description="Connects to your local Discord client and updates your status automatically."
+          label={t("settings.discord.enableLabel")}
+          description={t("settings.discord.enableDesc")}
           value={enabled}
           onChange={setEnabledState}
         />
         <ToggleRow
-          label="Show cover art"
-          description="Uses the movie/show poster as the large image. When off, only the Streambert icon is shown."
+          label={t("settings.discord.coverLabel")}
+          description={t("settings.discord.coverDesc")}
           value={showCover}
           onChange={setShowCover}
           disabled={!enabled}
         />
         <ToggleRow
-          label="Show elapsed time"
-          description="Displays how long you've been on the current title's page."
+          label={t("settings.discord.timeLabel")}
+          description={t("settings.discord.timeDesc")}
           value={showTimestamp}
           onChange={setShowTimestamp}
           disabled={!enabled}
         />
         <ToggleRow
-          label="Show GitHub button"
-          description="Adds a button linking to the Streambert GitHub repository."
+          label={t("settings.discord.buttonLabel")}
+          description={t("settings.discord.buttonDesc")}
           value={showButton}
           onChange={setShowButton}
           disabled={!enabled}
@@ -2479,10 +2592,12 @@ function DiscordRpcSection() {
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <button className="btn btn-primary" onClick={saveSettings}>
-          Save
+          {t("settings.common.save")}
         </button>
         {saved && (
-          <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
+          <span style={{ fontSize: 13, color: "#48c774" }}>
+            {t("settings.common.savedCheck")}
+          </span>
         )}
       </div>
     </div>
@@ -2540,7 +2655,7 @@ const SUPPORTS_HIGHLIGHT =
 const SECTION_NAV = [
   {
     id: "updates",
-    label: "Updates & API",
+    labelKey: "settings.nav.updates",
     icon: "↑",
     keywords: [
       "update",
@@ -2563,7 +2678,7 @@ const SECTION_NAV = [
   },
   {
     id: "content",
-    label: "Age Rating",
+    labelKey: "settings.nav.content",
     icon: "🔞",
     keywords: [
       "age",
@@ -2579,7 +2694,7 @@ const SECTION_NAV = [
   },
   {
     id: "playback",
-    label: "Playback",
+    labelKey: "settings.nav.playback",
     icon: "▶",
     keywords: [
       "invidious",
@@ -2600,7 +2715,7 @@ const SECTION_NAV = [
   },
   {
     id: "subtitles",
-    label: "Subtitles",
+    labelKey: "settings.nav.subtitles",
     icon: "CC",
     keywords: [
       "subtitle",
@@ -2615,7 +2730,7 @@ const SECTION_NAV = [
   },
   {
     id: "downloads",
-    label: "Downloads",
+    labelKey: "settings.nav.downloads",
     icon: "⬇",
     keywords: [
       "download",
@@ -2629,7 +2744,7 @@ const SECTION_NAV = [
   },
   {
     id: "notifications",
-    label: "Notifications",
+    labelKey: "settings.nav.notifications",
     icon: "🔔",
     keywords: [
       "notification",
@@ -2645,7 +2760,7 @@ const SECTION_NAV = [
   },
   {
     id: "discordRpc",
-    label: "Discord Rich Presence",
+    labelKey: "settings.nav.discordRpc",
     icon: "🎮",
     keywords: [
       "discord",
@@ -2660,7 +2775,7 @@ const SECTION_NAV = [
   },
   {
     id: "interface",
-    label: "Interface",
+    labelKey: "settings.nav.interface",
     icon: "✦",
     keywords: [
       "home",
@@ -2680,7 +2795,7 @@ const SECTION_NAV = [
   },
   {
     id: "library",
-    label: "Library",
+    labelKey: "settings.nav.library",
     icon: "📚",
     keywords: [
       "library",
@@ -2694,7 +2809,7 @@ const SECTION_NAV = [
   },
   {
     id: "backup",
-    label: "Backup",
+    labelKey: "settings.nav.backup",
     icon: "💾",
     keywords: [
       "backup",
@@ -2708,7 +2823,7 @@ const SECTION_NAV = [
   },
   {
     id: "storage",
-    label: "Storage & Data",
+    labelKey: "settings.nav.storage",
     icon: "🗄",
     keywords: [
       "storage",
@@ -2725,6 +2840,7 @@ const SECTION_NAV = [
 ];
 
 function SettingsTopBar({ sectionRefs, contentRef }) {
+  const { t } = useTranslation();
   const [searchOpen, setSearchOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -3003,7 +3119,7 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
                 ref={inputRef}
                 value={query}
                 onChange={handleQueryChange}
-                placeholder="Search on this page…"
+                placeholder={t("settings.topBar.searchPlaceholder")}
                 style={{
                   flex: 1,
                   background: "transparent",
@@ -3031,7 +3147,9 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
                     flexShrink: 0,
                   }}
                 >
-                  {noMatch ? "No results" : `${currentMatch} / ${matchCount}`}
+                  {noMatch
+                    ? t("settings.topBar.noResults")
+                    : `${currentMatch} / ${matchCount}`}
                 </span>
               )}
 
@@ -3039,7 +3157,7 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
               {matchCount > 0 && (
                 <button
                   onClick={goPrev}
-                  title="Previous match (Shift+Enter)"
+                  title={t("settings.topBar.previousMatch")}
                   style={navBtnStyle}
                   onMouseEnter={(e) =>
                     (e.currentTarget.style.background =
@@ -3068,7 +3186,7 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
               {matchCount > 0 && (
                 <button
                   onClick={goNext}
-                  title="Next match (Enter)"
+                  title={t("settings.topBar.nextMatch")}
                   style={navBtnStyle}
                   onMouseEnter={(e) =>
                     (e.currentTarget.style.background =
@@ -3101,7 +3219,7 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
                     clearHighlights();
                     inputRef.current?.focus();
                   }}
-                  title="Clear search"
+                  title={t("settings.topBar.clearSearch")}
                   style={{ ...navBtnStyle, color: "var(--text3)" }}
                   onMouseEnter={(e) =>
                     (e.currentTarget.style.background =
@@ -3129,7 +3247,7 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
               {/* Esc button */}
               <button
                 onClick={closeSearch}
-                title="Close (Esc)"
+                title={t("settings.topBar.close")}
                 style={{
                   background: "none",
                   border: "none",
@@ -3183,7 +3301,7 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
-              Search settings…
+              {t("settings.topBar.searchSettings")}
               <span
                 style={{
                   fontSize: 10,
@@ -3239,7 +3357,7 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
               <circle cx="3" cy="12" r="1" fill="currentColor" />
               <circle cx="3" cy="18" r="1" fill="currentColor" />
             </svg>
-            Jump to Section
+            {t("settings.topBar.jumpToSection")}
             <svg
               width="12"
               height="12"
@@ -3311,7 +3429,7 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
                   >
                     {s.icon}
                   </span>
-                  <span style={{ flex: 1 }}>{s.label}</span>
+                  <span style={{ flex: 1 }}>{t(s.labelKey)}</span>
                   <svg
                     width="12"
                     height="12"
@@ -3339,6 +3457,7 @@ export default function SettingsPage({
   onChangeApiKey,
   initialSection,
 }) {
+  const { t } = useTranslation();
   const [downloadPath, setDownloadPath] = useState(
     () => storage.get(STORAGE_KEYS.DOWNLOAD_PATH) || "",
   );
@@ -3399,10 +3518,10 @@ export default function SettingsPage({
     const el = sectionRefs[initialSection]?.current;
     if (!el) return;
     // Small delay so layout is complete before scrolling
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 120);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, []);
 
   // Age Rating
@@ -3437,7 +3556,10 @@ export default function SettingsPage({
   const checkInvidious = async (baseUrl) => {
     const clean = (baseUrl || "").trim().replace(/\/$/, "");
     if (!clean) {
-      setInvidiousStatus({ ok: false, msg: "Please enter a URL first." });
+      setInvidiousStatus({
+        ok: false,
+        msg: t("settings.playback.enterUrl"),
+      });
       return;
     }
     setInvidiousChecking(true);
@@ -3448,18 +3570,18 @@ export default function SettingsPage({
       if (res.ok) {
         setInvidiousStatus({
           ok: true,
-          msg: "Instance reachable and responding.",
+          msg: t("settings.playback.reachable"),
         });
       } else {
         setInvidiousStatus({
           ok: false,
-          msg: `Server responded with status ${res.status}.`,
+          msg: t("settings.playback.serverStatus", { status: res.status }),
         });
       }
     } catch (e) {
       setInvidiousStatus({
         ok: false,
-        msg: "Could not reach instance. Check the URL or try another.",
+        msg: t("settings.playback.unreachable"),
       });
     } finally {
       setInvidiousChecking(false);
@@ -3530,7 +3652,7 @@ export default function SettingsPage({
   const handleClearCache = async () => {
     await clearAppCaches();
     setSizes((prev) => ({ ...prev, cache: 0 }));
-    return { msg: "✓ Cache cleared successfully" };
+    return { msg: t("settings.storage.cacheCleared") };
   };
 
   const handleClearWatchProgress = async () => {
@@ -3539,17 +3661,18 @@ export default function SettingsPage({
     storage.remove(STORAGE_KEYS.WATCHED);
     if (isElectron) await window.electron.clearWatchData();
     setTimeout(() => window.location.reload(), 800);
-    return { msg: "✓ Watch data cleared" };
+    return { msg: t("settings.storage.watchDataCleared") };
   };
 
   const handleDeleteAllDownloads = async () => {
-    let msg = "✓ All downloads removed";
+    let msg = t("settings.storage.allRemoved");
     setSizes((prev) => ({ ...prev, downloads: 0 }));
     if (isElectron) {
       const res = await window.electron.deleteAllDownloads();
       if (res?.deleted != null) {
-        msg = `✓ Removed ${res.deleted} file${res.deleted !== 1 ? "s" : ""}`;
-        if (res.errors > 0) msg += ` (${res.errors} could not be deleted)`;
+        msg = t("settings.storage.removedFiles", { count: res.deleted });
+        if (res.errors > 0)
+          msg += " " + t("settings.storage.couldNotDelete", { errors: res.errors });
       }
     } else {
       storage.remove(STORAGE_KEYS.LOCAL_FILES);
@@ -3572,13 +3695,15 @@ export default function SettingsPage({
     <>
       {showProgressConfirm && (
         <ConfirmDialog
-          title="CLEAR WATCH PROGRESS?"
-          description="This will permanently delete all watch history, continue-watching progress, and watched/completed markings for all movies and series."
-          confirmLabel="Yes, Clear Everything"
+          title={t("settings.storage.progressConfirmTitle")}
+          description={t("settings.storage.progressConfirmDesc")}
+          confirmLabel={t("settings.storage.progressConfirmBtn")}
           onConfirm={async () => {
             setShowProgressConfirm(false);
             await handleClearWatchProgress();
-            window.__progressConfirmResolve?.({ msg: "✓ Watch data cleared" });
+            window.__progressConfirmResolve?.({
+              msg: t("settings.storage.watchDataCleared"),
+            });
             window.__progressConfirmResolve = null;
           }}
           onCancel={() => {
@@ -3590,9 +3715,9 @@ export default function SettingsPage({
       )}
       {showDeleteDlConfirm && (
         <ConfirmDialog
-          title="DELETE ALL DOWNLOADS?"
-          description="This will permanently delete all video files downloaded through Streambert and remove them from the download list."
-          confirmLabel="Yes, Delete All"
+          title={t("settings.storage.deleteConfirmTitle")}
+          description={t("settings.storage.deleteConfirmDesc")}
+          confirmLabel={t("settings.storage.deleteConfirmBtn")}
           onConfirm={async () => {
             setShowDeleteDlConfirm(false);
             const result = await handleDeleteAllDownloads();
@@ -3630,10 +3755,10 @@ export default function SettingsPage({
             marginBottom: 6,
           }}
         >
-          SETTINGS
+          {t("settings.page.title")}
         </div>
         <div style={{ color: "var(--text3)", fontSize: 14, marginBottom: 48 }}>
-          App configuration for Streambert
+          {t("settings.page.subtitle")}
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
@@ -3641,8 +3766,8 @@ export default function SettingsPage({
         {/* ══════════════════════════════════════════════════════════════════ */}
         <div ref={secUpdates} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
-            title="General"
-            subtitle="App version, updates, API credentials and Languages"
+            title={t("settings.groups.general.title")}
+            subtitle={t("settings.groups.general.subtitle")}
           />
 
           {/* Version & Updates */}
@@ -3652,7 +3777,9 @@ export default function SettingsPage({
 
           {/* TMDB API Token */}
           <div style={{ marginBottom: 40 }}>
-            <div className="settings-section-title">TMDB Read Access Token</div>
+            <div className="settings-section-title">
+              {t("settings.general.tmdbTitle")}
+            </div>
             <div
               style={{
                 fontSize: 13,
@@ -3661,8 +3788,7 @@ export default function SettingsPage({
                 lineHeight: 1.6,
               }}
             >
-              Used to fetch movie and TV metadata, posters, ratings, and cast
-              info from The Movie Database.
+              {t("settings.general.tmdbDesc")}
             </div>
             <div
               style={{
@@ -3682,13 +3808,19 @@ export default function SettingsPage({
                   border: "1px solid var(--border)",
                 }}
               >
-                {apiKey ? apiKey.slice(0, 8) + "••••••••••••••••" : "(not set)"}
+                {apiKey
+                  ? apiKey.slice(0, 8) + "••••••••••••••••"
+                  : t("settings.general.notSet")}
               </code>
               <button className="btn btn-ghost" onClick={onChangeApiKey}>
-                Change API Token
+                {t("settings.general.changeToken")}
               </button>
             </div>
           </div>
+
+          <Divider />
+
+          <UiLanguageSection />
 
           <Divider />
 
@@ -3700,13 +3832,13 @@ export default function SettingsPage({
         {/* ══════════════════════════════════════════════════════════════════ */}
         <div ref={secContent} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
-            title="Content"
-            subtitle="Parental controls and content filtering by age rating"
+            title={t("settings.groups.content.title")}
+            subtitle={t("settings.groups.content.subtitle")}
           />
 
           <div style={{ marginBottom: 40 }}>
             <div className="settings-section-title">
-              Age Rating &amp; Parental Controls
+              {t("settings.content.ageTitle")}
             </div>
             <div
               style={{
@@ -3716,12 +3848,13 @@ export default function SettingsPage({
                 lineHeight: 1.6,
               }}
             >
-              Set a maximum age rating. Content rated above this age will still
-              be visible but{" "}
-              <strong style={{ color: "var(--text)" }}>
-                you won't be able to play it.
-              </strong>{" "}
-              Set to <em>No restriction</em> to disable this feature entirely.
+              <Trans
+                i18nKey="settings.content.ageDescription"
+                components={{
+                  strong: <strong style={{ color: "var(--text)" }} />,
+                  em: <em />,
+                }}
+              />
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -3734,7 +3867,7 @@ export default function SettingsPage({
                     marginBottom: 8,
                   }}
                 >
-                  Rating Country
+                  {t("settings.content.ratingCountry")}
                 </div>
                 <SettingsSelect
                   value={ratingCountry}
@@ -3755,22 +3888,25 @@ export default function SettingsPage({
                     marginBottom: 8,
                   }}
                 >
-                  Maximum Allowed Age Rating
+                  {t("settings.content.maxAge")}
                 </div>
                 <SettingsSelect
                   value={ageLimit}
                   onChange={(v) => setAgeLimit(v)}
-                  options={AGE_LIMIT_OPTIONS}
+                  options={AGE_LIMIT_OPTIONS.map((o) => ({
+                    value: o.value,
+                    label: t(o.labelKey),
+                  }))}
                 />
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <button className="btn btn-primary" onClick={saveAgeSettings}>
-                  Save
+                  {t("settings.common.save")}
                 </button>
                 {ageSaved && (
                   <span style={{ fontSize: 13, color: "#48c774" }}>
-                    ✓ Saved
+                    {t("settings.common.savedCheck")}
                   </span>
                 )}
               </div>
@@ -3783,13 +3919,15 @@ export default function SettingsPage({
         {/* ══════════════════════════════════════════════════════════════════ */}
         <div ref={secPlayback} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
-            title="Playback"
-            subtitle="Trailer source and auto-watched behavior"
+            title={t("settings.groups.playback.title")}
+            subtitle={t("settings.groups.playback.subtitle")}
           />
 
           {/* Invidious */}
           <div style={{ marginBottom: 40 }}>
-            <div className="settings-section-title">Invidious Instance</div>
+            <div className="settings-section-title">
+              {t("settings.playback.invidiousTitle")}
+            </div>
             <div
               style={{
                 fontSize: 13,
@@ -3798,16 +3936,14 @@ export default function SettingsPage({
                 lineHeight: 1.6,
               }}
             >
-              Trailers are played via{" "}
-              <span style={{ color: "var(--text)", fontWeight: 600 }}>
-                Invidious
-              </span>
-              , a privacy-friendly YouTube frontend. Your configured instance is
-              tried first; if it fails, the app automatically falls back through
-              a list of known working instances. The default is{" "}
-              <code style={{ fontSize: 12 }}>{DEFAULT_INVIDIOUS_BASE}</code>.
-              The instance must have its API enabled (
-              <code style={{ fontSize: 12 }}>/api/v1/stats</code> reachable).
+              <Trans
+                i18nKey="settings.playback.invidiousDesc"
+                values={{ defaultBase: DEFAULT_INVIDIOUS_BASE }}
+                components={{
+                  hl: <span style={{ color: "var(--text)", fontWeight: 600 }} />,
+                  code: <code style={{ fontSize: 12 }} />,
+                }}
+              />
             </div>
             <div
               style={{
@@ -3833,10 +3969,12 @@ export default function SettingsPage({
                 onClick={() => checkInvidious(invidiousBase)}
                 style={{ opacity: invidiousChecking ? 0.5 : 1 }}
               >
-                {invidiousChecking ? "Checking…" : "Check"}
+                {invidiousChecking
+                  ? t("settings.playback.checking")
+                  : t("settings.playback.check")}
               </button>
               <button className="btn btn-primary" onClick={saveInvidiousBase}>
-                Save
+                {t("settings.common.save")}
               </button>
             </div>
 
@@ -3875,7 +4013,7 @@ export default function SettingsPage({
 
             {invidiousSaved && (
               <div style={{ marginTop: 10, fontSize: 13, color: "#48c774" }}>
-                ✓ Saved
+                {t("settings.common.savedCheck")}
               </div>
             )}
           </div>
@@ -3884,7 +4022,9 @@ export default function SettingsPage({
 
           {/* Auto-Watched Threshold */}
           <div style={{ marginBottom: 40 }}>
-            <div className="settings-section-title">Auto-Watched Threshold</div>
+            <div className="settings-section-title">
+              {t("settings.playback.thresholdTitle")}
+            </div>
             <div
               style={{
                 fontSize: 13,
@@ -3893,12 +4033,12 @@ export default function SettingsPage({
                 lineHeight: 1.6,
               }}
             >
-              A movie or episode is automatically marked as{" "}
-              <span style={{ color: "#48c774", fontWeight: 600 }}>
-                Watched ✓
-              </span>{" "}
-              when the remaining time drops to this value or below. Set between
-              1 and 300 seconds.
+              <Trans
+                i18nKey="settings.playback.thresholdDesc"
+                components={{
+                  ok: <span style={{ color: "#48c774", fontWeight: 600 }} />,
+                }}
+              />
             </div>
             <div
               style={{
@@ -3919,16 +4059,16 @@ export default function SettingsPage({
                   onChange={(e) => setWatchedThreshold(e.target.value)}
                 />
                 <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                  seconds
+                  {t("settings.playback.seconds")}
                 </span>
               </div>
               <button className="btn btn-primary" onClick={handleSaveThreshold}>
-                Save
+                {t("settings.common.save")}
               </button>
             </div>
             {saved && (
               <div style={{ marginTop: 10, fontSize: 13, color: "#48c774" }}>
-                ✓ Saved
+                {t("settings.common.savedCheck")}
               </div>
             )}
           </div>
@@ -3937,7 +4077,9 @@ export default function SettingsPage({
 
           {/* Autoplay Next Episode */}
           <div style={{ marginBottom: 40 }}>
-            <div className="settings-section-title">Autoplay Next Episode</div>
+            <div className="settings-section-title">
+              {t("settings.playback.autoplayTitle")}
+            </div>
             <div
               style={{
                 fontSize: 13,
@@ -3946,7 +4088,7 @@ export default function SettingsPage({
                 lineHeight: 1.6,
               }}
             >
-              Configure how the player behaves when an episode finishes.
+              {t("settings.playback.autoplayDesc")}
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -3968,7 +4110,7 @@ export default function SettingsPage({
                       color: "var(--text)",
                     }}
                   >
-                    Enable Autoplay Next
+                    {t("settings.playback.enableAutoplay")}
                   </div>
                   <div
                     style={{
@@ -3977,8 +4119,7 @@ export default function SettingsPage({
                       marginTop: 2,
                     }}
                   >
-                    Automatically play the next episode when the current one
-                    ends.
+                    {t("settings.playback.enableAutoplayDesc")}
                   </div>
                 </div>
               </div>
@@ -4001,7 +4142,7 @@ export default function SettingsPage({
                         color: "var(--text2)",
                       }}
                     >
-                      Countdown Duration
+                      {t("settings.playback.countdown")}
                     </div>
                     <div
                       style={{
@@ -4010,8 +4151,7 @@ export default function SettingsPage({
                         marginBottom: 4,
                       }}
                     >
-                      Number of seconds to display the countdown. Set to 0 to
-                      only show the buttons and not autoplay automatically.
+                      {t("settings.playback.countdownDesc")}
                     </div>
                     <div
                       style={{ display: "flex", alignItems: "center", gap: 12 }}
@@ -4040,7 +4180,7 @@ export default function SettingsPage({
                         }}
                       />
                       <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                        seconds
+                        {t("settings.playback.seconds")}
                       </span>
                     </div>
                   </div>
@@ -4055,7 +4195,7 @@ export default function SettingsPage({
                         marginBottom: 8,
                       }}
                     >
-                      Overlay Position
+                      {t("settings.playback.overlayPosition")}
                     </div>
                     <div
                       style={{
@@ -4064,8 +4204,7 @@ export default function SettingsPage({
                         marginBottom: 12,
                       }}
                     >
-                      Choose which side of the player the next episode thumbnail
-                      and details are shown.
+                      {t("settings.playback.overlayDesc")}
                     </div>
                     <SettingsSelect
                       value={autoplayNextLayout}
@@ -4075,8 +4214,8 @@ export default function SettingsPage({
                         flash();
                       }}
                       options={[
-                        { value: "left", label: "Left Side" },
-                        { value: "right", label: "Right Side" },
+                        { value: "left", label: t("settings.playback.left") },
+                        { value: "right", label: t("settings.playback.right") },
                       ]}
                     />
                   </div>
@@ -4089,7 +4228,9 @@ export default function SettingsPage({
 
           {/* Intro Skip */}
           <div style={{ marginBottom: 40 }}>
-            <div className="settings-section-title">Anime Intro Skip</div>
+            <div className="settings-section-title">
+              {t("settings.playback.introTitle")}
+            </div>
             <div
               style={{
                 fontSize: 13,
@@ -4098,16 +4239,12 @@ export default function SettingsPage({
                 lineHeight: 1.6,
               }}
             >
-              Uses{" "}
-              <span style={{ color: "var(--text)", fontWeight: 600 }}>
-                AniSkip
-              </span>{" "}
-              to detect and skip opening/ending segments. Only active for animes
-              and when using{" "}
-              <span style={{ color: "var(--text)", fontWeight: 600 }}>
-                HiAnime
-              </span>{" "}
-              as source.
+              <Trans
+                i18nKey="settings.playback.introDesc"
+                components={{
+                  hl: <span style={{ color: "var(--text)", fontWeight: 600 }} />,
+                }}
+              />
             </div>
             <div
               style={{
@@ -4120,18 +4257,18 @@ export default function SettingsPage({
               {[
                 {
                   value: "off",
-                  label: "Off",
-                  desc: "Intro skip is disabled.",
+                  label: t("settings.playback.introOff"),
+                  desc: t("settings.playback.introOffDesc"),
                 },
                 {
                   value: "auto",
-                  label: "Auto Skip",
-                  desc: "Automatically jumps past the intro/outro when reached.",
+                  label: t("settings.playback.introAuto"),
+                  desc: t("settings.playback.introAutoDesc"),
                 },
                 {
                   value: "manual",
-                  label: "Manual Skip",
-                  desc: 'Shows a "Skip Intro" button at the bottom of the player.',
+                  label: t("settings.playback.introManual"),
+                  desc: t("settings.playback.introManualDesc"),
                 },
               ].map(({ value, label, desc }, i, arr) => (
                 <div
@@ -4214,8 +4351,8 @@ export default function SettingsPage({
         {/* ══════════════════════════════════════════════════════════════════ */}
         <div ref={secSubtitles} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
-            title="Subtitles"
-            subtitle="Subtitle download source, preferred language, and API key"
+            title={t("settings.groups.subtitles.title")}
+            subtitle={t("settings.groups.subtitles.subtitle")}
           />
           <SubtitleSettingsSection />
         </div>
@@ -4225,12 +4362,14 @@ export default function SettingsPage({
         {/* ══════════════════════════════════════════════════════════════════ */}
         <div ref={secDownloads} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
-            title="Downloads"
-            subtitle="Where downloaded video files are saved on disk"
+            title={t("settings.groups.downloads.title")}
+            subtitle={t("settings.groups.downloads.subtitle")}
           />
 
           <div style={{ marginBottom: 40 }}>
-            <div className="settings-section-title">Download Folder</div>
+            <div className="settings-section-title">
+              {t("settings.downloads.folderTitle")}
+            </div>
             <div
               style={{
                 fontSize: 13,
@@ -4239,8 +4378,7 @@ export default function SettingsPage({
                 lineHeight: 1.6,
               }}
             >
-              Downloaded videos will be saved here. Make sure the folder exists
-              and Streambert has write access to it.
+              {t("settings.downloads.folderDesc")}
             </div>
             <div
               style={{
@@ -4259,22 +4397,21 @@ export default function SettingsPage({
               />
               {isElectron && (
                 <button className="btn btn-secondary" onClick={pickFolder}>
-                  Browse …
+                  {t("settings.downloads.browse")}
                 </button>
               )}
               <button className="btn btn-primary" onClick={handleSavePath}>
-                Save
+                {t("settings.common.save")}
               </button>
             </div>
             {saved && (
               <div style={{ marginTop: 10, fontSize: 13, color: "#4caf50" }}>
-                ✓ Saved
+                {t("settings.common.savedCheck")}
               </div>
             )}
             {!downloadPath && (
               <div style={{ marginTop: 10, fontSize: 13, color: "var(--red)" }}>
-                ⚠ No download folder set - videos cannot be downloaded until you
-                set one.
+                {t("settings.downloads.noFolder")}
               </div>
             )}
           </div>
@@ -4285,8 +4422,8 @@ export default function SettingsPage({
         {/* ══════════════════════════════════════════════════════════════════ */}
         <div ref={secNotifications} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
-            title="Notifications"
-            subtitle="Desktop alerts for downloads and new episode releases"
+            title={t("settings.groups.notifications.title")}
+            subtitle={t("settings.groups.notifications.subtitle")}
           />
           <NotificationsSection />
         </div>
@@ -4296,8 +4433,8 @@ export default function SettingsPage({
         {/* ══════════════════════════════════════════════════════════════════ */}
         <div ref={secDiscordRpc} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
-            title="Discord Rich Presence"
-            subtitle="Show what you're watching on your Discord profile"
+            title={t("settings.groups.discordRpc.title")}
+            subtitle={t("settings.groups.discordRpc.subtitle")}
           />
           <DiscordRpcSection />
         </div>
@@ -4307,8 +4444,8 @@ export default function SettingsPage({
         {/* ══════════════════════════════════════════════════════════════════ */}
         <div ref={secInterface} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
-            title="Interface"
-            subtitle="Home layout, start page, appearance, and display options"
+            title={t("settings.groups.interface.title")}
+            subtitle={t("settings.groups.interface.subtitle")}
           />
           <HomeLayoutSection />
           <Divider />
@@ -4322,8 +4459,8 @@ export default function SettingsPage({
         {/* ══════════════════════════════════════════════════════════════════ */}
         <div ref={secLibrary} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
-            title="Library"
-            subtitle="Watchlist sort order and watch history preferences"
+            title={t("settings.groups.library.title")}
+            subtitle={t("settings.groups.library.subtitle")}
           />
           <LibraryPrivacySection />
         </div>
@@ -4333,8 +4470,8 @@ export default function SettingsPage({
         {/* ══════════════════════════════════════════════════════════════════ */}
         <div ref={secBackup} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
-            title="Backup & Restore"
-            subtitle="Export your data or restore from a previous backup file"
+            title={t("settings.groups.backup.title")}
+            subtitle={t("settings.groups.backup.subtitle")}
           />
           <BackupRestoreSection />
         </div>
@@ -4344,8 +4481,8 @@ export default function SettingsPage({
         {/* ══════════════════════════════════════════════════════════════════ */}
         <div ref={secStorage} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
-            title="Storage & Data"
-            subtitle="Clear cache, watch progress, downloads, or reset the entire app"
+            title={t("settings.groups.storage.title")}
+            subtitle={t("settings.groups.storage.subtitle")}
           />
 
           <div
@@ -4359,9 +4496,9 @@ export default function SettingsPage({
             {/* Install location */}
             <div style={{ padding: "22px 24px" }}>
               <CleanRow
-                title="Install Location"
-                description="Opens the folder where Streambert is installed."
-                buttonLabel="Open Folder"
+                title={t("settings.storage.installTitle")}
+                description={t("settings.storage.installDesc")}
+                buttonLabel={t("settings.storage.openFolder")}
                 onAction={async () => {
                   const p = await window.electron?.getInstallPath?.();
                   if (p) window.electron.openPath(p);
@@ -4374,9 +4511,9 @@ export default function SettingsPage({
             {/* Cache */}
             <div style={{ padding: "22px 24px" }}>
               <CleanRow
-                title="Clear Cache"
-                description="Removes temporary browser cache, shader cache, and service worker data from all internal sessions (main, video player, trailer). Does not affect your personal data or settings."
-                buttonLabel="Clear Cache"
+                title={t("settings.storage.clearCacheTitle")}
+                description={t("settings.storage.clearCacheDesc")}
+                buttonLabel={t("settings.storage.clearCacheBtn")}
                 onAction={handleClearCache}
                 sizeLabel={formatBytes(sizes.cache)}
               />
@@ -4387,9 +4524,9 @@ export default function SettingsPage({
             {/* Watch Progress */}
             <div style={{ padding: "22px 24px" }}>
               <CleanRow
-                title="Clear Watch Progress"
-                description="Resets all watch history, continue-watching progress, and watched / completed markings for movies and series. Also clears internal video player session data."
-                buttonLabel="Clear Progress"
+                title={t("settings.storage.progressTitle")}
+                description={t("settings.storage.progressDesc")}
+                buttonLabel={t("settings.storage.clearProgress")}
                 onAction={() =>
                   new Promise((resolve) => {
                     setShowProgressConfirm(true);
@@ -4405,9 +4542,9 @@ export default function SettingsPage({
             {/* Delete Downloads */}
             <div style={{ padding: "22px 24px" }}>
               <CleanRow
-                title="Delete All Downloads"
-                description="Permanently deletes all video files that were downloaded through Streambert and removes them from the download list. Only files downloaded through the app will be deleted, nothing else in your folder is touched."
-                buttonLabel="Delete All"
+                title={t("settings.storage.deleteTitle")}
+                description={t("settings.storage.deleteDesc")}
+                buttonLabel={t("settings.storage.deleteAll")}
                 onAction={() =>
                   new Promise((resolve) => {
                     setShowDeleteDlConfirm(true);
@@ -4448,7 +4585,7 @@ export default function SettingsPage({
                       gap: 8,
                     }}
                   >
-                    Reset App
+                    {t("settings.storage.resetApp")}
                     <span
                       style={{
                         fontSize: 10,
@@ -4462,7 +4599,7 @@ export default function SettingsPage({
                         textTransform: "uppercase",
                       }}
                     >
-                      Irreversible
+                      {t("settings.storage.irreversible")}
                     </span>
                   </div>
                   <div
@@ -4472,10 +4609,7 @@ export default function SettingsPage({
                       lineHeight: 1.6,
                     }}
                   >
-                    Completely resets Streambert to factory defaults, clears all
-                    settings, API Token, saved library, watch history/progress,
-                    and all cached data. Your downloaded video files will not be
-                    touched.
+                    {t("settings.storage.resetDesc")}
                   </div>
                 </div>
                 <div style={{ flexShrink: 0, paddingTop: 2 }}>
@@ -4495,7 +4629,7 @@ export default function SettingsPage({
                       transition: "all 0.2s",
                     }}
                   >
-                    Reset App
+                    {t("settings.storage.resetApp")}
                   </button>
                 </div>
               </div>

@@ -1,6 +1,8 @@
+import { Trans, useTranslation } from "react-i18next";
 import { DownloadIcon } from "./Icons";
 
 export default function CloseConfirmModal({ count, onConfirm, onCancel }) {
+  const { t } = useTranslation();
   return (
     <div className="close-confirm-overlay">
       <div className="close-confirm-modal">
@@ -11,22 +13,23 @@ export default function CloseConfirmModal({ count, onConfirm, onCancel }) {
         </div>
 
         <div className="close-confirm-title">
-          Download{count > 1 ? "s" : ""} in Progress
+          {t("closeConfirm.title", { count })}
         </div>
 
         <div className="close-confirm-body">
-          <span className="close-confirm-count">
-            {count} active download{count > 1 ? "s" : ""}
-          </span>{" "}
-          will be cancelled and incomplete files will be deleted.
+          <Trans
+            i18nKey="closeConfirm.body"
+            count={count}
+            components={{ count: <span className="close-confirm-count" /> }}
+          />
         </div>
 
         <div className="close-confirm-actions">
           <button className="btn close-confirm-btn-cancel" onClick={onCancel}>
-            Keep Downloading
+            {t("closeConfirm.keepDownloading")}
           </button>
           <button className="btn close-confirm-btn-confirm" onClick={onConfirm}>
-            Cancel & Close App
+            {t("closeConfirm.cancelAndClose")}
           </button>
         </div>
       </div>

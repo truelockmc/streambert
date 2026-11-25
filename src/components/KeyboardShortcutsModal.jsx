@@ -1,12 +1,15 @@
 // Keyboard Shortcuts reference modal
+import { useTranslation, Trans } from "react-i18next";
+
 export default function KeyboardShortcutsModal({ onClose }) {
+  const { t } = useTranslation();
   const shortcuts = [
-    { keys: ["Ctrl", "F"], desc: "Open search" },
-    { keys: ["Ctrl", "K"], desc: "Search on a page" },
-    { keys: ["Esc"], desc: "Close search / modal" },
-    { keys: ["Ctrl", "Z"], desc: "Navigate back" },
-    { keys: ["Ctrl", "R"], desc: "Reload app" },
-    { keys: ["?"], desc: "Show this shortcuts overview" },
+    { keys: ["Ctrl", "F"], desc: t("shortcuts.openSearch") },
+    { keys: ["Ctrl", "K"], desc: t("shortcuts.searchOnPage") },
+    { keys: ["Esc"], desc: t("shortcuts.closeSearch") },
+    { keys: ["Ctrl", "Z"], desc: t("shortcuts.navigateBack") },
+    { keys: ["Ctrl", "R"], desc: t("shortcuts.reloadApp") },
+    { keys: ["?"], desc: t("shortcuts.showOverview") },
   ];
 
   return (
@@ -59,7 +62,7 @@ export default function KeyboardShortcutsModal({ onClose }) {
               color: "var(--text)",
             }}
           >
-            KEYBOARD SHORTCUTS
+            {t("shortcuts.title")}
           </div>
           <button
             onClick={onClose}
@@ -149,7 +152,7 @@ export default function KeyboardShortcutsModal({ onClose }) {
             textTransform: "uppercase",
           }}
         >
-          Controller
+          {t("shortcuts.controller")}
         </div>
         <div
           style={{
@@ -160,13 +163,13 @@ export default function KeyboardShortcutsModal({ onClose }) {
           }}
         >
           {[
-            { keys: ["D-Pad"], desc: "Navigate menus" },
-            { keys: ["A"], desc: "Select / Confirm" },
-            { keys: ["B"], desc: "Back / Close" },
-            { keys: ["Start"], desc: "Open search" },
+            { keys: ["D-Pad"], desc: t("shortcuts.navigateMenus") },
+            { keys: ["A"], desc: t("shortcuts.selectConfirm") },
+            { keys: ["B"], desc: t("shortcuts.backClose") },
+            { keys: ["Start"], desc: t("shortcuts.openSearch") },
             {
               keys: ["A / D-Pad / LB / RB"],
-              desc: "In player: play-pause, seek, volume, skip ±15s",
+              desc: t("shortcuts.inPlayer"),
             },
           ].map(({ keys, desc }, i) => (
             <div
@@ -236,10 +239,10 @@ export default function KeyboardShortcutsModal({ onClose }) {
                 marginBottom: 2,
               }}
             >
-              Need help or found a bug?
+              {t("shortcuts.needHelp")}
             </div>
             <div style={{ fontSize: 12, color: "var(--text3)" }}>
-              Open an issue or browse the README on GitHub
+              {t("shortcuts.openIssue")}
             </div>
           </div>
           <a
@@ -281,31 +284,22 @@ export default function KeyboardShortcutsModal({ onClose }) {
             textAlign: "center",
           }}
         >
-          Press{" "}
-          <kbd
-            style={{
-              fontSize: 11,
-              padding: "1px 5px",
-              background: "var(--surface2)",
-              border: "1px solid var(--border)",
-              borderRadius: 3,
+          <Trans
+            i18nKey="shortcuts.pressToClose"
+            components={{
+              kbd: (
+                <kbd
+                  style={{
+                    fontSize: 11,
+                    padding: "1px 5px",
+                    background: "var(--surface2)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 3,
+                  }}
+                />
+              ),
             }}
-          >
-            ?
-          </kbd>{" "}
-          or{" "}
-          <kbd
-            style={{
-              fontSize: 11,
-              padding: "1px 5px",
-              background: "var(--surface2)",
-              border: "1px solid var(--border)",
-              borderRadius: 3,
-            }}
-          >
-            Esc
-          </kbd>{" "}
-          to close
+          />
         </div>
         </div>
       </div>

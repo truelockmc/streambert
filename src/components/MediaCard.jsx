@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
+import { useTranslation } from "react-i18next";
 import { imgUrl, isAnimeContent } from "../utils/api";
 import {
   PlayIcon,
@@ -19,6 +20,7 @@ const MediaCard = memo(function MediaCard({
   ageRating,
   restricted,
 }) {
+  const { t } = useTranslation();
   const title = item.title || item.name;
   const year = (item.release_date || item.first_air_date || "").slice(0, 4);
   const isTV = item.media_type === "tv";
@@ -96,7 +98,7 @@ const MediaCard = memo(function MediaCard({
             <div className="no-poster">
               {isTV ? <TVIcon /> : <FilmIcon />}
               <span style={{ fontSize: 10, color: "var(--text3)" }}>
-                No Image
+                {t("mediaCard.noImage")}
               </span>
             </div>
           )}
@@ -116,7 +118,7 @@ const MediaCard = memo(function MediaCard({
           <div className="card-overlay">
             {isUnreleased ? (
               <div className="card-unreleased-overlay">
-                <span className="card-unreleased-label">🔒 Unreleased</span>
+                <span className="card-unreleased-label">{t("mediaCard.unreleased")}</span>
               </div>
             ) : (
               <div className="card-play">
@@ -145,13 +147,19 @@ const MediaCard = memo(function MediaCard({
           <div className="card-year">
             {isTV && item.season != null && item.episode != null
               ? `S${item.season}E${item.episode}${item.episodeName ? ` · ${item.episodeName}` : ""}`
-              : `${year} · ${isTV ? "Series" : "Movie"}`}
+              : `${year} · ${isTV ? t("common.series") : t("common.movie")}`}
           </div>
         </div>
         <span
           className={`card-badge${isUnreleased ? " card-badge--unreleased" : ""}${isAnime && !isUnreleased ? " card-badge--anime" : ""}`}
         >
-          {isUnreleased ? "SOON" : isAnime ? "ANIME" : isTV ? "TV" : "HD"}
+          {isUnreleased
+            ? t("mediaCard.badgeSoon")
+            : isAnime
+              ? t("mediaCard.badgeAnime")
+              : isTV
+                ? t("mediaCard.badgeTV")
+                : t("mediaCard.badgeHD")}
         </span>
       </div>
 
@@ -164,11 +172,11 @@ const MediaCard = memo(function MediaCard({
         >
           {isWatched ? (
             <button className="context-menu-item" onClick={handleMarkUnwatched}>
-              ↩ Mark as Unwatched
+              {t("mediaCard.markUnwatched")}
             </button>
           ) : (
             <button className="context-menu-item" onClick={handleMarkWatched}>
-              ✓ Mark as Watched
+              {t("mediaCard.markWatched")}
             </button>
           )}
         </div>

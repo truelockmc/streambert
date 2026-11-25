@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { imgUrl } from "../utils/api";
 
 const normalizeCastPerson = (person) => {
@@ -102,6 +103,7 @@ export default function CastModal({
   creators = [],
   title,
 }) {
+  const { t } = useTranslation();
   useEffect(() => {
     const handler = (e) => {
       if (e.key === "Escape") onClose();
@@ -132,28 +134,28 @@ export default function CastModal({
         className="cast-modal"
         role="dialog"
         aria-modal="true"
-        aria-label={`Cast & Crew — ${title}`}
+        aria-label={t("cast.ariaLabel", { title })}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="cast-modal-header">
-          <span className="cast-modal-title">🎭 Cast &amp; Crew — {title}</span>
+          <span className="cast-modal-title">{t("cast.title", { title })}</span>
           <button
             className="cast-close-btn"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("common.close")}
           >
             ✕
           </button>
         </div>
 
         <div className="cast-modal-body">
-          <Section title="Creators" people={creators} limit={4} />
-          <Section title="Directors" people={directors} limit={4} />
-          <Section title="Writers" people={writers} limit={4} />
+          <Section title={t("cast.creators")} people={creators} limit={4} />
+          <Section title={t("cast.directors")} people={directors} limit={4} />
+          <Section title={t("cast.writers")} people={writers} limit={4} />
           {normalizedCast.length > 0 ? (
-            <Section title="Cast" people={normalizedCast} limit={20} />
+            <Section title={t("cast.cast")} people={normalizedCast} limit={20} />
           ) : (
-            <div className="cast-empty">No cast information available.</div>
+            <div className="cast-empty">{t("cast.empty")}</div>
           )}
         </div>
       </div>
