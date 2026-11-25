@@ -1,0 +1,974 @@
+{
+  "common": {
+    "close": "",
+    "save": "",
+    "movie": "",
+    "series": ""
+  },
+  "sidebar": {
+    "back": "",
+    "search": "",
+    "home": "",
+    "library": "",
+    "downloads": "",
+    "remove": "",
+    "help": "",
+    "settings": "",
+    "quit": ""
+  },
+  "library": {
+    "title": "",
+    "subtitle": "",
+    "continueWatching": "",
+    "watchlist": "",
+    "watchHistory": "",
+    "removeFromHistory": "",
+    "emptyTitle": "",
+    "emptyText": "",
+    "sort": {
+      "manual": "",
+      "title": "",
+      "rating": "",
+      "year": ""
+    }
+  },
+  "blocked": {
+    "title": "",
+    "sessionSummary_one": "",
+    "sessionSummary_other": "",
+    "startPlaying": "",
+    "empty": "",
+    "alltime_one": "",
+    "alltime_other": ""
+  },
+  "settings": {
+    "uiLanguage": {
+      "title": "",
+      "description": "",
+      "system": ""
+    },
+    "ageLimit": {
+      "none": "",
+      "a0": "",
+      "a7": "",
+      "a12": "",
+      "a13": "",
+      "a15": "",
+      "a16": "",
+      "a17": "",
+      "a18": ""
+    },
+    "reset": {
+      "title": "",
+      "description": "",
+      "confirm": ""
+    },
+    "common": {
+      "cannotBeUndone": "",
+      "cancel": "",
+      "confirm": "",
+      "doneStatus": "",
+      "somethingWrong": "",
+      "working": "",
+      "savedCheck": "",
+      "save": ""
+    },
+    "version": {
+      "couldNotReach": "",
+      "theUpdateServer": "",
+      "title": "",
+      "current": "",
+      "checking": "",
+      "check": "",
+      "checkVia": "",
+      "available": "",
+      "fallback": "",
+      "upToDate": "",
+      "disableAutoCheck": "",
+      "enableAutoCheck": "",
+      "autoCheckTitle": "",
+      "autoCheckDesc": ""
+    },
+    "homeLayout": {
+      "title": "",
+      "description": "",
+      "rowStyle": "",
+      "carousel": "",
+      "carouselDesc": "",
+      "grid": "",
+      "gridDesc": "",
+      "hideRow": "",
+      "showRow": "",
+      "save": ""
+    },
+    "backup": {
+      "onStart": "",
+      "daily": "",
+      "weekly": "",
+      "monthly": "",
+      "scheduled": "",
+      "scheduledDesc": "",
+      "folder": "",
+      "browse": "",
+      "frequency": "",
+      "keepLast": "",
+      "invalidFile": "",
+      "restored": "",
+      "couldNotRead": "",
+      "title": "",
+      "description": "",
+      "export": "",
+      "import": ""
+    },
+    "page": {
+      "title": "",
+      "subtitle": ""
+    },
+    "nav": {
+      "updates": "",
+      "content": "",
+      "playback": "",
+      "subtitles": "",
+      "downloads": "",
+      "notifications": "",
+      "discordRpc": "",
+      "interface": "",
+      "library": "",
+      "backup": "",
+      "storage": ""
+    },
+    "topBar": {
+      "searchPlaceholder": "",
+      "noResults": "",
+      "previousMatch": "",
+      "nextMatch": "",
+      "clearSearch": "",
+      "close": "",
+      "searchSettings": "",
+      "jumpToSection": ""
+    },
+    "groups": {
+      "general": {
+        "title": "",
+        "subtitle": ""
+      },
+      "content": {
+        "title": "",
+        "subtitle": ""
+      },
+      "playback": {
+        "title": "",
+        "subtitle": ""
+      },
+      "subtitles": {
+        "title": "",
+        "subtitle": ""
+      },
+      "downloads": {
+        "title": "",
+        "subtitle": ""
+      },
+      "notifications": {
+        "title": "",
+        "subtitle": ""
+      },
+      "discordRpc": {
+        "title": "",
+        "subtitle": ""
+      },
+      "interface": {
+        "title": "",
+        "subtitle": ""
+      },
+      "library": {
+        "title": "",
+        "subtitle": ""
+      },
+      "backup": {
+        "title": "",
+        "subtitle": ""
+      },
+      "storage": {
+        "title": "",
+        "subtitle": ""
+      }
+    },
+    "general": {
+      "tmdbTitle": "",
+      "tmdbDesc": "",
+      "notSet": "",
+      "changeToken": ""
+    },
+    "tmdbLanguage": {
+      "title": "",
+      "description": "",
+      "savedCleared": ""
+    },
+    "content": {
+      "ageTitle": "",
+      "ageDescription": "",
+      "ratingCountry": "",
+      "maxAge": ""
+    },
+    "playback": {
+      "enterUrl": "",
+      "reachable": "",
+      "serverStatus": "",
+      "unreachable": "",
+      "invidiousTitle": "",
+      "invidiousDesc": "",
+      "checking": "",
+      "check": "",
+      "thresholdTitle": "",
+      "thresholdDesc": "",
+      "seconds": "",
+      "autoplayTitle": "",
+      "autoplayDesc": "",
+      "enableAutoplay": "",
+      "enableAutoplayDesc": "",
+      "countdown": "",
+      "countdownDesc": "",
+      "overlayPosition": "",
+      "overlayDesc": "",
+      "left": "",
+      "right": "",
+      "introTitle": "",
+      "introDesc": "",
+      "introOff": "",
+      "introOffDesc": "",
+      "introAuto": "",
+      "introAutoDesc": "",
+      "introManual": "",
+      "introManualDesc": ""
+    },
+    "subtitles": {
+      "title": "",
+      "sourceInfo": "",
+      "subdlActive": "",
+      "autoDownload": "",
+      "downloadDisabled": "",
+      "defaultLanguage": "",
+      "wyzieKey": "",
+      "keySet": "",
+      "keyRequired": "",
+      "wyzieKeyDesc": "",
+      "howToGetKey": "",
+      "hide": "",
+      "show": "",
+      "copyKey": "",
+      "copied": "",
+      "copy": "",
+      "openDashboard": "",
+      "dashboard": "",
+      "subdlKey": "",
+      "subdlRegister": "",
+      "keyOptional": "",
+      "subdlKeyDesc": "",
+      "subdlPlaceholder": "",
+      "clearKey": "",
+      "clear": ""
+    },
+    "downloads": {
+      "folderTitle": "",
+      "folderDesc": "",
+      "browse": "",
+      "noFolder": ""
+    },
+    "notifications": {
+      "title": "",
+      "description": "",
+      "downloadLabel": "",
+      "downloadDesc": "",
+      "episodeLabel": "",
+      "episodeDesc": ""
+    },
+    "discord": {
+      "title": "",
+      "description": "",
+      "enableLabel": "",
+      "enableDesc": "",
+      "coverLabel": "",
+      "coverDesc": "",
+      "timeLabel": "",
+      "timeDesc": "",
+      "buttonLabel": "",
+      "buttonDesc": ""
+    },
+    "storage": {
+      "installTitle": "",
+      "installDesc": "",
+      "openFolder": "",
+      "clearCacheTitle": "",
+      "clearCacheDesc": "",
+      "clearCacheBtn": "",
+      "cacheCleared": "",
+      "progressTitle": "",
+      "progressDesc": "",
+      "clearProgress": "",
+      "watchDataCleared": "",
+      "progressConfirmTitle": "",
+      "progressConfirmDesc": "",
+      "progressConfirmBtn": "",
+      "deleteTitle": "",
+      "deleteDesc": "",
+      "deleteAll": "",
+      "deleteConfirmTitle": "",
+      "deleteConfirmDesc": "",
+      "deleteConfirmBtn": "",
+      "allRemoved": "",
+      "removedFiles_one": "",
+      "removedFiles_other": "",
+      "couldNotDelete": "",
+      "resetApp": "",
+      "irreversible": "",
+      "resetDesc": ""
+    },
+    "appearance": {
+      "title": "",
+      "theme": "",
+      "themes": {
+        "dark": {
+          "label": "",
+          "description": ""
+        },
+        "amoled": {
+          "label": "",
+          "description": ""
+        },
+        "mocha": {
+          "label": "",
+          "description": ""
+        },
+        "slate": {
+          "label": "",
+          "description": ""
+        },
+        "light": {
+          "label": "",
+          "description": ""
+        },
+        "custom": {
+          "label": "",
+          "description": ""
+        }
+      },
+      "accents": {
+        "red": "",
+        "blue": "",
+        "purple": "",
+        "green": "",
+        "orange": "",
+        "pink": ""
+      },
+      "hideCustom": "",
+      "editCustom": "",
+      "resetDefaults": "",
+      "varBg": "",
+      "varSurface": "",
+      "varSurface2": "",
+      "varSurface3": "",
+      "varBorder": "",
+      "varText": "",
+      "varText2": "",
+      "varText3": "",
+      "accentColour": "",
+      "accentApplied": "",
+      "accentInPlayer": "",
+      "accentInPlayerDesc": "",
+      "fontSize": "",
+      "fontSmall": "",
+      "fontNormal": "",
+      "fontLarge": "",
+      "compact": "",
+      "compactDesc": "",
+      "reduceAnim": "",
+      "reduceAnimDesc": "",
+      "controller": "",
+      "controllerDesc": ""
+    },
+    "library": {
+      "title": "",
+      "sortManual": "",
+      "sortTitle": "",
+      "sortRating": "",
+      "sortYear": "",
+      "sortOrder": "",
+      "sortOrderDesc": "",
+      "recordHistory": "",
+      "recordHistoryDesc": "",
+      "historyDisabled": ""
+    },
+    "startPage": {
+      "title": "",
+      "description": "",
+      "home": "",
+      "history": "",
+      "downloads": ""
+    }
+  },
+  "closeConfirm": {
+    "title_one": "",
+    "title_other": "",
+    "body_one": "",
+    "body_other": "",
+    "keepDownloading": "",
+    "cancelAndClose": ""
+  },
+  "errorBoundary": {
+    "title": "",
+    "message": "",
+    "tryAgain": "",
+    "reload": ""
+  },
+  "setup": {
+    "intro": "",
+    "tokenPlaceholder": "",
+    "checking": "",
+    "letsGo": "",
+    "skip": "",
+    "errors": {
+      "invalidToken": {
+        "title": "",
+        "body": ""
+      },
+      "forbidden": {
+        "title": "",
+        "body": ""
+      },
+      "timeout": {
+        "title": "",
+        "body": ""
+      },
+      "unreachable": {
+        "title": "",
+        "body": ""
+      },
+      "unexpected": {
+        "title": "",
+        "body": "",
+        "bodyWithStatus": ""
+      }
+    }
+  },
+  "titlebar": {
+    "minimize": "",
+    "restore": "",
+    "maximize": "",
+    "close": ""
+  },
+  "update": {
+    "preparing": "",
+    "failed": "",
+    "launching": "",
+    "formats": {
+      "deb": "",
+      "pacman": "",
+      "exe": "",
+      "dmg": "",
+      "fallback": ""
+    },
+    "title": "",
+    "viewOn": "",
+    "readyToInstall": "",
+    "whatsNew": "",
+    "noChangelog": "",
+    "downloadsRunning_one": "",
+    "downloadsRunning_other": "",
+    "noFormat": "",
+    "downloading": "",
+    "installing": "",
+    "downloadManually": "",
+    "done": "",
+    "cancel": "",
+    "close": "",
+    "install": ""
+  },
+  "app": {
+    "unknownSeries": "",
+    "loading": "",
+    "dismiss": "",
+    "notify": {
+      "newEpisodeSingle": "",
+      "newEpisodesMulti": "",
+      "newEpisodesMultiMore": "",
+      "newEpisodesTitle": "",
+      "downloadComplete": "",
+      "downloadFinished": ""
+    },
+    "toast": {
+      "controllerConnected": "",
+      "removedFromWatchlist": "",
+      "addedToWatchlist": ""
+    },
+    "apiStatus": {
+      "invalidToken": "",
+      "updateToken": "",
+      "unreachable": "",
+      "retry": ""
+    },
+    "updateBanner": {
+      "available": "",
+      "install": ""
+    },
+    "episodeCheck": {
+      "checking": "",
+      "none": "",
+      "available_one": "",
+      "available_other": "",
+      "season": "",
+      "more": ""
+    },
+    "discord": {
+      "movie": "",
+      "series": ""
+    }
+  },
+  "utils": {
+    "updates": {
+      "apiError": "",
+      "noStableRelease": ""
+    },
+    "backup": {
+      "invalid": ""
+    },
+    "discord": {
+      "button": "",
+      "idling": ""
+    },
+    "api": {
+      "tmdbUnreachable": "",
+      "noImdbId": "",
+      "noKinopoiskId": ""
+    }
+  },
+  "downloadModal": {
+    "done": "",
+    "confirm": "",
+    "cancel": "",
+    "searchFailed": "",
+    "apiError403": "",
+    "searching": "",
+    "noSubtitlesFound": "",
+    "subtitleFallbackName": "",
+    "opening": "",
+    "openedIn": "",
+    "couldNotOpenExternal": "",
+    "starting": "",
+    "failedToStart": "",
+    "openSettings": "",
+    "title": "",
+    "waitingForStream": "",
+    "streamUrlFound": "",
+    "playExternalTitle": "",
+    "openExternal": "",
+    "subtitles": "",
+    "disableSubtitleDownload": "",
+    "enableSubtitleDownload": "",
+    "noTmdbId": "",
+    "noApiKeySet": "",
+    "addApiKeyHint": "",
+    "openSettingsSubtitles": "",
+    "searchingFor": "",
+    "retry": "",
+    "remove": "",
+    "noSubtitlesFoundFor": "",
+    "addChange": "",
+    "browse": "",
+    "clearAll": "",
+    "notSearchedYet": "",
+    "search": "",
+    "subdlKeyTip": "",
+    "browser": {
+      "title": "",
+      "titleSelected": "",
+      "language": "",
+      "allLanguages": "",
+      "hearingImpaired": "",
+      "aiTranslated": "",
+      "trusted": "",
+      "uploaderDownloads": "",
+      "clickRows": "",
+      "subtitlesSelected_one": "",
+      "subtitlesSelected_other": ""
+    },
+    "setFolder": {
+      "title": "",
+      "chooseWhereSaved": "",
+      "noFolderSet": "",
+      "chooseWhereToSave": "",
+      "browse": ""
+    },
+    "setup": {
+      "title": "",
+      "step1": "",
+      "step2": "",
+      "step3": "",
+      "chooseFolder": "",
+      "checking": "",
+      "permissionDenied": "",
+      "folderUnreadable": "",
+      "missingInternal": "",
+      "noExecutable": ""
+    },
+    "ready": {
+      "found": "",
+      "wrongFolder": "",
+      "change": "",
+      "startingEllipsis": "",
+      "startDownload": "",
+      "started": "",
+      "closeTrack": "",
+      "saveTo": ""
+    }
+  },
+  "downloads": {
+    "status": {
+      "downloading": "",
+      "completed": "",
+      "error": "",
+      "interrupted": ""
+    },
+    "timeAgo": {
+      "justNow": "",
+      "minutes": "",
+      "hours": "",
+      "days": ""
+    },
+    "sort": {
+      "date": "",
+      "name": "",
+      "size": "",
+      "type": ""
+    },
+    "deleteConfirm": "",
+    "deleteConfirmWithFile": "",
+    "title": "",
+    "subtitleActive": "",
+    "subtitleNone": "",
+    "filterPlaceholder": "",
+    "noResults": "",
+    "resultCount_one": "",
+    "resultCount_other": "",
+    "closeEsc": "",
+    "sortBy": "",
+    "descending": "",
+    "ascending": "",
+    "hideUntracked": "",
+    "showUntracked": "",
+    "untracked": "",
+    "untrackedCount": "",
+    "searchShortcut": "",
+    "active": "",
+    "localFiles": "",
+    "folderToScan": "",
+    "browse": "",
+    "scanning": "",
+    "scan": "",
+    "noMatch": "",
+    "noLocalFilesYet": "",
+    "noCompletedFound": "",
+    "empty": {
+      "title": "",
+      "description": ""
+    },
+    "openName": "",
+    "fragments": "",
+    "remove": "",
+    "notStarted": "",
+    "goToPage": "",
+    "watched": "",
+    "local": "",
+    "subs": {
+      "clickToManage": "",
+      "noneClickToDownload": "",
+      "withLangs": "",
+      "none": ""
+    },
+    "fileMissing": "",
+    "setWatchProgress": "",
+    "popover": {
+      "hours": "",
+      "minutes": "",
+      "seconds": ""
+    },
+    "reset": "",
+    "save": "",
+    "markUnwatched": "",
+    "watchedLabel": "",
+    "markWatched": "",
+    "markWatchedButton": "",
+    "resumeAt": "",
+    "watch": "",
+    "resume": "",
+    "showInFolder": "",
+    "delete": "",
+    "openErrorLog": "",
+    "viewLog": ""
+  },
+  "movie": {
+    "localPlayerFailed": "",
+    "notFoundOnHiAnime": "",
+    "genericError": "",
+    "runtimeMin": "",
+    "inappropriateAge": "",
+    "notReleasedYet": "",
+    "unreleased": "",
+    "restricted": "",
+    "restrictedTitle": "",
+    "restart": "",
+    "play": "",
+    "trailerRestricted": "",
+    "trailer": "",
+    "cast": "",
+    "saved": "",
+    "save": "",
+    "watched": "",
+    "markWatched": "",
+    "notStarted": "",
+    "back": "",
+    "loadingSource": "",
+    "sourceLower": "",
+    "source": "",
+    "tryDifferentSourceOrDub": "",
+    "couldNotResolveId": "",
+    "idErrorTryDifferent": "",
+    "playingInPopout": "",
+    "popoutReloadHint": "",
+    "closePopoutReturn": "",
+    "changeSource": "",
+    "toggleSubDub": "",
+    "sub": "",
+    "dub": "",
+    "blockedAdsTrackers": "",
+    "closePopout": "",
+    "popOutPlayer": "",
+    "downloadingViewInDownloads": "",
+    "alreadyDownloadedViewInDownloads": "",
+    "download": "",
+    "noProgressTrackingTitle": "",
+    "noTracking": "",
+    "markProgress": ""
+  },
+  "home": {
+    "rows": {
+      "continue": "",
+      "recommended": "",
+      "trendingMovies": "",
+      "trendingTV": "",
+      "topRated": ""
+    },
+    "offline": {
+      "title": "",
+      "text": "",
+      "retry": ""
+    },
+    "heroType": "",
+    "watchNow": "",
+    "moreInfo": ""
+  },
+  "mediaCard": {
+    "noImage": "",
+    "unreleased": "",
+    "badgeSoon": "",
+    "badgeAnime": "",
+    "badgeTV": "",
+    "badgeHD": "",
+    "markWatched": "",
+    "markUnwatched": ""
+  },
+  "trending": {
+    "ageRestricted": "",
+    "rated": "",
+    "comingSoon": "",
+    "anime": "",
+    "previous": "",
+    "next": "",
+    "goTo": ""
+  },
+  "cast": {
+    "ariaLabel": "",
+    "title": "",
+    "creators": "",
+    "directors": "",
+    "writers": "",
+    "cast": "",
+    "empty": ""
+  },
+  "trailer": {
+    "loading": "",
+    "allFailed": "",
+    "trying": "",
+    "officialTrailer": "",
+    "openInBrowserTitle": "",
+    "openInBrowser": ""
+  },
+  "hianimeLoader": {
+    "lookingUpMovie": "",
+    "lookingUpEpisode": "",
+    "steps": {
+      "search": "",
+      "episodes": "",
+      "stream": "",
+      "player": ""
+    }
+  },
+  "search": {
+    "placeholder": "",
+    "offline": "",
+    "noResults": "",
+    "series": "",
+    "movie": "",
+    "recent": "",
+    "clearAll": "",
+    "remove": "",
+    "hint": ""
+  },
+  "shortcuts": {
+    "title": "",
+    "openSearch": "",
+    "searchOnPage": "",
+    "closeSearch": "",
+    "navigateBack": "",
+    "reloadApp": "",
+    "showOverview": "",
+    "controller": "",
+    "navigateMenus": "",
+    "selectConfirm": "",
+    "backClose": "",
+    "inPlayer": "",
+    "needHelp": "",
+    "openIssue": "",
+    "pressToClose": ""
+  },
+  "subtitleModal": {
+    "searchFailed": "",
+    "noneSaved": "",
+    "confirmDelete": "",
+    "confirmDeleteWithRelease": "",
+    "title": "",
+    "downloaded": "",
+    "deleteFile": "",
+    "downloadMore": "",
+    "allLanguages": "",
+    "refresh": "",
+    "selected": "",
+    "noApiKey": "",
+    "openSettings": "",
+    "searching": "",
+    "noneFound": "",
+    "alreadyDownloaded": "",
+    "hearingImpaired": "",
+    "aiTranslated": "",
+    "langSubtitle": "",
+    "uploaderDownloads": "",
+    "savedOk": "",
+    "downloading": "",
+    "downloadCount": "",
+    "selectAbove": "",
+    "noFilePath": "",
+    "close": ""
+  },
+  "wyzieKey": {
+    "invalidKey": "",
+    "extractFailed": "",
+    "title": "",
+    "subtitle": "",
+    "intro": "",
+    "getKey": "",
+    "haveKey": "",
+    "skipNoSubs": "",
+    "paste": "",
+    "back": "",
+    "confirm": "",
+    "captcha": "",
+    "pleaseWait": "",
+    "validating": "",
+    "saved": "",
+    "timeout": "",
+    "tryAgain": "",
+    "enterManually": "",
+    "skip": ""
+  },
+  "tv": {
+    "seasonCount_one": "",
+    "seasonCount_other": "",
+    "episodeCount_one": "",
+    "episodeCount_other": "",
+    "ageRestrictedSetting": "",
+    "ageRestrictedRatingSetting": "",
+    "trailer": "",
+    "cast": "",
+    "saved": "",
+    "back": "",
+    "contextMenu": {
+      "markNotStarted": "",
+      "markWatched": "",
+      "markUnwatched": "",
+      "markSeasonWatched": "",
+      "markSeasonUnwatched": ""
+    },
+    "errors": {
+      "localPlayerFailed": "",
+      "episodeNotFound": "",
+      "generic": "",
+      "trySourceOrDub": "",
+      "resolveIdFailed": "",
+      "errorTrySource": ""
+    },
+    "popout": {
+      "playing": "",
+      "closingReloads": "",
+      "closeReturn": ""
+    },
+    "autoplay": {
+      "upNext": "",
+      "seasonEpisode": "",
+      "startingIn": "",
+      "playNow": "",
+      "cancel": ""
+    },
+    "player": {
+      "seasonEpisodeShort": "",
+      "watched": "",
+      "markWatched": "",
+      "loadingSource": "",
+      "sourceFallback": "",
+      "source": "",
+      "changeSource": "",
+      "toggleSubDub": "",
+      "sub": "",
+      "dub": "",
+      "blockedAdsTrackers": "",
+      "closePopout": "",
+      "popOutPlayer": "",
+      "download": "",
+      "downloadingViewInDownloads": "",
+      "alreadyDownloadedViewInDownloads": "",
+      "noTrackingTitle": "",
+      "noTracking": "",
+      "skip": "",
+      "intro": "",
+      "outro": "",
+      "introMarker": "",
+      "outroMarker": "",
+      "percentWatched": "",
+      "markProgress": ""
+    },
+    "episodes": {
+      "title": "",
+      "more": "",
+      "releasingToday": "",
+      "daysLeft_one": "",
+      "daysLeft_other": "",
+      "seasonRightClick": "",
+      "specials": "",
+      "season": "",
+      "specialsWarning": "",
+      "inappropriateAge": "",
+      "unreleased": "",
+      "playing": "",
+      "downloadingClickView": "",
+      "downloadedClickView": ""
+    }
+  }
+}
