@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import MediaCard from "../components/MediaCard";
 import { imgUrl } from "../utils/api";
 import { EyeIcon, WatchedIcon } from "../components/Icons";
@@ -17,6 +18,7 @@ export default function LibraryPage({
   onMarkUnwatched,
   onRemoveHistory,
 }) {
+  const { t, i18n } = useTranslation();
   const allItems = useMemo(
     () => [...inProgress, ...saved],
     [inProgress, saved],
@@ -33,12 +35,6 @@ export default function LibraryPage({
       window.removeEventListener("streambert:library-sort-changed", handler);
   }, []);
 
-  const sortLabels = {
-    manual: "Custom order",
-    title: "A-Z",
-    rating: "Top rated",
-    year: "Newest first",
-  };
 
   const getRating = useCallback(
     (item) => getRatingForItem(item, ratingsMap),
@@ -52,15 +48,13 @@ export default function LibraryPage({
   return (
     <div className="fade-in">
       <div className="library-header">
-        <div className="library-title">My Library</div>
-        <div className="library-sub">
-          Watch history, progress, and saved titles
-        </div>
+        <div className="library-title">{t("library.title")}</div>
+        <div className="library-sub">{t("library.subtitle")}</div>
       </div>
 
       {inProgress.length > 0 && (
         <div className="library-section">
-          <div className="library-section-title">Continue Watching</div>
+          <div className="library-section-title">{t("library.continueWatching")}</div>
           <div className="cards-grid">
             {inProgress.map((item, i) => {
               const pk =
@@ -90,7 +84,7 @@ export default function LibraryPage({
       {saved.length > 0 && (
         <div className="library-section">
           <div className="library-section-title">
-            Watchlist ({saved.length})
+            {t("library.watchlist", { count: saved.length })}
             {sort !== "manual" && (
               <span
                 style={{
@@ -100,7 +94,7 @@ export default function LibraryPage({
                   marginLeft: 10,
                 }}
               >
-                {sortLabels[sort]}
+                {t(`library.sort.${sort}`)}
               </span>
             )}
           </div>
@@ -127,7 +121,7 @@ export default function LibraryPage({
 
       {history.length > 0 && (
         <div className="library-section">
-          <div className="library-section-title">Watch History</div>
+          <div className="library-section-title">{t("library.watchHistory")}</div>
           <div className="history-rows">
             {history.map((item, i) => {
               const pk =
@@ -169,7 +163,7 @@ export default function LibraryPage({
                             {" · "}
                           </>
                         )}
-                      {new Date(item.watchedAt).toLocaleDateString("en-US", {
+                      {new Date(item.watchedAt).toLocaleDateString(i18n.language, {
                         year: "numeric",
                         month: "short",
                         day: "numeric",
@@ -179,12 +173,12 @@ export default function LibraryPage({
                   <span
                     className={`search-result-type ${item.media_type === "tv" ? "type-tv" : "type-movie"}`}
                   >
-                    {item.media_type === "tv" ? "Series" : "Movie"}
+                    {item.media_type === "tv" ? t("common.series") : t("common.movie")}
                   </span>
                   {onRemoveHistory && (
                     <button
                       className="history-remove-btn"
-                      title="Remove from history"
+                      title={t("library.removeFromHistory")}
                       onClick={(e) => {
                         e.stopPropagation();
                         onRemoveHistory(item);
@@ -203,10 +197,8 @@ export default function LibraryPage({
       {history.length === 0 && saved.length === 0 && (
         <div className="empty-state">
           <EyeIcon />
-          <h3>Nothing here yet</h3>
-          <p>
-            Start watching a movie or series and your history will appear here.
-          </p>
+          <h3>{t("library.emptyTitle")}</h3>
+          <p>{t("library.emptyText")}</p>
         </div>
       )}
     </div>

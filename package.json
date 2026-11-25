@@ -24,8 +24,10 @@
   "dependencies": {
     "approve": "^0.0.12",
     "hls.js": "1.5.17",
+    "i18next": "^25.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-i18next": "^15.0.0",
     "scripts": "^0.1.0"
   },
   "devDependencies": {

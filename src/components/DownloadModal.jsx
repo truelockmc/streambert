@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation, Trans } from "react-i18next";
 import { CloseIcon, DownloadIcon, SettingsIcon, SubtitlesIcon } from "./Icons";
 import {
   storage,
@@ -26,6 +27,7 @@ export function SubtitleBrowser({
   onClose,
   defaultLang,
 }) {
+  const { t, i18n } = useTranslation();
   const [langFilter, setLangFilter] = useState(defaultLang);
   const [browseResults, setBrowseResults] = useState(null);
   const [browsing, setBrowsing] = useState(false);
@@ -45,13 +47,13 @@ export function SubtitleBrowser({
         wyzieApiKey,
       });
       if (!res.ok) {
-        const errMsg = res.error || "Search failed";
+        const errMsg = res.error || t("downloadModal.searchFailed");
         const is403 =
           errMsg.includes("403") ||
           errMsg.toLowerCase().includes("cannot consume");
         setBrowseError(
           is403
-            ? "API error 403 - your SubDL or Wyzie API key is missing or invalid. Add a valid key in Settings."
+            ? t("downloadModal.apiError403")
             : errMsg,
         );
         setBrowseResults([]);
@@ -114,10 +116,12 @@ export function SubtitleBrowser({
               gap: 6,
             }}
           >
-            <SubtitlesIcon size={14} /> Browse Subtitles
+            <SubtitlesIcon size={14} />{" "}
             {selectedSubs.length > 0
-              ? ` · ${selectedSubs.length} selected`
-              : ""}
+              ? t("downloadModal.browser.titleSelected", {
+                  count: selectedSubs.length,
+                })
+              : t("downloadModal.browser.title")}
           </span>
           <button className="icon-btn" onClick={() => onClose()}>
             <CloseIcon />
@@ -134,7 +138,9 @@ export function SubtitleBrowser({
             flexWrap: "wrap",
           }}
         >
-          <span style={{ fontSize: 12, color: "var(--text3)" }}>Language:</span>
+          <span style={{ fontSize: 12, color: "var(--text3)" }}>
+            {t("downloadModal.browser.language")}
+          </span>
           <select
             value={langFilter}
             onChange={(e) => {
@@ -151,7 +157,7 @@ export function SubtitleBrowser({
               cursor: "pointer",
             }}
           >
-            <option value="">All languages</option>
+            <option value="">{t("downloadModal.browser.allLanguages")}</option>
             {SUBTITLE_LANGUAGES.map((l) => (
               <option key={l.code} value={l.code}>
                 {l.label}
@@ -177,7 +183,7 @@ export function SubtitleBrowser({
                 className="spinner"
                 style={{ width: 16, height: 16, borderWidth: 2 }}
               />{" "}
-              Searching…
+              {t("downloadModal.searching")}
             </div>
           )}
           {browseError && (
@@ -200,7 +206,7 @@ export function SubtitleBrowser({
                 textAlign: "center",
               }}
             >
-              No subtitles found
+              {t("downloadModal.noSubtitlesFound")}
             </div>
           )}
           {!browsing &&
@@ -294,7 +300,7 @@ export function SubtitleBrowser({
                       {r.hearing_impaired && (
                         <span
                           style={{ fontSize: 10, color: "var(--text3)" }}
-                          title="Hearing impaired"
+                          title={t("downloadModal.browser.hearingImpaired")}
                         >
                           ♿
                         </span>
@@ -302,7 +308,7 @@ export function SubtitleBrowser({
                       {r.ai_translated && (
                         <span
                           style={{ fontSize: 10, color: "var(--text3)" }}
-                          title="AI translated"
+                          title={t("downloadModal.browser.aiTranslated")}
                         >
                           🤖
                         </span>
@@ -310,7 +316,7 @@ export function SubtitleBrowser({
                       {r.from_trusted && (
                         <span
                           style={{ fontSize: 10, color: "#4caf50" }}
-                          title="Trusted"
+                          title={t("downloadModal.browser.trusted")}
                         >
                           ✓
                         </span>
@@ -328,11 +334,15 @@ export function SubtitleBrowser({
                     >
                       {r.release ||
                         r.file_name ||
-                        `${r.language.toUpperCase()} subtitle`}
+                        t("downloadModal.subtitleFallbackName", {
+                          lang: r.language.toUpperCase(),
+                        })}
                     </div>
                     <div style={{ fontSize: 11, color: "var(--text3)" }}>
-                      {r.uploader} · {(r.download_count || 0).toLocaleString()}{" "}
-                      downloads
+                      {t("downloadModal.browser.uploaderDownloads", {
+                        uploader: r.uploader ?? "",
+                        downloads: (r.download_count || 0).toLocaleString(i18n.language),
+                      })}
                     </div>
                   </div>
                 </div>
@@ -352,15 +362,17 @@ export function SubtitleBrowser({
         >
           <span style={{ fontSize: 11, color: "var(--text3)" }}>
             {selectedSubs.length === 0
-              ? "Click rows to select subtitles"
-              : `${selectedSubs.length} subtitle${selectedSubs.length > 1 ? "s" : ""} selected`}
+              ? t("downloadModal.browser.clickRows")
+              : t("downloadModal.browser.subtitlesSelected", {
+                  count: selectedSubs.length,
+                })}
           </span>
           <button
             className="btn btn-primary"
             style={{ padding: "6px 18px", fontSize: 13 }}
             onClick={() => onClose()}
           >
-            Done
+            {t("downloadModal.done")}
           </button>
         </div>
       </div>
@@ -384,6 +396,7 @@ export default function DownloadModal({
   posterPath,
   tmdbId,
 }) {
+  const { t } = useTranslation();
   const [downloadPath, setDownloadPath] = useState(
     () => storage.get("downloadPath") || "",
   );
@@ -467,13 +480,13 @@ export default function DownloadModal({
           wyzieApiKey: wyzieApiKey || "",
         });
         if (!res.ok) {
-          const errMsg = res.error || "Search failed";
+          const errMsg = res.error || t("downloadModal.searchFailed");
           const is403 =
             errMsg.includes("403") ||
             errMsg.toLowerCase().includes("cannot consume");
           setSubSearchError(
             is403
-              ? "API error 403 - your SubDL or Wyzie API key is missing or invalid. Add a valid key in Settings."
+              ? t("downloadModal.apiError403")
               : errMsg,
           );
           setSubResults([]);
@@ -513,7 +526,7 @@ export default function DownloadModal({
 
   const handleOpenExternal = async () => {
     if (!m3u8Url || !isElectron) return;
-    setExternalStatus({ ok: true, text: "Opening …" });
+    setExternalStatus({ ok: true, text: t("downloadModal.opening") });
     try {
       // Pass found subtitles (intercepted + selected from search) to the player
       const subs = [...subtitles];
@@ -531,9 +544,11 @@ export default function DownloadModal({
         res?.ok
           ? {
               ok: true,
-              text: `✓ Opened in ${res.player === "vlc" ? "VLC" : "mpv"}`,
+              text: t("downloadModal.openedIn", {
+                player: res.player === "vlc" ? "VLC" : "mpv",
+              }),
             }
-          : { ok: false, text: res?.error || "Could not open external player" },
+          : { ok: false, text: res?.error || t("downloadModal.couldNotOpenExternal") },
       );
     } catch (e) {
       setExternalStatus({ ok: false, text: e.message });
@@ -597,7 +612,7 @@ export default function DownloadModal({
         speed: "",
         size: "",
         totalFragments: 0,
-        lastMessage: "Starting…",
+        lastMessage: t("downloadModal.starting"),
         startedAt: Date.now(),
         completedAt: null,
         mediaId,
@@ -611,7 +626,7 @@ export default function DownloadModal({
       });
       setDownloadStatus("ok");
     } else {
-      setDownloadStatus(result.error || "Failed to start");
+      setDownloadStatus(result.error || t("downloadModal.failedToStart"));
     }
   };
 
@@ -622,7 +637,7 @@ export default function DownloadModal({
         <div className="download-modal" onClick={(e) => e.stopPropagation()}>
           <div className="download-modal-header">
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <DownloadIcon /> Set Download Folder
+              <DownloadIcon /> {t("downloadModal.setFolder.title")}
             </span>
             <button className="icon-btn" onClick={onClose}>
               <CloseIcon />
@@ -638,14 +653,14 @@ export default function DownloadModal({
               }}
             >
               {settingPath ? (
-                "Choose where downloaded videos should be saved:"
+                t("downloadModal.setFolder.chooseWhereSaved")
               ) : (
                 <>
                   <span style={{ color: "var(--red)", fontWeight: 600 }}>
-                    No download folder set.
+                    {t("downloadModal.setFolder.noFolderSet")}
                   </span>
                   <br />
-                  Choose where to save downloaded videos:
+                  {t("downloadModal.setFolder.chooseWhereToSave")}
                 </>
               )}
             </div>
@@ -670,7 +685,7 @@ export default function DownloadModal({
                   className="btn btn-secondary"
                   onClick={pickDownloadFolder}
                 >
-                  Browse …
+                  {t("downloadModal.setFolder.browse")}
                 </button>
               )}
             </div>
@@ -684,14 +699,14 @@ export default function DownloadModal({
                   setSettingPath(false);
                 }}
               >
-                Confirm
+                {t("downloadModal.confirm")}
               </button>
               {settingPath && (
                 <button
                   className="btn btn-ghost"
                   onClick={() => setSettingPath(false)}
                 >
-                  Cancel
+                  {t("downloadModal.cancel")}
                 </button>
               )}
             </div>
@@ -705,7 +720,7 @@ export default function DownloadModal({
                     onOpenSettings("downloads");
                   }}
                 >
-                  <SettingsIcon /> Open Settings
+                  <SettingsIcon /> {t("downloadModal.openSettings")}
                 </button>
               </div>
             )}
@@ -722,7 +737,7 @@ export default function DownloadModal({
         <div className="download-modal" onClick={(e) => e.stopPropagation()}>
           <div className="download-modal-header">
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <DownloadIcon /> Download
+              <DownloadIcon /> {t("downloadModal.title")}
             </span>
             <button className="icon-btn" onClick={onClose}>
               <CloseIcon />
@@ -735,14 +750,16 @@ export default function DownloadModal({
                 className="spinner"
                 style={{ width: 24, height: 24, borderWidth: 2 }}
               />
-              Waiting for stream URL … (start the video first)
+              {t("downloadModal.waitingForStream")}
             </div>
           )}
 
           {m3u8Url && (
             <>
               <div className="download-url-block">
-                <div className="download-url-label">Stream URL found</div>
+                <div className="download-url-label">
+                  {t("downloadModal.streamUrlFound")}
+                </div>
                 <code className="download-url-code">{m3u8Url}</code>
               </div>
 
@@ -761,9 +778,9 @@ export default function DownloadModal({
                   <button
                     className="btn btn-secondary"
                     onClick={handleOpenExternal}
-                    title="Play this stream in mpv or VLC"
+                    title={t("downloadModal.playExternalTitle")}
                   >
-                    ▶ Open in external player
+                    {t("downloadModal.openExternal")}
                   </button>
                   {externalStatus && (
                     <span
@@ -805,7 +822,7 @@ export default function DownloadModal({
                       gap: 6,
                     }}
                   >
-                    <SubtitlesIcon size={14} /> Subtitles
+                    <SubtitlesIcon size={14} /> {t("downloadModal.subtitles")}
                   </span>
                   <div style={{ flex: 1 }} />
                   {/* Toggle */}
@@ -822,8 +839,8 @@ export default function DownloadModal({
                     }}
                     title={
                       subEnabled
-                        ? "Disable subtitle download"
-                        : "Enable subtitle download"
+                        ? t("downloadModal.disableSubtitleDownload")
+                        : t("downloadModal.enableSubtitleDownload")
                     }
                     style={{
                       width: 36,
@@ -857,7 +874,7 @@ export default function DownloadModal({
                   <>
                     {!canSearchOS && (
                       <div style={{ fontSize: 12, color: "var(--text3)" }}>
-                        No TMDB ID: Subtitle search unavailable
+                        {t("downloadModal.noTmdbId")}
                       </div>
                     )}
                     {canSearchOS &&
@@ -881,10 +898,9 @@ export default function DownloadModal({
                             <span
                               style={{ color: "var(--red)", fontWeight: 600 }}
                             >
-                              No subtitle API key set.
+                              {t("downloadModal.noApiKeySet")}
                             </span>{" "}
-                            Add/Generate a Wyzie or SubDL key in Settings to
-                            enable subtitle search.
+                            {t("downloadModal.addApiKeyHint")}
                           </span>
                           {onOpenSettings && (
                             <button
@@ -899,7 +915,7 @@ export default function DownloadModal({
                                 onOpenSettings("subtitles");
                               }}
                             >
-                              <SettingsIcon /> Open Settings → Subtitles
+                              <SettingsIcon /> {t("downloadModal.openSettingsSubtitles")}
                             </button>
                           )}
                         </div>
@@ -918,8 +934,9 @@ export default function DownloadModal({
                           className="spinner"
                           style={{ width: 12, height: 12, borderWidth: 1.5 }}
                         />
-                        Searching for {LANG_LABEL[defaultLang] || defaultLang}{" "}
-                        subtitles…
+                        {t("downloadModal.searchingFor", {
+                          lang: LANG_LABEL[defaultLang] || defaultLang,
+                        })}
                       </div>
                     )}
                     {subSearchError && !subSearching && (
@@ -939,7 +956,7 @@ export default function DownloadModal({
                           style={{ padding: "2px 8px", fontSize: 11 }}
                           onClick={() => searchSubtitles(defaultLang)}
                         >
-                          Retry
+                          {t("downloadModal.retry")}
                         </button>
                         {onOpenSettings && (
                           <button
@@ -950,7 +967,7 @@ export default function DownloadModal({
                               onOpenSettings("subtitles");
                             }}
                           >
-                            Open Settings
+                            {t("downloadModal.openSettings")}
                           </button>
                         )}
                       </div>
@@ -1013,7 +1030,9 @@ export default function DownloadModal({
                                   >
                                     {sub.release ||
                                       sub.file_name ||
-                                      `${sub.language.toUpperCase()} subtitle`}
+                                      t("downloadModal.subtitleFallbackName", {
+                                        lang: sub.language.toUpperCase(),
+                                      })}
                                   </span>
                                   <button
                                     className="btn btn-ghost"
@@ -1030,7 +1049,7 @@ export default function DownloadModal({
                                         ),
                                       )
                                     }
-                                    title="Remove"
+                                    title={t("downloadModal.remove")}
                                   >
                                     ✕
                                   </button>
@@ -1041,8 +1060,9 @@ export default function DownloadModal({
                             <span
                               style={{ fontSize: 12, color: "var(--text3)" }}
                             >
-                              No subtitles found for{" "}
-                              {LANG_LABEL[defaultLang] || defaultLang}
+                              {t("downloadModal.noSubtitlesFoundFor", {
+                                lang: LANG_LABEL[defaultLang] || defaultLang,
+                              })}
                             </span>
                           )}
                           <div
@@ -1054,8 +1074,8 @@ export default function DownloadModal({
                               onClick={() => setShowBrowser(true)}
                             >
                               {selectedSubs.length > 0
-                                ? "＋ Add / Change"
-                                : "Browse"}
+                                ? t("downloadModal.addChange")
+                                : t("downloadModal.browse")}
                             </button>
                             {selectedSubs.length > 0 && (
                               <button
@@ -1066,9 +1086,9 @@ export default function DownloadModal({
                                   color: "var(--text3)",
                                 }}
                                 onClick={() => setSelectedSubs([])}
-                                title="Clear all"
+                                title={t("downloadModal.clearAll")}
                               >
-                                Clear all
+                                {t("downloadModal.clearAll")}
                               </button>
                             )}
                           </div>
@@ -1086,14 +1106,14 @@ export default function DownloadModal({
                           }}
                         >
                           <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                            Not searched yet
+                            {t("downloadModal.notSearchedYet")}
                           </span>
                           <button
                             className="btn btn-ghost"
                             style={{ padding: "3px 10px", fontSize: 11 }}
                             onClick={() => searchSubtitles(defaultLang)}
                           >
-                            Search
+                            {t("downloadModal.search")}
                           </button>
                         </div>
                       )}
@@ -1105,8 +1125,7 @@ export default function DownloadModal({
                           color: "var(--text3)",
                         }}
                       >
-                        💡 Add a free SubDL API key in Settings for better
-                        results
+                        {t("downloadModal.subdlKeyTip")}
                       </div>
                     )}
                   </>
@@ -1117,28 +1136,38 @@ export default function DownloadModal({
               {!downloader?.exists && (
                 <div className="download-instructions">
                   <div className="download-instructions-title">
-                    Set up Video Downloader
+                    {t("downloadModal.setup.title")}
                   </div>
                   <ol className="download-steps">
                     <li>
-                      Download the latest release from{" "}
-                      <a
-                        className="download-link"
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          isElectron &&
-                            window.electron.openExternal(releaseUrl);
+                      <Trans
+                        i18nKey="downloadModal.setup.step1"
+                        values={{
+                          url: "github.com/truelockmc/vid-dl-cli-only/releases/latest",
+                          binary: binaryHint,
                         }}
-                      >
-                        github.com/truelockmc/vid-dl-cli-only/releases/latest
-                      </a>{" "}
-                      , for your OS: <code>{binaryHint}</code>
+                        components={{
+                          link: (
+                            <a
+                              className="download-link"
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                isElectron &&
+                                  window.electron.openExternal(releaseUrl);
+                              }}
+                            />
+                          ),
+                          code: <code />,
+                        }}
+                      />
                     </li>
-                    <li>Extract the release into a folder of your choice</li>
+                    <li>{t("downloadModal.setup.step2")}</li>
                     <li>
-                      Select that folder below, it must contain{" "}
-                      <code>_internal</code> and the binary
+                      <Trans
+                        i18nKey="downloadModal.setup.step3"
+                        components={{ code: <code /> }}
+                      />
                     </li>
                   </ol>
                   <div className="download-folder-row">
@@ -1146,7 +1175,7 @@ export default function DownloadModal({
                       className="btn btn-secondary"
                       onClick={pickBinaryFolder}
                     >
-                      Choose folder …
+                      {t("downloadModal.setup.chooseFolder")}
                     </button>
                     {downloaderFolder && (
                       <span className="download-folder-path">
@@ -1160,7 +1189,7 @@ export default function DownloadModal({
                         className="spinner"
                         style={{ width: 16, height: 16, borderWidth: 2 }}
                       />{" "}
-                      Checking …
+                      {t("downloadModal.setup.checking")}
                     </div>
                   )}
                   {!checking &&
@@ -1169,25 +1198,23 @@ export default function DownloadModal({
                     downloaderFolder && (
                       <div className="download-error">
                         {downloader.reason === "folder_permission" && (
-                          <>Permission denied, can't read the chosen folder.</>
+                          <>{t("downloadModal.setup.permissionDenied")}</>
                         )}
                         {downloader.reason === "folder_unreadable" && (
-                          <>Folder could not be read. Is it still accessible?</>
+                          <>{t("downloadModal.setup.folderUnreadable")}</>
                         )}
                         {downloader.reason === "no_internal" && (
-                          <>
-                            Missing <code>_internal</code> folder. Extract the
-                            full release archive, not just the binary.
-                          </>
+                          <Trans
+                            i18nKey="downloadModal.setup.missingInternal"
+                            components={{ code: <code /> }}
+                          />
                         )}
                         {(downloader.reason === "no_executable" ||
                           !downloader.reason) && (
-                          <>
-                            No executable binary found. On Linux, make sure the
-                            binary has execute permissions (
-                            <code>chmod +x</code>
-                            ).
-                          </>
+                          <Trans
+                            i18nKey="downloadModal.setup.noExecutable"
+                            components={{ code: <code /> }}
+                          />
                         )}
                       </div>
                     )}
@@ -1197,7 +1224,7 @@ export default function DownloadModal({
               {downloader?.exists && (
                 <div className="download-ready">
                   <div className="download-found-badge">
-                    ✓ Video Downloader found
+                    {t("downloadModal.ready.found")}
                   </div>
 
                   <div
@@ -1209,14 +1236,14 @@ export default function DownloadModal({
                     }}
                   >
                     <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                      Wrong binary folder?
+                      {t("downloadModal.ready.wrongFolder")}
                     </span>
                     <button
                       className="btn btn-ghost"
                       style={{ padding: "4px 10px", fontSize: 12 }}
                       onClick={pickBinaryFolder}
                     >
-                      Change
+                      {t("downloadModal.ready.change")}
                     </button>
                   </div>
 
@@ -1229,8 +1256,8 @@ export default function DownloadModal({
                     >
                       <DownloadIcon />
                       {downloadStatus === "starting"
-                        ? "Starting …"
-                        : "Start Download"}
+                        ? t("downloadModal.ready.startingEllipsis")
+                        : t("downloadModal.ready.startDownload")}
                     </button>
                   )}
 
@@ -1240,14 +1267,14 @@ export default function DownloadModal({
                         className="download-success"
                         style={{ fontSize: 15, marginBottom: 8 }}
                       >
-                        ✓ Download started!
+                        {t("downloadModal.ready.started")}
                       </div>
                       <button
                         className="btn btn-ghost"
                         style={{ fontSize: 13 }}
                         onClick={onClose}
                       >
-                        Close — track progress in Downloads
+                        {t("downloadModal.ready.closeTrack")}
                       </button>
                     </div>
                   )}
@@ -1266,14 +1293,18 @@ export default function DownloadModal({
                     }}
                   >
                     <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                      Save to: <code>{downloadPath}</code>
+                      <Trans
+                        i18nKey="downloadModal.ready.saveTo"
+                        values={{ path: downloadPath }}
+                        components={{ code: <code /> }}
+                      />
                     </span>
                     <button
                       className="btn btn-ghost"
                       style={{ padding: "4px 10px", fontSize: 12 }}
                       onClick={() => setSettingPath(true)}
                     >
-                      Change
+                      {t("downloadModal.ready.change")}
                     </button>
                   </div>
                 </div>

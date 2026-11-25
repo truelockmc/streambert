@@ -7,6 +7,8 @@ import {
   lazy,
   Suspense,
 } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "./i18n";
 import ErrorBoundary from "./components/ErrorBoundary";
 import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
 import WindowTitlebar from "./components/WindowTitlebar";
@@ -47,6 +49,7 @@ import {
 } from "./utils/updates";
 
 export default function App() {
+  const { t } = useTranslation();
   // apiKey loaded async from secure storage (OS keychain)
   const [apiKey, setApiKey] = useState(null);
   const [apiKeyLoaded, setApiKeyLoaded] = useState(false);
@@ -232,7 +235,7 @@ export default function App() {
                       series.title ||
                       series.name ||
                       data.name ||
-                      "Unknown series",
+                      i18n.t("app.unknownSeries"),
                     season: lastEp?.season_number ?? null,
                     id: series.id,
                     seriesItem: series,
@@ -266,7 +269,7 @@ export default function App() {
                         series.title ||
                         series.name ||
                         data.name ||
-                        "Unknown series",
+                        i18n.t("app.unknownSeries"),
                       season: lastEp?.season_number ?? null,
                       id: series.id,
                       seriesItem: series,
@@ -310,12 +313,17 @@ export default function App() {
         const names = newEpisodeEntries.map((e) => e.title);
         const body =
           names.length === 1
-            ? `${names[0]} has a new episode.`
-            : `${names.slice(0, 3).join(", ")}${
-                names.length > 3 ? ` and ${names.length - 3} more` : ""
-              } have new episodes.`;
+            ? i18n.t("app.notify.newEpisodeSingle", { name: names[0] })
+            : names.length > 3
+              ? i18n.t("app.notify.newEpisodesMultiMore", {
+                  names: names.slice(0, 3).join(", "),
+                  more: names.length - 3,
+                })
+              : i18n.t("app.notify.newEpisodesMulti", {
+                  names: names.join(", "),
+                });
         window.electron.showNotification({
-          title: "New episodes available",
+          title: i18n.t("app.notify.newEpisodesTitle"),
           body,
           silent: false,
         });
@@ -456,8 +464,8 @@ export default function App() {
         window.electron.showNotification
       ) {
         window.electron.showNotification({
-          title: "Download complete",
-          body: update.name || "Your download has finished.",
+          title: i18n.t("app.notify.downloadComplete"),
+          body: update.name || i18n.t("app.notify.downloadFinished"),
           silent: false,
         });
       }
@@ -602,7 +610,8 @@ export default function App() {
     if (!discordSettings.enabled) return;
     if ((page === "movie" || page === "tv") && selected) {
       const title = selected.title || selected.name || "";
-      let subtitle = page === "movie" ? "Movie" : "Series";
+      let subtitle =
+        page === "movie" ? i18n.t("app.discord.movie") : i18n.t("app.discord.series");
       if (page === "tv" && watchingEpisode) {
         subtitle = `S${watchingEpisode.season} · E${watchingEpisode.episode}`;
       }
@@ -752,7 +761,7 @@ export default function App() {
       gamepadToastedRef.current = true;
       // showToast is defined further below in this component; effects only
       // run after the full render, so it's already initialized by then.
-      showToast("Controller connected");
+      showToast(i18n.t("app.toast.controllerConnected"));
     }
     if (!gamepadConnected) gamepadToastedRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -806,7 +815,7 @@ export default function App() {
 
       if (isRemoving) {
         delete next[id];
-        showToast("Removed from watchlist");
+        showToast(i18n.t("app.toast.removedFromWatchlist"));
         setSavedOrder((prev) => {
           const currentOrder = prev || Object.keys(currentSaved);
           const newOrder = currentOrder.filter((k) => k !== id);
@@ -822,7 +831,7 @@ export default function App() {
           vote_average: item.vote_average,
           year: (item.release_date || item.first_air_date || "").slice(0, 4),
         };
-        showToast("Added to watchlist");
+        showToast(i18n.t("app.toast.addedToWatchlist"));
         setSavedOrder((prev) => {
           const currentOrder = prev || Object.keys(currentSaved);
           const newOrder = [...currentOrder, id];
@@ -1013,28 +1022,22 @@ export default function App() {
           {/* Suspense boundary: lazy page chunks are fetched on first visit */}
           {apiKeyStatus === "invalid_token" && (
             <div className="api-status-banner api-status-error">
-              <span>
-                ⚠ Your TMDB token is invalid, not set or has been revoked.
-                Movies and shows won't load.
-              </span>
+              <span>⚠ {t("app.apiStatus.invalidToken")}</span>
               <button className="api-status-btn" onClick={changeApiKey}>
-                Update Token
+                {t("app.apiStatus.updateToken")}
               </button>
             </div>
           )}
           {apiKeyStatus === "unreachable" && (
             <div className="api-status-banner api-status-warn">
-              <span>
-                ⚠ Cannot reach TMDB, check your internet connection. Content may
-                not load.
-              </span>
+              <span>⚠ {t("app.apiStatus.unreachable")}</span>
               <button
                 className="api-status-btn"
                 onClick={() =>
                   setApiKeyStatus("checking") || window.location.reload()
                 }
               >
-                Retry
+                {t("app.apiStatus.retry")}
               </button>
             </div>
           )}
@@ -1048,7 +1051,7 @@ export default function App() {
                   fontSize: 15,
                 }}
               >
-                Laden…
+                {t("app.loading")}
               </div>
             }
           >
@@ -1192,7 +1195,9 @@ export default function App() {
               color: "#fff",
             }}
           >
-            <span>🎉 Streambert v{updateBanner.latest} is available!</span>
+            <span>
+              🎉 {t("app.updateBanner.available", { version: updateBanner.latest })}
+            </span>
             <button
               onClick={() => setShowUpdateModal(true)}
               style={{
@@ -1206,7 +1211,7 @@ export default function App() {
                 cursor: "pointer",
               }}
             >
-              Install Update
+              {t("app.updateBanner.install")}
             </button>
             <button
               onClick={() => setUpdateBanner(null)}
@@ -1219,7 +1224,7 @@ export default function App() {
                 lineHeight: 1,
                 padding: "0 4px",
               }}
-              aria-label="Dismiss"
+              aria-label={t("app.dismiss")}
             >
               ×
             </button>
@@ -1274,7 +1279,7 @@ export default function App() {
                     flexShrink: 0,
                   }}
                 />
-                Checking for new episodes…
+                {t("app.episodeCheck.checking")}
               </div>
             )}
 
@@ -1290,7 +1295,7 @@ export default function App() {
                 }}
               >
                 <span style={{ fontSize: 16 }}>✓</span>
-                No new episodes found
+                {t("app.episodeCheck.none")}
               </div>
             )}
 
@@ -1317,8 +1322,9 @@ export default function App() {
                     <span style={{ color: "var(--red)", fontSize: 15 }}>
                       🎬
                     </span>
-                    New episode
-                    {episodeCheckStatus.entries.length > 1 ? "s" : ""} available
+                    {t("app.episodeCheck.available", {
+                      count: episodeCheckStatus.entries.length,
+                    })}
                   </div>
                   <button
                     onClick={() => {
@@ -1334,7 +1340,7 @@ export default function App() {
                       lineHeight: 1,
                       padding: "0 2px",
                     }}
-                    aria-label="Dismiss"
+                    aria-label={t("app.dismiss")}
                   >
                     ×
                   </button>
@@ -1398,7 +1404,9 @@ export default function App() {
                             flexShrink: 0,
                           }}
                         >
-                          Season {entry.season}
+                          {t("app.episodeCheck.season", {
+                            number: entry.season,
+                          })}
                         </span>
                       )}
                     </li>
@@ -1411,7 +1419,9 @@ export default function App() {
                         paddingTop: 2,
                       }}
                     >
-                      +{episodeCheckStatus.entries.length - 5} more
+                      {t("app.episodeCheck.more", {
+                        count: episodeCheckStatus.entries.length - 5,
+                      })}
                     </li>
                   )}
                 </ul>

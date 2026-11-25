@@ -75,6 +75,8 @@ import {
 import { useSourceId } from "../utils/useSourceId";
 import { setPlayerGamepadActive } from "../utils/gamepadPlayerState";
 import HiAnimeLoader from "../components/HiAnimeLoader";
+import { useTranslation } from "react-i18next";
+import i18n from "../i18n";
 
 export default function MoviePage({
   item,
@@ -95,6 +97,7 @@ export default function MoviePage({
   onGoToDownloads,
   onSelect,
 }) {
+  const { t } = useTranslation();
   const [details, setDetails] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
@@ -428,7 +431,7 @@ export default function MoviePage({
                 setM3u8Url(res.url);
               })
               .catch(() => {
-                if (mounted) setResolveError("Failed to start local player");
+                if (mounted) setResolveError(i18n.t("movie.localPlayerFailed"));
               });
           } else {
             resolvedPlayerUrlRef.current = res.url;
@@ -447,12 +450,12 @@ export default function MoviePage({
             setResolveError(null);
             setPlayerSource(next);
           } else {
-            setResolveError(res?.error || "Movie not found on HiAnime");
+            setResolveError(res?.error || i18n.t("movie.notFoundOnHiAnime"));
           }
         }
       })
       .catch((e) => {
-        if (mounted) setResolveError(e.message || "Error");
+        if (mounted) setResolveError(e.message || i18n.t("movie.genericError"));
       })
       .finally(() => {
         if (mounted) {
@@ -837,7 +840,7 @@ export default function MoviePage({
             )}
           </div>
           <div className="detail-info">
-            <div className="detail-type">Movie</div>
+            <div className="detail-type">{t("common.movie")}</div>
             <div className="detail-title">{title}</div>
             <div className="genres">
               {displayGenres.map((g) => (
@@ -853,7 +856,7 @@ export default function MoviePage({
                 </span>
               )}
               {year && <span>{year}</span>}
-              {d.runtime && <span>{d.runtime} min</span>}
+              {d.runtime && <span>{t("movie.runtimeMin", { runtime: d.runtime })}</span>}
               {d.original_language && (
                 <span>{d.original_language?.toUpperCase()}</span>
               )}
@@ -870,7 +873,7 @@ export default function MoviePage({
                 <span className="age-rating-pill-cert">{rating.cert}</span>
                 {restricted && (
                   <span className="age-rating-pill-label">
-                    Inappropriate for your age setting
+                    {t("movie.inappropriateAge")}
                   </span>
                 )}
               </div>
@@ -894,21 +897,21 @@ export default function MoviePage({
                 <button
                   className="btn btn-primary btn-restricted"
                   disabled
-                  title="This movie has not been released yet"
+                  title={t("movie.notReleasedYet")}
                 >
-                  🔒 Unreleased
+                  {t("movie.unreleased")}
                 </button>
               ) : restricted ? (
                 <button
                   className="btn btn-primary btn-restricted"
                   disabled
-                  title="Inappropriate for your age rating setting"
+                  title={t("movie.restrictedTitle")}
                 >
-                  🔒 Restricted
+                  {t("movie.restricted")}
                 </button>
               ) : (
                 <button className="btn btn-primary" onClick={handlePlay}>
-                  <PlayIcon /> {playing ? "Restart" : "Play"}
+                  <PlayIcon /> {playing ? t("movie.restart") : t("movie.play")}
                 </button>
               )}
               {trailerKey &&
@@ -916,27 +919,27 @@ export default function MoviePage({
                   <button
                     className="btn btn-secondary btn-restricted"
                     disabled
-                    title="Inappropriate for your age rating setting"
+                    title={t("movie.restrictedTitle")}
                   >
-                    🔒 Trailer
+                    {t("movie.trailerRestricted")}
                   </button>
                 ) : (
                   <button
                     className="btn btn-secondary"
                     onClick={() => setShowTrailer(true)}
                   >
-                    <TrailerIcon /> Trailer
+                    <TrailerIcon /> {t("movie.trailer")}
                   </button>
                 ))}
               <button
                 className="btn btn-secondary"
                 onClick={() => setShowCast(true)}
               >
-                <CastIcon /> Cast
+                <CastIcon /> {t("movie.cast")}
               </button>
               <button className="btn btn-secondary" onClick={onSave}>
                 {isSaved ? <BookmarkFillIcon /> : <BookmarkIcon />}
-                {isSaved ? "Saved" : "Save"}
+                {isSaved ? t("movie.saved") : t("movie.save")}
               </button>
               {!isUnreleased &&
                 (isWatched ? (
@@ -944,7 +947,7 @@ export default function MoviePage({
                     className="btn btn-ghost watched-btn"
                     onClick={() => onMarkUnwatched?.(progressKey)}
                   >
-                    <WatchedIcon size={16} /> Watched
+                    <WatchedIcon size={16} /> {t("movie.watched")}
                   </button>
                 ) : (
                   <>
@@ -952,7 +955,7 @@ export default function MoviePage({
                       className="btn btn-ghost"
                       onClick={() => onMarkWatched?.(progressKey)}
                     >
-                      ✓ Mark Watched
+                      {t("movie.markWatched")}
                     </button>
                     {hasProgress && (
                       <button
@@ -963,13 +966,13 @@ export default function MoviePage({
                           storage.set("dlTime_" + progressKey, null);
                         }}
                       >
-                        ⊘ Not Started
+                        {t("movie.notStarted")}
                       </button>
                     )}
                   </>
                 ))}
               <button className="btn btn-ghost" onClick={onBack}>
-                <BackIcon /> Back
+                <BackIcon /> {t("movie.back")}
               </button>
             </div>
           </div>
@@ -1007,7 +1010,11 @@ export default function MoviePage({
                   <>
                     <div className="spinner" />
                     <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                      {`Loading ${PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "source"}…`}
+                      {t("movie.loadingSource", {
+                        source:
+                          PLAYER_SOURCES.find((s) => s.id === playerSource)
+                            ?.label ?? t("movie.sourceLower"),
+                      })}
                     </span>
                   </>
                 )}
@@ -1031,13 +1038,13 @@ export default function MoviePage({
               >
                 <span style={{ fontSize: 28 }}>⚠️</span>
                 <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                  Movie not found on HiAnime
+                  {t("movie.notFoundOnHiAnime")}
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text3)" }}>
                   {resolveError}
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                  Try a different source, or switch sub/dub.
+                  {t("movie.tryDifferentSourceOrDub")}
                 </span>
               </div>
             )}
@@ -1059,10 +1066,10 @@ export default function MoviePage({
               >
                 <span style={{ fontSize: 28 }}>⚠️</span>
                 <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                  Could not resolve the {srcId.idLabel} for this title
+                  {t("movie.couldNotResolveId", { idLabel: srcId.idLabel })}
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                  {srcId.error}. Try a different source.
+                  {t("movie.idErrorTryDifferent", { error: srcId.error })}
                 </span>
               </div>
             )}
@@ -1090,7 +1097,7 @@ export default function MoviePage({
                     fontWeight: 600,
                   }}
                 >
-                  Playing in pop-out window
+                  {t("movie.playingInPopout")}
                 </span>
                 <span
                   style={{
@@ -1100,14 +1107,14 @@ export default function MoviePage({
                     maxWidth: 260,
                   }}
                 >
-                  Closing the pop-out will reload the player here.
+                  {t("movie.popoutReloadHint")}
                 </span>
                 <button
                   className="player-overlay-btn"
                   onClick={() => window.electron?.closePipWindow?.()}
                   style={{ marginTop: 4 }}
                 >
-                  Close pop-out &amp; return
+                  {t("movie.closePopoutReturn")}
                 </button>
               </div>
             )}
@@ -1153,11 +1160,11 @@ export default function MoviePage({
                     setMenuPos({ top: rect.bottom + 6, left: rect.left });
                   setShowSourceMenu((v) => !v);
                 }}
-                title="Change source"
+                title={t("movie.changeSource")}
               >
                 <SourceIcon />
                 {PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ??
-                  "Source"}
+                  t("movie.source")}
               </button>
               {/* Sub/Dub toggle: HiAnime, and anime-capable sources (Vidnest) on anime titles */}
               {(sourceIsAsync(playerSource) ||
@@ -1176,9 +1183,9 @@ export default function MoviePage({
                     setResolvingUrl(false);
                     setResolveError(null);
                   }}
-                  title="Toggle Sub/Dub"
+                  title={t("movie.toggleSubDub")}
                 >
-                  {dubMode === "sub" ? "SUB" : "DUB"}
+                  {dubMode === "sub" ? t("movie.sub") : t("movie.dub")}
                 </button>
               )}
               {/* Blocked ads & trackers button */}
@@ -1188,7 +1195,7 @@ export default function MoviePage({
                   setShowSourceMenu(false);
                   setShowBlockedModal(true);
                 }}
-                title="Blocked ads & trackers"
+                title={t("movie.blockedAdsTrackers")}
               >
                 <ShieldBlockIcon />
                 {blockedSession > 0 && (
@@ -1214,7 +1221,7 @@ export default function MoviePage({
                     sourceUsesCleanUa(playerSource) ? CLEAN_USER_AGENT : null,
                   );
                 }}
-                title={pipOpen ? "Close pop-out" : "Pop out player"}
+                title={pipOpen ? t("movie.closePopout") : t("movie.popOutPlayer")}
                 disabled={
                   !pipOpen &&
                   (webviewLoading ||
@@ -1277,9 +1284,9 @@ export default function MoviePage({
               title={
                 movieDownload
                   ? movieDownload.status === "downloading"
-                    ? "Downloading… - view in Downloads"
-                    : "Already downloaded - view in Downloads"
-                  : "Download"
+                    ? t("movie.downloadingViewInDownloads")
+                    : t("movie.alreadyDownloadedViewInDownloads")
+                  : t("movie.download")
               }
             >
               {movieDownload ? (
@@ -1303,9 +1310,9 @@ export default function MoviePage({
               {!sourceSupportsProgress(playerSource) && (
                 <span
                   className="player-no-progress-hint"
-                  title="No automatic progress tracking for this source"
+                  title={t("movie.noProgressTrackingTitle")}
                 >
-                  ⚠ no tracking
+                  {t("movie.noTracking")}
                 </span>
               )}
             </button>
@@ -1328,7 +1335,7 @@ export default function MoviePage({
             <span
               style={{ fontSize: 12, color: "var(--text3)", marginRight: 4 }}
             >
-              Mark progress:
+              {t("movie.markProgress")}
             </span>
             {[25, 50, 75, 100].map((p) => (
               <button

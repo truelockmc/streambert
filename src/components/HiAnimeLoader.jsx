@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 // Loading overlay content shown while the main process scrapes HiAnime.
 // Subscribes to "hianime-progress" events and renders the lookup steps.
 
 const STEPS = [
-  { id: "search", label: "Searching title" },
-  { id: "episodes", label: "Loading episode list" },
-  { id: "stream", label: "Fetching stream" },
-  { id: "player", label: "Starting player" },
+  { id: "search", labelKey: "hianimeLoader.steps.search" },
+  { id: "episodes", labelKey: "hianimeLoader.steps.episodes" },
+  { id: "stream", labelKey: "hianimeLoader.steps.stream" },
+  { id: "player", labelKey: "hianimeLoader.steps.player" },
 ];
 
 export default function HiAnimeLoader({ what = "episode", playerStarting }) {
+  const { t } = useTranslation();
   const [stage, setStage] = useState("search");
 
   useEffect(() => {
@@ -34,7 +36,9 @@ export default function HiAnimeLoader({ what = "episode", playerStarting }) {
     <>
       <div className="spinner" />
       <span style={{ fontSize: 14, color: "var(--text2)" }}>
-        Looking up {what} on HiAnime…
+        {what === "movie"
+          ? t("hianimeLoader.lookingUpMovie")
+          : t("hianimeLoader.lookingUpEpisode")}
       </span>
       <div
         style={{
@@ -67,7 +71,7 @@ export default function HiAnimeLoader({ what = "episode", playerStarting }) {
             <span style={{ width: 14, textAlign: "center" }}>
               {i < current ? "✓" : i === current ? "●" : "○"}
             </span>
-            {step.label}
+            {t(step.labelKey)}
           </div>
         ))}
       </div>
