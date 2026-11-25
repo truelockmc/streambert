@@ -1,0 +1,19 @@
+#!/bin/bash
+# Keeps Streambert running inside the container session: if the app is
+# closed or crashes, it is started again (there is no desktop to fall back to).
+#
+# --no-sandbox          the container is the sandbox; Chromium's own sandbox
+#                       needs privileges the container doesn't have
+# --password-store=basic  no OS keyring in the container; keeps the stored
+#                       TMDB key decryptable across restarts
+
+mkdir -p "$HOME/Downloads"
+
+while true; do
+  /opt/streambert/streambert \
+    --no-sandbox \
+    --password-store=basic \
+    --start-maximized \
+    $STREAMBERT_EXTRA_FLAGS
+  sleep 2
+done

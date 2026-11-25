@@ -1,0 +1,22 @@
+services:
+  streambert:
+    build: .
+    image: streambert:latest
+    container_name: streambert
+    shm_size: "1gb"          # required for Electron/Chromium
+    environment:
+      - PUID=1000            # match your host user (id -u)
+      - PGID=1000            # match your host group (id -g)
+      - TZ=Etc/UTC
+      - CUSTOM_USER=streambert
+      - PASSWORD=change-me   # HTTP basic auth for the web UI
+    volumes:
+      - ./config:/config     # app settings, library, watch history
+      - ./downloads:/config/Downloads
+    ports:
+      - "3001:3001"          # https://<server>:3001
+      - "127.0.0.1:3000:3000" # http://localhost:3000 (this machine only)
+    # Optional: GPU for hardware video encoding/decoding (Intel/AMD)
+    # devices:
+    #   - /dev/dri:/dev/dri
+    restart: unless-stopped

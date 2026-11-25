@@ -4,3 +4,7 @@ download_config.ini
 dist/
 *.zip
 *secret.txt
+
+# docker compose data
+config/
+downloads/
