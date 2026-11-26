@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Github Discussions
+    url: https://github.com/truelockmc/streambert/discussions/categories/q-a
+    about: Ask your questions here.
+  - name: Discord Community
+    url: https://discord.com/invite/wDESTYeZy9
+    about: Get further help on my Discord Server
+  - name: Streambert README
+    url: https://github.com/truelockmc/streambert/blob/main/README.md
+    about: View the README (Installation/build Instructions & more are there)
+  - name: Download Streambert
+    url: https://github.com/truelockmc/streambert/releases/latest
+    about: Download the latest version of streambert.

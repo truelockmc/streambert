@@ -1,0 +1,974 @@
+{
+  "common": {
+    "close": "Close",
+    "save": "Save",
+    "movie": "Movie",
+    "series": "Series"
+  },
+  "sidebar": {
+    "back": "Back (Ctrl+Z)",
+    "search": "Search  (⌘F)",
+    "home": "Home",
+    "library": "Library & History",
+    "downloads": "Downloads",
+    "remove": "Remove",
+    "help": "Help & Shortcuts (?)",
+    "settings": "Settings",
+    "quit": "Quit App"
+  },
+  "library": {
+    "title": "My Library",
+    "subtitle": "Watch history, progress, and saved titles",
+    "continueWatching": "Continue Watching",
+    "watchlist": "Watchlist ({{count}})",
+    "watchHistory": "Watch History",
+    "removeFromHistory": "Remove from history",
+    "emptyTitle": "Nothing here yet",
+    "emptyText": "Start watching a movie or series and your history will appear here.",
+    "sort": {
+      "manual": "Custom order",
+      "title": "A-Z",
+      "rating": "Top rated",
+      "year": "Newest first"
+    }
+  },
+  "blocked": {
+    "title": "Ads & Trackers Blocked",
+    "sessionSummary_one": "{{count}} ad/tracker request blocked this session",
+    "sessionSummary_other": "{{count}} ad/tracker requests blocked this session",
+    "startPlaying": "Start playing content to see blocked ads & trackers.",
+    "empty": "No ads or trackers blocked yet, play something to start.",
+    "alltime_one": "All-time: <strong>{{formatted}} ad & tracker request</strong> blocked",
+    "alltime_other": "All-time: <strong>{{formatted}} ad & tracker requests</strong> blocked"
+  },
+  "settings": {
+    "uiLanguage": {
+      "title": "Interface Language",
+      "description": "Language of the app's menus and buttons. This is separate from the metadata language below, which controls titles and descriptions from TMDB.",
+      "system": "System default"
+    },
+    "ageLimit": {
+      "none": "No restriction",
+      "a0": "0 — All audiences (G / FSK 0)",
+      "a7": "7 — Family friendly (PG / FSK 6)",
+      "a12": "12 — Teens and up",
+      "a13": "13 — PG-13 and equivalent",
+      "a15": "15 — Older teens",
+      "a16": "16 — FSK 16 and equivalent",
+      "a17": "17 — R / 17+ and equivalent",
+      "a18": "18 — Adults only (NC-17 / FSK 18)"
+    },
+    "reset": {
+      "title": "RESET STREAMBERT?",
+      "description": "This will permanently delete all your settings, watch history, saved titles, progress data, and cached data. Your downloaded video files will <hl>not</hl> be deleted.",
+      "confirm": "Yes, Reset Everything"
+    },
+    "common": {
+      "cannotBeUndone": "This action cannot be undone.",
+      "cancel": "Cancel",
+      "confirm": "Confirm",
+      "doneStatus": "✓ Done",
+      "somethingWrong": "Something went wrong",
+      "working": "Working…",
+      "savedCheck": "✓ Saved",
+      "save": "Save"
+    },
+    "version": {
+      "couldNotReach": "Could not reach {{name}}.",
+      "theUpdateServer": "the update server",
+      "title": "App Version",
+      "current": "Current version",
+      "checking": "Checking…",
+      "check": "Check for Updates",
+      "checkVia": "Check for updates via {{source}}",
+      "available": "🎉 v{{version}} available. Install Update",
+      "fallback": "({{from}} unavailable, used {{used}} instead)",
+      "upToDate": "✓ You're up to date",
+      "disableAutoCheck": "Disable auto-check",
+      "enableAutoCheck": "Enable auto-check",
+      "autoCheckTitle": "Check for updates on startup",
+      "autoCheckDesc": "Shows a notification banner if a new version is available. Turned on by default."
+    },
+    "homeLayout": {
+      "title": "Home Page Layout",
+      "description": "Choose which rows appear on the Home page and drag to reorder them. The hero banner is always shown at the top.",
+      "rowStyle": "Row display style",
+      "carousel": "Carousel",
+      "carouselDesc": "Scrollable spotlight with featured poster",
+      "grid": "⊞ Grid",
+      "gridDesc": "Compact grid of all items",
+      "hideRow": "Hide row",
+      "showRow": "Show row",
+      "save": "Save Layout"
+    },
+    "backup": {
+      "onStart": "On App Start",
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "scheduled": "Scheduled Backups",
+      "scheduledDesc": "Automatically save a backup file on a schedule",
+      "folder": "Backup Folder",
+      "browse": "Browse…",
+      "frequency": "Frequency",
+      "keepLast": "Keep Last N Backups",
+      "invalidFile": "Invalid backup file, missing data field.",
+      "restored": "✓ Backup restored: reloading…",
+      "couldNotRead": "Could not read backup file.",
+      "title": "Backup & Restore",
+      "description": "Export your watchlist, watch history, progress, and all settings to a JSON file. Import it later to restore everything, useful before reinstalling or switching devices.",
+      "export": "⬆ Export Backup",
+      "import": "⬇ Import Backup"
+    },
+    "page": {
+      "title": "SETTINGS",
+      "subtitle": "App configuration for Streambert"
+    },
+    "nav": {
+      "updates": "Updates & API",
+      "content": "Age Rating",
+      "playback": "Playback",
+      "subtitles": "Subtitles",
+      "downloads": "Downloads",
+      "notifications": "Notifications",
+      "discordRpc": "Discord Rich Presence",
+      "interface": "Interface",
+      "library": "Library",
+      "backup": "Backup",
+      "storage": "Storage & Data"
+    },
+    "topBar": {
+      "searchPlaceholder": "Search on this page…",
+      "noResults": "No results",
+      "previousMatch": "Previous match (Shift+Enter)",
+      "nextMatch": "Next match (Enter)",
+      "clearSearch": "Clear search",
+      "close": "Close (Esc)",
+      "searchSettings": "Search settings…",
+      "jumpToSection": "Jump to Section"
+    },
+    "groups": {
+      "general": {
+        "title": "General",
+        "subtitle": "App version, updates, API credentials and Languages"
+      },
+      "content": {
+        "title": "Content",
+        "subtitle": "Parental controls and content filtering by age rating"
+      },
+      "playback": {
+        "title": "Playback",
+        "subtitle": "Trailer source and auto-watched behavior"
+      },
+      "subtitles": {
+        "title": "Subtitles",
+        "subtitle": "Subtitle download source, preferred language, and API key"
+      },
+      "downloads": {
+        "title": "Downloads",
+        "subtitle": "Where downloaded video files are saved on disk"
+      },
+      "notifications": {
+        "title": "Notifications",
+        "subtitle": "Desktop alerts for downloads and new episode releases"
+      },
+      "discordRpc": {
+        "title": "Discord Rich Presence",
+        "subtitle": "Show what you're watching on your Discord profile"
+      },
+      "interface": {
+        "title": "Interface",
+        "subtitle": "Home layout, start page, appearance, and display options"
+      },
+      "library": {
+        "title": "Library",
+        "subtitle": "Watchlist sort order and watch history preferences"
+      },
+      "backup": {
+        "title": "Backup & Restore",
+        "subtitle": "Export your data or restore from a previous backup file"
+      },
+      "storage": {
+        "title": "Storage & Data",
+        "subtitle": "Clear cache, watch progress, downloads, or reset the entire app"
+      }
+    },
+    "general": {
+      "tmdbTitle": "TMDB Read Access Token",
+      "tmdbDesc": "Used to fetch movie and TV metadata, posters, ratings, and cast info from The Movie Database.",
+      "notSet": "(not set)",
+      "changeToken": "Change API Token"
+    },
+    "tmdbLanguage": {
+      "title": "Metadata Language",
+      "description": "Language used when fetching titles, descriptions, and other metadata from TMDB. Changing this clears the metadata cache so updated content loads immediately.",
+      "savedCleared": "✓ Saved, cache cleared"
+    },
+    "content": {
+      "ageTitle": "Age Rating & Parental Controls",
+      "ageDescription": "Set a maximum age rating. Content rated above this age will still be visible but <strong>you won't be able to play it.</strong> Set to <em>No restriction</em> to disable this feature entirely.",
+      "ratingCountry": "Rating Country",
+      "maxAge": "Maximum Allowed Age Rating"
+    },
+    "playback": {
+      "enterUrl": "Please enter a URL first.",
+      "reachable": "Instance reachable and responding.",
+      "serverStatus": "Server responded with status {{status}}.",
+      "unreachable": "Could not reach instance. Check the URL or try another.",
+      "invidiousTitle": "Invidious Instance",
+      "invidiousDesc": "Trailers are played via <hl>Invidious</hl>, a privacy-friendly YouTube frontend. Your configured instance is tried first; if it fails, the app automatically falls back through a list of known working instances. The default is <code>{{defaultBase}}</code>. The instance must have its API enabled (<code>/api/v1/stats</code> reachable).",
+      "checking": "Checking…",
+      "check": "Check",
+      "thresholdTitle": "Auto-Watched Threshold",
+      "thresholdDesc": "A movie or episode is automatically marked as <ok>Watched ✓</ok> when the remaining time drops to this value or below. Set between 1 and 300 seconds.",
+      "seconds": "seconds",
+      "autoplayTitle": "Autoplay Next Episode",
+      "autoplayDesc": "Configure how the player behaves when an episode finishes.",
+      "enableAutoplay": "Enable Autoplay Next",
+      "enableAutoplayDesc": "Automatically play the next episode when the current one ends.",
+      "countdown": "Countdown Duration",
+      "countdownDesc": "Number of seconds to display the countdown. Set to 0 to only show the buttons and not autoplay automatically.",
+      "overlayPosition": "Overlay Position",
+      "overlayDesc": "Choose which side of the player the next episode thumbnail and details are shown.",
+      "left": "Left Side",
+      "right": "Right Side",
+      "introTitle": "Anime Intro Skip",
+      "introDesc": "Uses <hl>AniSkip</hl> to detect and skip opening/ending segments. Only active for animes and when using <hl>HiAnime</hl> as source.",
+      "introOff": "Off",
+      "introOffDesc": "Intro skip is disabled.",
+      "introAuto": "Auto Skip",
+      "introAutoDesc": "Automatically jumps past the intro/outro when reached.",
+      "introManual": "Manual Skip",
+      "introManualDesc": "Shows a \"Skip Intro\" button at the bottom of the player."
+    },
+    "subtitles": {
+      "title": "Subtitle Downloads",
+      "sourceInfo": "<hl>Wyzie Subs</hl> is used by default and requires a free API key (no account needed). Optionally add a <link>SubDL API key</link> (free), to use SubDL as the primary source instead.",
+      "subdlActive": "SubDL ACTIVE",
+      "autoDownload": "Auto-download subtitles when downloading videos",
+      "downloadDisabled": "Subtitle download disabled",
+      "defaultLanguage": "Default language",
+      "wyzieKey": "Wyzie API key",
+      "keySet": "SET",
+      "keyRequired": "REQUIRED",
+      "wyzieKeyDesc": "Required for Wyzie Subs. Get a free key by following the tutorial.",
+      "howToGetKey": "How to get a key ↗",
+      "hide": "Hide",
+      "show": "Show",
+      "copyKey": "Copy key",
+      "copied": "Copied!",
+      "copy": "Copy",
+      "openDashboard": "Open your wyzie dashboard",
+      "dashboard": "Dashboard ↗",
+      "subdlKey": "SubDL API key",
+      "subdlRegister": "(free, register at subdl.com ↗)",
+      "keyOptional": "OPTIONAL",
+      "subdlKeyDesc": "Leave empty to use <strong>Wyzie Subs</strong> (default, requires Wyzie API key above). Add a SubDL key to switch to SubDL as the primary source.",
+      "subdlPlaceholder": "SubDL API key, leave empty to use Wyzie",
+      "clearKey": "Clear key (revert to Wyzie)",
+      "clear": "Clear"
+    },
+    "downloads": {
+      "folderTitle": "Download Folder",
+      "folderDesc": "Downloaded videos will be saved here. Make sure the folder exists and Streambert has write access to it.",
+      "browse": "Browse …",
+      "noFolder": "⚠ No download folder set - videos cannot be downloaded until you set one."
+    },
+    "notifications": {
+      "title": "Desktop Notifications",
+      "description": "Control which events trigger a desktop notification.",
+      "downloadLabel": "Notify when a download completes",
+      "downloadDesc": "Shows a desktop notification when an item finishes downloading.",
+      "episodeLabel": "Notify about new episodes on startup",
+      "episodeDesc": "On startup, checks every TV series you have saved for newly released episodes and notifies you if any aired since the last check."
+    },
+    "discord": {
+      "title": "Discord Rich Presence",
+      "description": "Shows what you're currently watching on your Discord profile (title + cover, or \"Idling\" when nothing is open). Off by default. Requires the Discord desktop client to be running.",
+      "enableLabel": "Enable Discord Rich Presence",
+      "enableDesc": "Connects to your local Discord client and updates your status automatically.",
+      "coverLabel": "Show cover art",
+      "coverDesc": "Uses the movie/show poster as the large image. When off, only the Streambert icon is shown.",
+      "timeLabel": "Show elapsed time",
+      "timeDesc": "Displays how long you've been on the current title's page.",
+      "buttonLabel": "Show GitHub button",
+      "buttonDesc": "Adds a button linking to the Streambert GitHub repository."
+    },
+    "storage": {
+      "installTitle": "Install Location",
+      "installDesc": "Opens the folder where Streambert is installed.",
+      "openFolder": "Open Folder",
+      "clearCacheTitle": "Clear Cache",
+      "clearCacheDesc": "Removes temporary browser cache, shader cache, and service worker data from all internal sessions (main, video player, trailer). Does not affect your personal data or settings.",
+      "clearCacheBtn": "Clear Cache",
+      "cacheCleared": "✓ Cache cleared successfully",
+      "progressTitle": "Clear Watch Progress",
+      "progressDesc": "Resets all watch history, continue-watching progress, and watched / completed markings for movies and series. Also clears internal video player session data.",
+      "clearProgress": "Clear Progress",
+      "watchDataCleared": "✓ Watch data cleared",
+      "progressConfirmTitle": "CLEAR WATCH PROGRESS?",
+      "progressConfirmDesc": "This will permanently delete all watch history, continue-watching progress, and watched/completed markings for all movies and series.",
+      "progressConfirmBtn": "Yes, Clear Everything",
+      "deleteTitle": "Delete All Downloads",
+      "deleteDesc": "Permanently deletes all video files that were downloaded through Streambert and removes them from the download list. Only files downloaded through the app will be deleted, nothing else in your folder is touched.",
+      "deleteAll": "Delete All",
+      "deleteConfirmTitle": "DELETE ALL DOWNLOADS?",
+      "deleteConfirmDesc": "This will permanently delete all video files downloaded through Streambert and remove them from the download list.",
+      "deleteConfirmBtn": "Yes, Delete All",
+      "allRemoved": "✓ All downloads removed",
+      "removedFiles_one": "✓ Removed {{count}} file",
+      "removedFiles_other": "✓ Removed {{count}} files",
+      "couldNotDelete": "({{errors}} could not be deleted)",
+      "resetApp": "Reset App",
+      "irreversible": "Irreversible",
+      "resetDesc": "Completely resets Streambert to factory defaults, clears all settings, API Token, saved library, watch history/progress, and all cached data. Your downloaded video files will not be touched."
+    },
+    "appearance": {
+      "title": "Appearance",
+      "theme": "Theme",
+      "themes": {
+        "dark": {
+          "label": "Dark",
+          "description": "Default dark theme"
+        },
+        "amoled": {
+          "label": "AMOLED",
+          "description": "Very black :) (for OLED displays)"
+        },
+        "mocha": {
+          "label": "Mocha",
+          "description": "Warm dark brown tones"
+        },
+        "slate": {
+          "label": "Slate",
+          "description": "Cool blue-grey tones"
+        },
+        "light": {
+          "label": "Light",
+          "description": "Very white (basic light theme)"
+        },
+        "custom": {
+          "label": "Custom",
+          "description": "Your own colours"
+        }
+      },
+      "accents": {
+        "red": "Red",
+        "blue": "Blue",
+        "purple": "Purple",
+        "green": "Green",
+        "orange": "Orange",
+        "pink": "Pink"
+      },
+      "hideCustom": "▲ Hide custom colours",
+      "editCustom": "▼ Edit custom colours",
+      "resetDefaults": "Reset to defaults",
+      "varBg": "Background",
+      "varSurface": "Surface",
+      "varSurface2": "Surface 2",
+      "varSurface3": "Surface 3",
+      "varBorder": "Border",
+      "varText": "Text",
+      "varText2": "Text 2",
+      "varText3": "Text 3",
+      "accentColour": "Accent Colour",
+      "accentApplied": "{{colour}}, applied to buttons, highlights, and indicators.",
+      "accentInPlayer": "Apply accent colour to streaming player",
+      "accentInPlayerDesc": "Passes the selected accent colour to the player source (Videasy, Vidking). VidSrc does not support colour theming.",
+      "fontSize": "Font Size",
+      "fontSmall": "Small",
+      "fontNormal": "Normal",
+      "fontLarge": "Large",
+      "compact": "Compact card grid",
+      "compactDesc": "Shows more titles per row by reducing card size.",
+      "reduceAnim": "Reduce animations",
+      "reduceAnimDesc": "Disables transitions and hover effects throughout the app.",
+      "controller": "Controller support",
+      "controllerDesc": "Navigate menus with a D-pad/stick and use A/B to select and go back. In the player: A play/pause, D-pad seek/volume, LB/RB skip ±15s, Y fullscreen, B exit."
+    },
+    "library": {
+      "title": "Library & Privacy",
+      "sortManual": "Custom order",
+      "sortTitle": "Title A-Z",
+      "sortRating": "Top rated",
+      "sortYear": "Newest first",
+      "sortOrder": "Watchlist sort order",
+      "sortOrderDesc": "How titles in your watchlist are sorted. \"Custom order\" keeps your drag-and-drop arrangement.",
+      "recordHistory": "Record watch history",
+      "recordHistoryDesc": "When off, nothing you watch will be added to history or \"Continue Watching\".",
+      "historyDisabled": "⚠ Watch history is disabled. Progress tracking and \"Continue Watching\" will not work."
+    },
+    "startPage": {
+      "title": "Start Page",
+      "description": "Choose which page opens when you launch Streambert.",
+      "home": "🏠  Home",
+      "history": "🕐  Library / History",
+      "downloads": "⬇  Downloads"
+    }
+  },
+  "closeConfirm": {
+    "title_one": "Download in Progress",
+    "title_other": "Downloads in Progress",
+    "body_one": "<count>{{count}} active download</count> will be cancelled and incomplete files will be deleted.",
+    "body_other": "<count>{{count}} active downloads</count> will be cancelled and incomplete files will be deleted.",
+    "keepDownloading": "Keep Downloading",
+    "cancelAndClose": "Cancel & Close App"
+  },
+  "errorBoundary": {
+    "title": "SOMETHING WENT WRONG",
+    "message": "An unexpected error occurred in this section. Your data is safe, you can try reloading the app.",
+    "tryAgain": "Try Again",
+    "reload": "Reload App"
+  },
+  "setup": {
+    "intro": "Enter your <strong>free</strong> TMDB <strong>Read Access Token</strong> to get started.<br/>Go to <settingsLink>themoviedb.org → Settings → API</settingsLink> and copy the <em>API Read Access Token</em> (the long JWT, not the shorter API Key below).<br/><guideLink>Step-by-step guide on how to get that Token</guideLink>",
+    "tokenPlaceholder": "Paste your TMDB Read Access Token (eyJ...)...",
+    "checking": "Checking…",
+    "letsGo": "Let's go",
+    "skip": "Skip for now",
+    "errors": {
+      "invalidToken": {
+        "title": "Invalid token",
+        "body": "TMDB rejected the token (401 Unauthorized). Make sure you copied the long JWT Read Access Token, not the shorter API Key."
+      },
+      "forbidden": {
+        "title": "Access denied",
+        "body": "TMDB returned 403 Forbidden. Your account may be suspended or the token may have been revoked."
+      },
+      "timeout": {
+        "title": "Request timed out",
+        "body": "TMDB took too long to respond. Check your internet connection and try again."
+      },
+      "unreachable": {
+        "title": "Cannot reach TMDB",
+        "body": "No connection to api.themoviedb.org. Check your internet connection."
+      },
+      "unexpected": {
+        "title": "Something went wrong",
+        "body": "TMDB returned an unexpected error. Try again in a moment.",
+        "bodyWithStatus": "TMDB returned an unexpected error (HTTP {{status}}). Try again in a moment."
+      }
+    }
+  },
+  "titlebar": {
+    "minimize": "Minimize",
+    "restore": "Restore",
+    "maximize": "Maximize",
+    "close": "Close"
+  },
+  "update": {
+    "preparing": "Preparing…",
+    "failed": "Update failed",
+    "launching": "Launching installer…",
+    "formats": {
+      "deb": ".deb package",
+      "pacman": ".pacman (Arch)",
+      "exe": "Windows installer",
+      "dmg": "macOS installer (Universal)",
+      "fallback": "installer"
+    },
+    "title": "UPDATE AVAILABLE",
+    "viewOn": "View on {{source}}",
+    "readyToInstall": "is ready to install",
+    "whatsNew": "What's New",
+    "noChangelog": "No changelog available.",
+    "downloadsRunning_one": "{{count}} download running, finish or cancel them before updating.",
+    "downloadsRunning_other": "{{count}} downloads running, finish or cancel them before updating.",
+    "noFormat": "Could not detect install format. Use the <link>{{source}} releases page</link> to download manually.",
+    "downloading": "Downloading update…",
+    "installing": "Installing…",
+    "downloadManually": "Download manually ↗",
+    "done": "Update downloaded, installer is running",
+    "cancel": "Cancel",
+    "close": "Close",
+    "install": "Install Update"
+  },
+  "app": {
+    "unknownSeries": "Unknown series",
+    "loading": "Laden…",
+    "dismiss": "Dismiss",
+    "notify": {
+      "newEpisodeSingle": "{{name}} has a new episode.",
+      "newEpisodesMulti": "{{names}} have new episodes.",
+      "newEpisodesMultiMore": "{{names}} and {{more}} more have new episodes.",
+      "newEpisodesTitle": "New episodes available",
+      "downloadComplete": "Download complete",
+      "downloadFinished": "Your download has finished."
+    },
+    "toast": {
+      "controllerConnected": "Controller connected",
+      "removedFromWatchlist": "Removed from watchlist",
+      "addedToWatchlist": "Added to watchlist"
+    },
+    "apiStatus": {
+      "invalidToken": "Your TMDB token is invalid, not set or has been revoked. Movies and shows won't load.",
+      "updateToken": "Update Token",
+      "unreachable": "Cannot reach TMDB, check your internet connection. Content may not load.",
+      "retry": "Retry"
+    },
+    "updateBanner": {
+      "available": "Streambert v{{version}} is available!",
+      "install": "Install Update"
+    },
+    "episodeCheck": {
+      "checking": "Checking for new episodes…",
+      "none": "No new episodes found",
+      "available_one": "New episode available",
+      "available_other": "New episodes available",
+      "season": "Season {{number}}",
+      "more": "+{{count}} more"
+    },
+    "discord": {
+      "movie": "Movie",
+      "series": "Series"
+    }
+  },
+  "utils": {
+    "updates": {
+      "apiError": "{{source}} API error {{status}}",
+      "noStableRelease": "No stable release found on {{source}}"
+    },
+    "backup": {
+      "invalid": "Invalid backup data"
+    },
+    "discord": {
+      "button": "Watch media for free",
+      "idling": "Idling"
+    },
+    "api": {
+      "tmdbUnreachable": "TMDB unreachable",
+      "noImdbId": "No IMDb ID found for TMDB {{kind}} {{id}}",
+      "noKinopoiskId": "No Kinopoisk ID found for TMDB {{kind}} {{id}}"
+    }
+  },
+  "downloadModal": {
+    "done": "Done",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "searchFailed": "Search failed",
+    "apiError403": "API error 403 - your SubDL or Wyzie API key is missing or invalid. Add a valid key in Settings.",
+    "searching": "Searching…",
+    "noSubtitlesFound": "No subtitles found",
+    "subtitleFallbackName": "{{lang}} subtitle",
+    "opening": "Opening …",
+    "openedIn": "✓ Opened in {{player}}",
+    "couldNotOpenExternal": "Could not open external player",
+    "starting": "Starting…",
+    "failedToStart": "Failed to start",
+    "openSettings": "Open Settings",
+    "title": "Download",
+    "waitingForStream": "Waiting for stream URL … (start the video first)",
+    "streamUrlFound": "Stream URL found",
+    "playExternalTitle": "Play this stream in mpv or VLC",
+    "openExternal": "▶ Open in external player",
+    "subtitles": "Subtitles",
+    "disableSubtitleDownload": "Disable subtitle download",
+    "enableSubtitleDownload": "Enable subtitle download",
+    "noTmdbId": "No TMDB ID: Subtitle search unavailable",
+    "noApiKeySet": "No subtitle API key set.",
+    "addApiKeyHint": "Add/Generate a Wyzie or SubDL key in Settings to enable subtitle search.",
+    "openSettingsSubtitles": "Open Settings → Subtitles",
+    "searchingFor": "Searching for {{lang}} subtitles…",
+    "retry": "Retry",
+    "remove": "Remove",
+    "noSubtitlesFoundFor": "No subtitles found for {{lang}}",
+    "addChange": "＋ Add / Change",
+    "browse": "Browse",
+    "clearAll": "Clear all",
+    "notSearchedYet": "Not searched yet",
+    "search": "Search",
+    "subdlKeyTip": "💡 Add a free SubDL API key in Settings for better results",
+    "browser": {
+      "title": "Browse Subtitles",
+      "titleSelected": "Browse Subtitles · {{count}} selected",
+      "language": "Language:",
+      "allLanguages": "All languages",
+      "hearingImpaired": "Hearing impaired",
+      "aiTranslated": "AI translated",
+      "trusted": "Trusted",
+      "uploaderDownloads": "{{uploader}} · {{downloads}} downloads",
+      "clickRows": "Click rows to select subtitles",
+      "subtitlesSelected_one": "{{count}} subtitle selected",
+      "subtitlesSelected_other": "{{count}} subtitles selected"
+    },
+    "setFolder": {
+      "title": "Set Download Folder",
+      "chooseWhereSaved": "Choose where downloaded videos should be saved:",
+      "noFolderSet": "No download folder set.",
+      "chooseWhereToSave": "Choose where to save downloaded videos:",
+      "browse": "Browse …"
+    },
+    "setup": {
+      "title": "Set up Video Downloader",
+      "step1": "Download the latest release from <link>{{url}}</link> , for your OS: <code>{{binary}}</code>",
+      "step2": "Extract the release into a folder of your choice",
+      "step3": "Select that folder below, it must contain <code>_internal</code> and the binary",
+      "chooseFolder": "Choose folder …",
+      "checking": "Checking …",
+      "permissionDenied": "Permission denied, can't read the chosen folder.",
+      "folderUnreadable": "Folder could not be read. Is it still accessible?",
+      "missingInternal": "Missing <code>_internal</code> folder. Extract the full release archive, not just the binary.",
+      "noExecutable": "No executable binary found. On Linux, make sure the binary has execute permissions (<code>chmod +x</code>)."
+    },
+    "ready": {
+      "found": "✓ Video Downloader found",
+      "wrongFolder": "Wrong binary folder?",
+      "change": "Change",
+      "startingEllipsis": "Starting …",
+      "startDownload": "Start Download",
+      "started": "✓ Download started!",
+      "closeTrack": "Close — track progress in Downloads",
+      "saveTo": "Save to: <code>{{path}}</code>"
+    }
+  },
+  "downloads": {
+    "status": {
+      "downloading": "Downloading",
+      "completed": "Completed",
+      "error": "Error",
+      "interrupted": "Interrupted"
+    },
+    "timeAgo": {
+      "justNow": "just now",
+      "minutes": "{{n}}m ago",
+      "hours": "{{n}}h ago",
+      "days": "{{n}}d ago"
+    },
+    "sort": {
+      "date": "Date",
+      "name": "Name",
+      "size": "Size",
+      "type": "Type"
+    },
+    "deleteConfirm": "Delete \"{{name}}\"?",
+    "deleteConfirmWithFile": "Delete \"{{name}}\" and its file?",
+    "title": "DOWNLOADS",
+    "subtitleActive": "{{active}} active · {{completed}} completed",
+    "subtitleNone": "No active downloads · {{completed}} completed",
+    "filterPlaceholder": "Filter downloads…",
+    "noResults": "No results",
+    "resultCount_one": "{{count}} result",
+    "resultCount_other": "{{count}} results",
+    "closeEsc": "Close (Esc)",
+    "sortBy": "Sort by",
+    "descending": "Descending",
+    "ascending": "Ascending",
+    "hideUntracked": "Hide untracked files",
+    "showUntracked": "Show untracked files",
+    "untracked": "Untracked",
+    "untrackedCount": "Untracked ({{n}})",
+    "searchShortcut": "Search (Ctrl+K)",
+    "active": "Active",
+    "localFiles": "Local Files",
+    "folderToScan": "Folder to scan…",
+    "browse": "Browse",
+    "scanning": "Scanning…",
+    "scan": "⟳ Scan",
+    "noMatch": "No downloads match \"{{query}}\".",
+    "noLocalFilesYet": "No local files yet. Scan a folder or start a download.",
+    "noCompletedFound": "No completed downloads or local files found.",
+    "empty": {
+      "title": "No downloads yet",
+      "description": "Start a download from any movie or series page, or scan a folder to find local video files."
+    },
+    "openName": "Open {{name}}",
+    "fragments": "{{done}}/{{total}} fragments",
+    "remove": "Remove",
+    "notStarted": "Not started",
+    "goToPage": "Go to page",
+    "watched": "Watched",
+    "local": "Local",
+    "subs": {
+      "clickToManage": "Subtitles: {{langs}}: click to manage",
+      "noneClickToDownload": "No subtitles: click to download",
+      "withLangs": "Subtitles: {{langs}}",
+      "none": "No subtitles"
+    },
+    "fileMissing": "File missing",
+    "setWatchProgress": "Set watch progress",
+    "popover": {
+      "hours": "HH",
+      "minutes": "MM",
+      "seconds": "SS"
+    },
+    "reset": "Reset",
+    "save": "Save",
+    "markUnwatched": "Mark as Unwatched",
+    "watchedLabel": "Watched",
+    "markWatched": "Mark as Watched",
+    "markWatchedButton": "✓ Mark Watched",
+    "resumeAt": "Resume at {{time}}",
+    "watch": "Watch",
+    "resume": "Resume",
+    "showInFolder": "Show in folder",
+    "delete": "Delete",
+    "openErrorLog": "Open error log",
+    "viewLog": "View Log"
+  },
+  "movie": {
+    "localPlayerFailed": "Failed to start local player",
+    "notFoundOnHiAnime": "Movie not found on HiAnime",
+    "genericError": "Error",
+    "runtimeMin": "{{runtime}} min",
+    "inappropriateAge": "Inappropriate for your age setting",
+    "notReleasedYet": "This movie has not been released yet",
+    "unreleased": "🔒 Unreleased",
+    "restricted": "🔒 Restricted",
+    "restrictedTitle": "Inappropriate for your age rating setting",
+    "restart": "Restart",
+    "play": "Play",
+    "trailerRestricted": "🔒 Trailer",
+    "trailer": "Trailer",
+    "cast": "Cast",
+    "saved": "Saved",
+    "save": "Save",
+    "watched": "Watched",
+    "markWatched": "✓ Mark Watched",
+    "notStarted": "⊘ Not Started",
+    "back": "Back",
+    "loadingSource": "Loading {{source}}…",
+    "sourceLower": "source",
+    "source": "Source",
+    "tryDifferentSourceOrDub": "Try a different source, or switch sub/dub.",
+    "couldNotResolveId": "Could not resolve the {{idLabel}} for this title",
+    "idErrorTryDifferent": "{{error}}. Try a different source.",
+    "playingInPopout": "Playing in pop-out window",
+    "popoutReloadHint": "Closing the pop-out will reload the player here.",
+    "closePopoutReturn": "Close pop-out & return",
+    "changeSource": "Change source",
+    "toggleSubDub": "Toggle Sub/Dub",
+    "sub": "SUB",
+    "dub": "DUB",
+    "blockedAdsTrackers": "Blocked ads & trackers",
+    "closePopout": "Close pop-out",
+    "popOutPlayer": "Pop out player",
+    "downloadingViewInDownloads": "Downloading… - view in Downloads",
+    "alreadyDownloadedViewInDownloads": "Already downloaded - view in Downloads",
+    "download": "Download",
+    "noProgressTrackingTitle": "No automatic progress tracking for this source",
+    "noTracking": "⚠ no tracking",
+    "markProgress": "Mark progress:"
+  },
+  "home": {
+    "rows": {
+      "continue": "Continue Watching",
+      "recommended": "Recommended for You",
+      "trendingMovies": "Trending Movies",
+      "trendingTV": "Trending Series",
+      "topRated": "Top Rated"
+    },
+    "offline": {
+      "title": "No internet connection",
+      "text": "Trending and search require an internet connection. Your downloads and library still work offline.",
+      "retry": "Retry"
+    },
+    "heroType": "Trending · Movie",
+    "watchNow": "Watch Now",
+    "moreInfo": "More Info"
+  },
+  "mediaCard": {
+    "noImage": "No Image",
+    "unreleased": "🔒 Unreleased",
+    "badgeSoon": "SOON",
+    "badgeAnime": "ANIME",
+    "badgeTV": "TV",
+    "badgeHD": "HD",
+    "markWatched": "✓ Mark as Watched",
+    "markUnwatched": "↩ Mark as Unwatched"
+  },
+  "trending": {
+    "ageRestricted": "Age-restricted",
+    "rated": "Rated {{cert}}",
+    "comingSoon": "🔒 Coming Soon",
+    "anime": "ANIME",
+    "previous": "Previous",
+    "next": "Next",
+    "goTo": "Go to {{number}}"
+  },
+  "cast": {
+    "ariaLabel": "Cast & Crew — {{title}}",
+    "title": "🎭 Cast & Crew — {{title}}",
+    "creators": "Creators",
+    "directors": "Directors",
+    "writers": "Writers",
+    "cast": "Cast",
+    "empty": "No cast information available."
+  },
+  "trailer": {
+    "loading": "Loading trailer…",
+    "allFailed": "All Invidious instances failed. Try setting a custom instance in Settings.",
+    "trying": "Trying {{label}}…",
+    "officialTrailer": "🎬 {{title}} — Official Trailer",
+    "openInBrowserTitle": "Open in browser",
+    "openInBrowser": "Open in Browser"
+  },
+  "hianimeLoader": {
+    "lookingUpMovie": "Looking up movie on HiAnime…",
+    "lookingUpEpisode": "Looking up episode on HiAnime…",
+    "steps": {
+      "search": "Searching title",
+      "episodes": "Loading episode list",
+      "stream": "Fetching stream",
+      "player": "Starting player"
+    }
+  },
+  "search": {
+    "placeholder": "Search movies and series...",
+    "offline": "No internet, search is unavailable offline.",
+    "noResults": "No results for \"{{query}}\"",
+    "series": "Series",
+    "movie": "Movie",
+    "recent": "Recent searches",
+    "clearAll": "Clear all",
+    "remove": "Remove",
+    "hint": "Search for movies and series  ·  <kbd>ESC</kbd> to close"
+  },
+  "shortcuts": {
+    "title": "KEYBOARD SHORTCUTS",
+    "openSearch": "Open search",
+    "searchOnPage": "Search on a page",
+    "closeSearch": "Close search / modal",
+    "navigateBack": "Navigate back",
+    "reloadApp": "Reload app",
+    "showOverview": "Show this shortcuts overview",
+    "controller": "Controller",
+    "navigateMenus": "Navigate menus",
+    "selectConfirm": "Select / Confirm",
+    "backClose": "Back / Close",
+    "inPlayer": "In player: play-pause, seek, volume, skip ±15s",
+    "needHelp": "Need help or found a bug?",
+    "openIssue": "Open an issue or browse the README on GitHub",
+    "pressToClose": "Press <kbd>?</kbd> or <kbd>Esc</kbd> to close"
+  },
+  "subtitleModal": {
+    "searchFailed": "Search failed",
+    "noneSaved": "No subtitles could be saved.",
+    "confirmDelete": "Delete subtitle \"{{lang}}\"?",
+    "confirmDeleteWithRelease": "Delete subtitle \"{{lang}}\" ({{release}})?",
+    "title": "Subtitles: {{name}}",
+    "downloaded": "Downloaded subtitles",
+    "deleteFile": "Delete this subtitle file",
+    "downloadMore": "Download more:",
+    "allLanguages": "All languages",
+    "refresh": "⟳ Refresh",
+    "selected": "{{n}} selected",
+    "noApiKey": "<red>No subtitle API key set.</red> Add/Generate a Wyzie or SubDL key in Settings to search and download subtitles.",
+    "openSettings": "Open Settings → Subtitles",
+    "searching": "Searching…",
+    "noneFound": "No subtitles found for this language",
+    "alreadyDownloaded": "already downloaded",
+    "hearingImpaired": "HI",
+    "aiTranslated": "AI",
+    "langSubtitle": "{{lang}} subtitle",
+    "uploaderDownloads": "{{uploader}} · {{downloads}} downloads",
+    "savedOk": "✓ Subtitles downloaded!",
+    "downloading": "Downloading…",
+    "downloadCount": "↓ Download ({{n}})",
+    "selectAbove": "Select subtitles above",
+    "noFilePath": "No file path, needs completed download",
+    "close": "Close"
+  },
+  "wyzieKey": {
+    "invalidKey": "Invalid key, please try again.",
+    "extractFailed": "Could not extract API key. Please copy it manually.",
+    "title": "Wyzie Subs requires an API key",
+    "subtitle": "Free, no account required",
+    "intro": "Wyzie Subs now requires a free API key. Claim one instantly by solving a quick captcha, no registration needed.",
+    "getKey": "Get free key — opens redeem page",
+    "haveKey": "I already have a key — enter manually",
+    "skipNoSubs": "Skip — use without subtitles",
+    "paste": "Paste your Wyzie API key below. It looks like <code>wyzie-xxxxxxxxxxxxxxxx</code>",
+    "back": "Back",
+    "confirm": "Confirm & validate",
+    "captcha": "Complete the captcha in the popup window",
+    "pleaseWait": "Please wait — key will be saved automatically…",
+    "validating": "Validating key…",
+    "saved": "API key saved! Loading subtitles…",
+    "timeout": "No key received within 10 seconds.<br />The captcha may not have been completed, or the redirect failed.",
+    "tryAgain": "Try again",
+    "enterManually": "Enter key manually",
+    "skip": "Skip"
+  },
+  "tv": {
+    "seasonCount_one": "{{count}} Season",
+    "seasonCount_other": "{{count}} Seasons",
+    "episodeCount_one": "{{count}} Episode",
+    "episodeCount_other": "{{count}} Episodes",
+    "ageRestrictedSetting": "Inappropriate for your age setting",
+    "ageRestrictedRatingSetting": "Inappropriate for your age rating setting",
+    "trailer": "Trailer",
+    "cast": "Cast",
+    "saved": "Saved",
+    "back": "Back",
+    "contextMenu": {
+      "markNotStarted": "Mark as Not Started",
+      "markWatched": "Mark as Watched",
+      "markUnwatched": "Mark as Unwatched",
+      "markSeasonWatched": "Mark Season as Watched",
+      "markSeasonUnwatched": "Mark Season as Unwatched"
+    },
+    "errors": {
+      "localPlayerFailed": "Failed to start local player",
+      "episodeNotFound": "Episode not found on HiAnime",
+      "generic": "Error",
+      "trySourceOrDub": "Try a different source, or switch sub/dub.",
+      "resolveIdFailed": "Could not resolve the {{idLabel}} for this title",
+      "errorTrySource": "{{error}}. Try a different source."
+    },
+    "popout": {
+      "playing": "Playing in pop-out window",
+      "closingReloads": "Closing the pop-out will reload the player here.",
+      "closeReturn": "Close pop-out & return"
+    },
+    "autoplay": {
+      "upNext": "Up Next",
+      "seasonEpisode": "Season {{season}} · Episode {{episode}}",
+      "startingIn": "Starting in <num>{{seconds}}</num>s...",
+      "playNow": "Play Now",
+      "cancel": "Cancel"
+    },
+    "player": {
+      "seasonEpisodeShort": "Season {{season}} · E{{episode}}",
+      "watched": "Watched",
+      "markWatched": "Mark Watched",
+      "loadingSource": "Loading {{source}}…",
+      "sourceFallback": "source",
+      "source": "Source",
+      "changeSource": "Change source",
+      "toggleSubDub": "Toggle Sub/Dub",
+      "sub": "SUB",
+      "dub": "DUB",
+      "blockedAdsTrackers": "Blocked ads & trackers",
+      "closePopout": "Close pop-out",
+      "popOutPlayer": "Pop out player",
+      "download": "Download",
+      "downloadingViewInDownloads": "Downloading… - view in Downloads",
+      "alreadyDownloadedViewInDownloads": "Already downloaded - view in Downloads",
+      "noTrackingTitle": "No automatic progress tracking for this source",
+      "noTracking": "no tracking",
+      "skip": "SKIP",
+      "intro": "INTRO",
+      "outro": "OUTRO",
+      "introMarker": "Intro",
+      "outroMarker": "Outro",
+      "percentWatched": "{{percent}}% watched",
+      "markProgress": "Mark progress:"
+    },
+    "episodes": {
+      "title": "Episodes",
+      "more": "More",
+      "releasingToday": "Releasing today",
+      "daysLeft_one": "{{count}} day left",
+      "daysLeft_other": "{{count}} days left",
+      "seasonRightClick": "Right-click to mark season as watched/unwatched",
+      "specials": "Specials",
+      "season": "Season {{number}}",
+      "specialsWarning": "Specials support varies by provider. If the wrong episode plays, try switching to a different source. But it can't be guaranteed that the correct Episode will be available.",
+      "inappropriateAge": "Inappropriate for your age",
+      "unreleased": "Unreleased",
+      "playing": "Playing",
+      "downloadingClickView": "Downloading… - click to view in Downloads",
+      "downloadedClickView": "Downloaded - click to view in Downloads"
+    }
+  }
+}

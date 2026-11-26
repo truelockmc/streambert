@@ -1,0 +1,78 @@
+name: Feature Request
+description: Suggest an idea for Streambert which you would like to see in a future release
+title: "[Feature]: "
+labels: ["enhancement"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **README: Before You Submit Your Issue**
+        - Issues are not a place to go ask support questions or start discussions.
+        - Please use discussions instead: https://github.com/truelockmc/streambert/discussions
+
+  - type: checkboxes
+    attributes:
+      label: Guidelines
+      description: Please ensure you've completed all of the following.
+      options:
+        - label: I have searched the issue tracker and found no similar feature request
+          required: true
+        - label: I have checked the documentation and found no existing solution
+          required: true
+        - label: This issue contains only one feature request
+          required: true
+
+  - type: textarea
+    attributes:
+      label: Problem Description
+      description: What problem are you trying to solve?
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Proposed Solution
+      description: Describe your idea clearly
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative solutions?
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: Feature Type
+      multiple: true
+      options:
+        - improvement to existing feature
+        - new feature
+        - UI / UX improvement
+        - performance improvement
+        - integration / external support
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Streambert Version
+      description: Which version are you using?
+      placeholder: v2.2.1
+    validations:
+      required: true
+
+  - type: upload
+    attributes:
+      label: Screenshots / Mockups
+      description: Optional, but helps explain the idea
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Additional Information
+      description: Add any other context here
