@@ -86,6 +86,7 @@ import {
 import { useSourceId } from "../utils/useSourceId";
 import { setPlayerGamepadActive } from "../utils/gamepadPlayerState";
 import HiAnimeLoader from "../components/HiAnimeLoader";
+import { useImdbRatings, getImdbRatingForItem } from "../utils/useRatings";
 
 // ── Partial-circle progress icon (cached per pct tier) ───────────────────────
 // Uses a single SVG arc. Three instances (25/50/75)
@@ -539,6 +540,11 @@ export default function TVPage({
   const ageLimitSetting = useMemo(() => getAgeLimitSetting(storage), []);
   const ratingCountry = useMemo(() => getRatingCountry(storage), []);
   const restricted = isRestricted(rating.minAge, ageLimitSetting);
+  const imdbRatings = useImdbRatings([{ ...item, media_type: "tv" }], apiKey);
+  const imdbRating = getImdbRatingForItem(
+    { ...item, media_type: "tv" },
+    imdbRatings,
+  );
   const [seasonMenu, setSeasonMenu] = useState(null); // { x, y, seasonNum }
 
   // Report the currently selected episode up to App.jsx for Discord RPC
@@ -1804,6 +1810,11 @@ export default function TVPage({
                   {displayScore && (
                     <span className="detail-rating">
                       <StarIcon /> {displayScore}
+                    </span>
+                  )}
+                  {imdbRating != null && (
+                    <span className="detail-rating" title="IMDb rating">
+                      IMDb ★ {imdbRating.toFixed(1)}
                     </span>
                   )}
                   {year && <span>{year}</span>}

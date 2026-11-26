@@ -2375,6 +2375,47 @@ function SubtitleSettingsSection() {
   );
 }
 
+function ImdbRatingsSettingsSection() {
+  const [apiKey, setApiKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  useEffect(() => {
+    secureStorage.get(STORAGE_KEYS.OMDB_API_KEY).then((value) => {
+      if (value) setApiKey(value);
+    });
+  }, []);
+
+  const save = async () => {
+    const result = await secureStorage.set(STORAGE_KEYS.OMDB_API_KEY, apiKey.trim());
+    if (!result?.ok) {
+      setSaved(false);
+      setSaveError(result?.error || "Could not save the OMDb key securely.");
+      return;
+    }
+    setSaveError("");
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">IMDb Ratings (OMDb API)</div>
+      <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12, lineHeight: 1.6 }}>
+        Add your OMDb API key to show IMDb ratings on movie and series cards and detail pages. The key is stored with the app's OS encrypted storage and used by the main process. Ratings require encrypted storage to be available.
+        {" "}<button className="btn btn-ghost" style={{ display: "inline", padding: 0, fontSize: 12, color: "var(--red)", background: "none", border: "none", cursor: "pointer" }} onClick={() => window.electron?.openExternal("https://www.omdbapi.com/apikey.aspx")}>Get an OMDb key ↗</button>
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <input className="apikey-input" style={{ flex: 1, maxWidth: 340, marginBottom: 0 }} type={showKey ? "text" : "password"} placeholder="OMDb API key" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+        <button className="btn btn-ghost" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => setShowKey((value) => !value)}>{showKey ? "Hide" : "Show"}</button>
+        <button className="btn btn-primary" style={{ padding: "6px 12px", fontSize: 12 }} onClick={save}>{saved ? "Saved" : "Save key"}</button>
+      </div>
+      {saveError && <div style={{ color: "var(--red)", fontSize: 12, marginTop: 8 }}>{saveError}</div>}
+    </div>
+  );
+}
+
 // ── Notifications Section ─────────────────────────────────────────────────────
 function NotificationsSection() {
   const { t } = useTranslation();
@@ -3825,6 +3866,8 @@ export default function SettingsPage({
           <Divider />
 
           <TmdbLanguageSection />
+          <Divider />
+          <ImdbRatingsSettingsSection />
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════ */}

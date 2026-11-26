@@ -4,7 +4,12 @@ import MediaCard from "../components/MediaCard";
 import TrendingCarousel from "../components/TrendingCarousel";
 import { PlayIcon, StarIcon } from "../components/Icons";
 import { imgUrl, tmdbFetch } from "../utils/api";
-import { useRatings, getRatingForItem } from "../utils/useRatings";
+import {
+  useRatings,
+  getRatingForItem,
+  useImdbRatings,
+  getImdbRatingForItem,
+} from "../utils/useRatings";
 import { isRestricted } from "../utils/ageRating";
 import { storage } from "../utils/storage";
 import { loadHomeLayout, loadHomeViewMode } from "../utils/homeLayout";
@@ -73,6 +78,7 @@ export default function HomePage({
   );
 
   const { ratingsMap, ageLimitSetting } = useRatings(allItems);
+  const imdbRatings = useImdbRatings(allItems, apiKey);
 
   const getRating = useCallback(
     (item) => getRatingForItem(item, ratingsMap),
@@ -88,7 +94,10 @@ export default function HomePage({
   const enrichedRatingsMap = useMemo(() => {
     const out = {};
     for (const [k, v] of Object.entries(ratingsMap)) {
-      out[k] = { ...v, restricted: isRestricted(v.minAge, ageLimitSetting) };
+      out[k] = {
+        ...v,
+        restricted: isRestricted(v.minAge, ageLimitSetting),
+      };
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -312,6 +321,7 @@ export default function HomePage({
                       onMarkUnwatched={onMarkUnwatched}
                       ageRating={r.cert}
                       restricted={restr}
+                      imdbRating={getImdbRatingForItem(item, imdbRatings)}
                     />
                   );
                 })}
@@ -353,6 +363,7 @@ export default function HomePage({
                       onMarkUnwatched={onMarkUnwatched}
                       ageRating={rd.cert}
                       restricted={rd.restricted}
+                      imdbRating={getImdbRatingForItem(item, imdbRatings)}
                     />
                   );
                 })}
@@ -377,6 +388,7 @@ export default function HomePage({
               title={t("home.rows.recommended")}
               onSelect={onSelect}
               ratingsMap={enrichedRatingsMap}
+              imdbRatings={imdbRatings}
             />
           );
         }
@@ -397,6 +409,7 @@ export default function HomePage({
               title={t("home.rows.trendingMovies")}
               onSelect={onSelect}
               ratingsMap={enrichedRatingsMap}
+              imdbRatings={imdbRatings}
             />
           );
         }
@@ -417,6 +430,7 @@ export default function HomePage({
               title={t("home.rows.trendingTV")}
               onSelect={onSelect}
               ratingsMap={enrichedRatingsMap}
+              imdbRatings={imdbRatings}
             />
           );
         }
@@ -432,6 +446,7 @@ export default function HomePage({
               title={t("home.rows.topRated")}
               onSelect={onSelect}
               ratingsMap={enrichedRatingsMap}
+              imdbRatings={imdbRatings}
             />
           );
         }

@@ -137,6 +137,8 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("secure-store-get", key).then((r) => r.value ?? null),
   secureSet: (key, value) =>
     ipcRenderer.invoke("secure-store-set", { key, value }),
+  hasImdbApiKey: () => ipcRenderer.invoke("has-imdb-api-key"),
+  getImdbRating: (imdbId) => ipcRenderer.invoke("get-imdb-rating", imdbId),
   // Picture-in-Picture pop-out (full player UI, only one stream active at a time)
   openPipWindow: (url, title, userAgent = null) =>
     ipcRenderer.invoke("open-pip-window", { url, title, userAgent }),

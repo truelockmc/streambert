@@ -179,6 +179,12 @@ function register() {
 
   ipcMain.handle("secure-store-set", (_, { key, value }) => {
     try {
+      if (key === "omdbApiKey" && value && !safeStorage.isEncryptionAvailable()) {
+        return {
+          ok: false,
+          error: "OS encrypted storage is unavailable; the OMDb key was not saved.",
+        };
+      }
       secureStoreSet(key, value);
       return { ok: true };
     } catch (e) {
@@ -260,6 +266,7 @@ function register() {
 
 module.exports = {
   register,
+  getSecureValue: secureStoreGet,
   applySecretMigrationIfNeeded,
   writeSecretMigration,
   loadScheduledBackupSettings,

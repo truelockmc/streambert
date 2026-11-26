@@ -6,6 +6,7 @@ import {
   getRatingCountry,
 } from "./ageRating";
 import { storage, getApiKey } from "./storage";
+import { fetchImdbId } from "./api";
 
 const CACHE_KEY = "ratingsCache";
 const CACHE_TTL = 1000 * 60 * 60 * 24 * 7; // 7 days
@@ -129,4 +130,95 @@ export function useRatings(items) {
 export function getRatingForItem(item, ratingsMap) {
   const type = item.media_type === "tv" ? "tv" : "movie";
   return ratingsMap[`${type}_${item.id}`] || { cert: null, minAge: null };
+}
+
+const IMDB_CACHE_KEY = "imdbRatingsCache";
+const IMDB_CACHE_TTL = 1000 * 60 * 60 * 24 * 7;
+
+/** Fetch and locally cache IMDb ratings for a set of TMDB movie/TV items. */
+export function useImdbRatings(items, apiKeyOverride) {
+  const [ratings, setRatings] = useState({});
+  const [storedApiKey] = useState(() => getApiKey());
+  const apiKey = apiKeyOverride || storedApiKey;
+  const itemsKey = useMemo(
+    () =>
+      (items || [])
+        .filter((item) => item?.id != null)
+        .map((item) => `${item.media_type === "tv" ? "tv" : "movie"}_${item.id}`)
+        .sort()
+        .join(","),
+    [items],
+  );
+
+  useEffect(() => {
+    if (!itemsKey || !apiKey || !window.electron?.getImdbRating) return;
+    let cancelled = false;
+    const unique = new Map();
+    for (const item of items || []) {
+      if (item?.id == null) continue;
+      const type = item.media_type === "tv" ? "tv" : "movie";
+      unique.set(`${type}_${item.id}`, { item, type });
+    }
+
+    (async () => {
+      let cache = {};
+      try {
+        cache = storage.get(IMDB_CACHE_KEY) || {};
+      } catch {}
+      const now = Date.now();
+      const missing = [];
+      const initial = {};
+      for (const [mapKey, value] of unique) {
+        const entry = cache[mapKey];
+        if (entry && now - entry.ts <= IMDB_CACHE_TTL) initial[mapKey] = entry.rating;
+        else missing.push([mapKey, value]);
+      }
+      if (Object.keys(initial).length) setRatings((prev) => ({ ...prev, ...initial }));
+      if (!missing.length) return;
+
+      try {
+        const configured = await window.electron.hasImdbApiKey();
+        if (!configured || cancelled) return;
+      } catch {
+        return;
+      }
+
+      for (let i = 0; i < missing.length; i++) {
+        if (cancelled) return;
+        const [mapKey, { item, type }] = missing[i];
+        try {
+          const imdbId = await fetchImdbId(type, item.id, apiKey);
+          const result = await window.electron.getImdbRating(imdbId);
+          if (!result?.configured) return;
+          if (result.cacheable === false) return;
+          if (cancelled) return;
+          cache[mapKey] = { rating: result.rating, ts: Date.now() };
+          setRatings((prev) => ({ ...prev, [mapKey]: result.rating }));
+        } catch {
+          // Missing IMDb IDs and transient provider errors are left uncached.
+        }
+        if (i < missing.length - 1) await new Promise((resolve) => setTimeout(resolve, 120));
+      }
+      if (!cancelled) {
+        try {
+          const cutoff = Date.now() - IMDB_CACHE_TTL;
+          for (const [key, entry] of Object.entries(cache)) {
+            if (entry?.ts < cutoff) delete cache[key];
+          }
+          storage.set(IMDB_CACHE_KEY, cache);
+        } catch {}
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [itemsKey, apiKey]);
+
+  return ratings;
+}
+
+export function getImdbRatingForItem(item, ratings) {
+  const type = item.media_type === "tv" ? "tv" : "movie";
+  return ratings[`${type}_${item.id}`] ?? null;
 }
