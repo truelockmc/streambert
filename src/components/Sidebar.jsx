@@ -12,6 +12,7 @@ import {
   QuitIcon,
   BackIcon,
   HelpIcon,
+  TagIcon,
 } from "./Icons";
 
 export default function Sidebar({
@@ -122,6 +123,12 @@ export default function Sidebar({
         onClick={() => onNavigate("home")}
         icon={<HomeIcon />}
         label="Home"
+      />
+      <SideBtn
+        active={page === "genres"}
+        onClick={() => onNavigate("genres")}
+        icon={<TagIcon />}
+        label="Genres"
       />
       <SideBtn
         active={page === "history"}
