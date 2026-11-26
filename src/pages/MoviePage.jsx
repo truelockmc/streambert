@@ -28,6 +28,7 @@ import {
   CLEAN_USER_AGENT,
   sourceUsesCleanUa,
   getNextNonAsyncSource,
+  fetchImdbId,
 } from "../utils/api";
 import {
   PlayIcon,
@@ -75,8 +76,6 @@ import {
 import { useSourceId } from "../utils/useSourceId";
 import { setPlayerGamepadActive } from "../utils/gamepadPlayerState";
 import HiAnimeLoader from "../components/HiAnimeLoader";
-import { useTranslation } from "react-i18next";
-import i18n from "../i18n";
 
 export default function MoviePage({
   item,
@@ -97,7 +96,6 @@ export default function MoviePage({
   onGoToDownloads,
   onSelect,
 }) {
-  const { t } = useTranslation();
   const [details, setDetails] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
@@ -211,6 +209,7 @@ export default function MoviePage({
 
   // Age rating
   const [rating, setRating] = useState({ cert: null, minAge: null });
+  const [imdbRating, setImdbRating] = useState(null);
   const ageLimitSetting = useMemo(() => getAgeLimitSetting(storage), []);
   const ratingCountry = useMemo(() => getRatingCountry(storage), []);
   const restricted = isRestricted(rating.minAge, ageLimitSetting);
@@ -288,6 +287,29 @@ export default function MoviePage({
       mounted = false;
     };
   }, [item.id, apiKey, ratingCountry]);
+
+  // IMDb rating (via existing IMDb ID lookup + free ratings proxy)
+  useEffect(() => {
+    if (!apiKey) return;
+    let mounted = true;
+    fetchImdbId("movie", item.id, apiKey)
+      .then(async (imdbId) => {
+        if (!mounted || !imdbId) return;
+        const res = await fetch(
+          `https://api.agregarr.org/api/ratings?id=${imdbId}`,
+        );
+        if (!res.ok || !mounted) return;
+        const data = await res.json();
+        const entry = Array.isArray(data)
+          ? data.find((d) => d.imdbId === imdbId)
+          : null;
+        if (entry?.rating && mounted) setImdbRating(entry.rating);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [item.id, apiKey]);
 
   useEffect(() => {
     let mounted = true;
@@ -431,7 +453,7 @@ export default function MoviePage({
                 setM3u8Url(res.url);
               })
               .catch(() => {
-                if (mounted) setResolveError(i18n.t("movie.localPlayerFailed"));
+                if (mounted) setResolveError("Failed to start local player");
               });
           } else {
             resolvedPlayerUrlRef.current = res.url;
@@ -450,12 +472,12 @@ export default function MoviePage({
             setResolveError(null);
             setPlayerSource(next);
           } else {
-            setResolveError(res?.error || i18n.t("movie.notFoundOnHiAnime"));
+            setResolveError(res?.error || "Movie not found on HiAnime");
           }
         }
       })
       .catch((e) => {
-        if (mounted) setResolveError(e.message || i18n.t("movie.genericError"));
+        if (mounted) setResolveError(e.message || "Error");
       })
       .finally(() => {
         if (mounted) {
@@ -840,7 +862,7 @@ export default function MoviePage({
             )}
           </div>
           <div className="detail-info">
-            <div className="detail-type">{t("common.movie")}</div>
+            <div className="detail-type">Movie</div>
             <div className="detail-title">{title}</div>
             <div className="genres">
               {displayGenres.map((g) => (
@@ -850,13 +872,20 @@ export default function MoviePage({
               ))}
             </div>
             <div className="detail-meta">
+              {imdbRating && (
+                <span className="detail-rating" title="IMDb">
+                  <StarIcon /> {Number(imdbRating).toFixed(1)}
+                  <span style={{ fontSize: "0.75em", opacity: 0.7, marginLeft: 2 }}>IMDb</span>
+                </span>
+              )}
               {displayScore && (
-                <span className="detail-rating">
+                <span className="detail-rating" title="TMDB">
                   <StarIcon /> {displayScore}
+                  {!imdbRating && <span style={{ fontSize: "0.75em", opacity: 0.7, marginLeft: 2 }}>TMDB</span>}
                 </span>
               )}
               {year && <span>{year}</span>}
-              {d.runtime && <span>{t("movie.runtimeMin", { runtime: d.runtime })}</span>}
+              {d.runtime && <span>{d.runtime} min</span>}
               {d.original_language && (
                 <span>{d.original_language?.toUpperCase()}</span>
               )}
@@ -873,7 +902,7 @@ export default function MoviePage({
                 <span className="age-rating-pill-cert">{rating.cert}</span>
                 {restricted && (
                   <span className="age-rating-pill-label">
-                    {t("movie.inappropriateAge")}
+                    Inappropriate for your age setting
                   </span>
                 )}
               </div>
@@ -897,21 +926,21 @@ export default function MoviePage({
                 <button
                   className="btn btn-primary btn-restricted"
                   disabled
-                  title={t("movie.notReleasedYet")}
+                  title="This movie has not been released yet"
                 >
-                  {t("movie.unreleased")}
+                  🔒 Unreleased
                 </button>
               ) : restricted ? (
                 <button
                   className="btn btn-primary btn-restricted"
                   disabled
-                  title={t("movie.restrictedTitle")}
+                  title="Inappropriate for your age rating setting"
                 >
-                  {t("movie.restricted")}
+                  🔒 Restricted
                 </button>
               ) : (
                 <button className="btn btn-primary" onClick={handlePlay}>
-                  <PlayIcon /> {playing ? t("movie.restart") : t("movie.play")}
+                  <PlayIcon /> {playing ? "Restart" : "Play"}
                 </button>
               )}
               {trailerKey &&
@@ -919,27 +948,27 @@ export default function MoviePage({
                   <button
                     className="btn btn-secondary btn-restricted"
                     disabled
-                    title={t("movie.restrictedTitle")}
+                    title="Inappropriate for your age rating setting"
                   >
-                    {t("movie.trailerRestricted")}
+                    🔒 Trailer
                   </button>
                 ) : (
                   <button
                     className="btn btn-secondary"
                     onClick={() => setShowTrailer(true)}
                   >
-                    <TrailerIcon /> {t("movie.trailer")}
+                    <TrailerIcon /> Trailer
                   </button>
                 ))}
               <button
                 className="btn btn-secondary"
                 onClick={() => setShowCast(true)}
               >
-                <CastIcon /> {t("movie.cast")}
+                <CastIcon /> Cast
               </button>
               <button className="btn btn-secondary" onClick={onSave}>
                 {isSaved ? <BookmarkFillIcon /> : <BookmarkIcon />}
-                {isSaved ? t("movie.saved") : t("movie.save")}
+                {isSaved ? "Saved" : "Save"}
               </button>
               {!isUnreleased &&
                 (isWatched ? (
@@ -947,7 +976,7 @@ export default function MoviePage({
                     className="btn btn-ghost watched-btn"
                     onClick={() => onMarkUnwatched?.(progressKey)}
                   >
-                    <WatchedIcon size={16} /> {t("movie.watched")}
+                    <WatchedIcon size={16} /> Watched
                   </button>
                 ) : (
                   <>
@@ -955,7 +984,7 @@ export default function MoviePage({
                       className="btn btn-ghost"
                       onClick={() => onMarkWatched?.(progressKey)}
                     >
-                      {t("movie.markWatched")}
+                      ✓ Mark Watched
                     </button>
                     {hasProgress && (
                       <button
@@ -966,13 +995,13 @@ export default function MoviePage({
                           storage.set("dlTime_" + progressKey, null);
                         }}
                       >
-                        {t("movie.notStarted")}
+                        ⊘ Not Started
                       </button>
                     )}
                   </>
                 ))}
               <button className="btn btn-ghost" onClick={onBack}>
-                <BackIcon /> {t("movie.back")}
+                <BackIcon /> Back
               </button>
             </div>
           </div>
@@ -1010,11 +1039,7 @@ export default function MoviePage({
                   <>
                     <div className="spinner" />
                     <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                      {t("movie.loadingSource", {
-                        source:
-                          PLAYER_SOURCES.find((s) => s.id === playerSource)
-                            ?.label ?? t("movie.sourceLower"),
-                      })}
+                      {`Loading ${PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "source"}…`}
                     </span>
                   </>
                 )}
@@ -1038,13 +1063,13 @@ export default function MoviePage({
               >
                 <span style={{ fontSize: 28 }}>⚠️</span>
                 <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                  {t("movie.notFoundOnHiAnime")}
+                  Movie not found on HiAnime
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text3)" }}>
                   {resolveError}
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                  {t("movie.tryDifferentSourceOrDub")}
+                  Try a different source, or switch sub/dub.
                 </span>
               </div>
             )}
@@ -1066,10 +1091,10 @@ export default function MoviePage({
               >
                 <span style={{ fontSize: 28 }}>⚠️</span>
                 <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                  {t("movie.couldNotResolveId", { idLabel: srcId.idLabel })}
+                  Could not resolve the {srcId.idLabel} for this title
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                  {t("movie.idErrorTryDifferent", { error: srcId.error })}
+                  {srcId.error}. Try a different source.
                 </span>
               </div>
             )}
@@ -1097,7 +1122,7 @@ export default function MoviePage({
                     fontWeight: 600,
                   }}
                 >
-                  {t("movie.playingInPopout")}
+                  Playing in pop-out window
                 </span>
                 <span
                   style={{
@@ -1107,14 +1132,14 @@ export default function MoviePage({
                     maxWidth: 260,
                   }}
                 >
-                  {t("movie.popoutReloadHint")}
+                  Closing the pop-out will reload the player here.
                 </span>
                 <button
                   className="player-overlay-btn"
                   onClick={() => window.electron?.closePipWindow?.()}
                   style={{ marginTop: 4 }}
                 >
-                  {t("movie.closePopoutReturn")}
+                  Close pop-out &amp; return
                 </button>
               </div>
             )}
@@ -1160,11 +1185,11 @@ export default function MoviePage({
                     setMenuPos({ top: rect.bottom + 6, left: rect.left });
                   setShowSourceMenu((v) => !v);
                 }}
-                title={t("movie.changeSource")}
+                title="Change source"
               >
                 <SourceIcon />
                 {PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ??
-                  t("movie.source")}
+                  "Source"}
               </button>
               {/* Sub/Dub toggle: HiAnime, and anime-capable sources (Vidnest) on anime titles */}
               {(sourceIsAsync(playerSource) ||
@@ -1183,9 +1208,9 @@ export default function MoviePage({
                     setResolvingUrl(false);
                     setResolveError(null);
                   }}
-                  title={t("movie.toggleSubDub")}
+                  title="Toggle Sub/Dub"
                 >
-                  {dubMode === "sub" ? t("movie.sub") : t("movie.dub")}
+                  {dubMode === "sub" ? "SUB" : "DUB"}
                 </button>
               )}
               {/* Blocked ads & trackers button */}
@@ -1195,7 +1220,7 @@ export default function MoviePage({
                   setShowSourceMenu(false);
                   setShowBlockedModal(true);
                 }}
-                title={t("movie.blockedAdsTrackers")}
+                title="Blocked ads & trackers"
               >
                 <ShieldBlockIcon />
                 {blockedSession > 0 && (
@@ -1221,7 +1246,7 @@ export default function MoviePage({
                     sourceUsesCleanUa(playerSource) ? CLEAN_USER_AGENT : null,
                   );
                 }}
-                title={pipOpen ? t("movie.closePopout") : t("movie.popOutPlayer")}
+                title={pipOpen ? "Close pop-out" : "Pop out player"}
                 disabled={
                   !pipOpen &&
                   (webviewLoading ||
@@ -1284,9 +1309,9 @@ export default function MoviePage({
               title={
                 movieDownload
                   ? movieDownload.status === "downloading"
-                    ? t("movie.downloadingViewInDownloads")
-                    : t("movie.alreadyDownloadedViewInDownloads")
-                  : t("movie.download")
+                    ? "Downloading… - view in Downloads"
+                    : "Already downloaded - view in Downloads"
+                  : "Download"
               }
             >
               {movieDownload ? (
@@ -1310,9 +1335,9 @@ export default function MoviePage({
               {!sourceSupportsProgress(playerSource) && (
                 <span
                   className="player-no-progress-hint"
-                  title={t("movie.noProgressTrackingTitle")}
+                  title="No automatic progress tracking for this source"
                 >
-                  {t("movie.noTracking")}
+                  ⚠ no tracking
                 </span>
               )}
             </button>
@@ -1335,7 +1360,7 @@ export default function MoviePage({
             <span
               style={{ fontSize: 12, color: "var(--text3)", marginRight: 4 }}
             >
-              {t("movie.markProgress")}
+              Mark progress:
             </span>
             {[25, 50, 75, 100].map((p) => (
               <button

@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
-import { useTranslation } from "react-i18next";
 import { imgUrl, isAnimeContent } from "../utils/api";
 import {
   PlayIcon,
@@ -8,6 +7,7 @@ import {
   WatchedIcon,
   RatingShieldIcon,
   RatingLockIcon,
+  StarIcon,
 } from "./Icons";
 
 const MediaCard = memo(function MediaCard({
@@ -19,8 +19,8 @@ const MediaCard = memo(function MediaCard({
   onMarkUnwatched,
   ageRating,
   restricted,
+  imdbRating,
 }) {
-  const { t } = useTranslation();
   const title = item.title || item.name;
   const year = (item.release_date || item.first_air_date || "").slice(0, 4);
   const isTV = item.media_type === "tv";
@@ -98,7 +98,7 @@ const MediaCard = memo(function MediaCard({
             <div className="no-poster">
               {isTV ? <TVIcon /> : <FilmIcon />}
               <span style={{ fontSize: 10, color: "var(--text3)" }}>
-                {t("mediaCard.noImage")}
+                No Image
               </span>
             </div>
           )}
@@ -114,11 +114,17 @@ const MediaCard = memo(function MediaCard({
               {ageRating}
             </div>
           )}
+          {imdbRating && (
+            <div className="card-imdb-badge" title="IMDb rating">
+              <StarIcon size={9} />
+              {Number(imdbRating).toFixed(1)}
+            </div>
+          )}
 
           <div className="card-overlay">
             {isUnreleased ? (
               <div className="card-unreleased-overlay">
-                <span className="card-unreleased-label">{t("mediaCard.unreleased")}</span>
+                <span className="card-unreleased-label">🔒 Unreleased</span>
               </div>
             ) : (
               <div className="card-play">
@@ -147,19 +153,13 @@ const MediaCard = memo(function MediaCard({
           <div className="card-year">
             {isTV && item.season != null && item.episode != null
               ? `S${item.season}E${item.episode}${item.episodeName ? ` · ${item.episodeName}` : ""}`
-              : `${year} · ${isTV ? t("common.series") : t("common.movie")}`}
+              : `${year} · ${isTV ? "Series" : "Movie"}`}
           </div>
         </div>
         <span
           className={`card-badge${isUnreleased ? " card-badge--unreleased" : ""}${isAnime && !isUnreleased ? " card-badge--anime" : ""}`}
         >
-          {isUnreleased
-            ? t("mediaCard.badgeSoon")
-            : isAnime
-              ? t("mediaCard.badgeAnime")
-              : isTV
-                ? t("mediaCard.badgeTV")
-                : t("mediaCard.badgeHD")}
+          {isUnreleased ? "SOON" : isAnime ? "ANIME" : isTV ? "TV" : "HD"}
         </span>
       </div>
 
@@ -172,11 +172,11 @@ const MediaCard = memo(function MediaCard({
         >
           {isWatched ? (
             <button className="context-menu-item" onClick={handleMarkUnwatched}>
-              {t("mediaCard.markUnwatched")}
+              ↩ Mark as Unwatched
             </button>
           ) : (
             <button className="context-menu-item" onClick={handleMarkWatched}>
-              {t("mediaCard.markWatched")}
+              ✓ Mark as Watched
             </button>
           )}
         </div>

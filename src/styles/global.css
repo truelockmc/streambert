@@ -2703,6 +2703,28 @@ kbd {
     color: #fff;
 }
 
+.card-imdb-badge {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    background: color-mix(in srgb, #f5c518 90%, transparent);
+    color: #000;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    line-height: 1;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.card-imdb-badge svg {
+    flex-shrink: 0;
+}
+
 .age-rating-pill {
     display: inline-flex;
     align-items: center;

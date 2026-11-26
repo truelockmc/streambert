@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState, useEffect } from "react";
-import { useTranslation } from "react-i18next";
 import MediaCard from "../components/MediaCard";
 import { imgUrl } from "../utils/api";
 import { EyeIcon, WatchedIcon } from "../components/Icons";
 import { useRatings, getRatingForItem } from "../utils/useRatings";
+import { useImdbRatings, getImdbRatingForItem } from "../utils/useImdbRatings";
 import { isRestricted } from "../utils/ageRating";
 import { storage, STORAGE_KEYS } from "../utils/storage";
 
@@ -18,12 +18,25 @@ export default function LibraryPage({
   onMarkUnwatched,
   onRemoveHistory,
 }) {
-  const { t, i18n } = useTranslation();
   const allItems = useMemo(
     () => [...inProgress, ...saved],
     [inProgress, saved],
   );
   const { ratingsMap, ageLimitSetting } = useRatings(allItems);
+  const imdbRatingsMap = useImdbRatings(allItems);
+
+  const getRating = useCallback(
+    (item) => getRatingForItem(item, ratingsMap),
+    [ratingsMap],
+  );
+  const getImdb = useCallback(
+    (item) => getImdbRatingForItem(imdbRatingsMap, item),
+    [imdbRatingsMap],
+  );
+  const itemRestricted = useCallback(
+    (item) => isRestricted(getRating(item).minAge, ageLimitSetting),
+    [getRating, ageLimitSetting],
+  );
 
   const [sort, setSort] = useState(
     () => storage.get(STORAGE_KEYS.LIBRARY_SORT) || "manual",
@@ -35,26 +48,25 @@ export default function LibraryPage({
       window.removeEventListener("streambert:library-sort-changed", handler);
   }, []);
 
-
-  const getRating = useCallback(
-    (item) => getRatingForItem(item, ratingsMap),
-    [ratingsMap],
-  );
-  const itemRestricted = useCallback(
-    (item) => isRestricted(getRating(item).minAge, ageLimitSetting),
-    [getRating, ageLimitSetting],
-  );
+  const sortLabels = {
+    manual: "Custom order",
+    title: "A-Z",
+    rating: "Top rated",
+    year: "Newest first",
+  };
 
   return (
     <div className="fade-in">
       <div className="library-header">
-        <div className="library-title">{t("library.title")}</div>
-        <div className="library-sub">{t("library.subtitle")}</div>
+        <div className="library-title">My Library</div>
+        <div className="library-sub">
+          Watch history, progress, and saved titles
+        </div>
       </div>
 
       {inProgress.length > 0 && (
         <div className="library-section">
-          <div className="library-section-title">{t("library.continueWatching")}</div>
+          <div className="library-section-title">Continue Watching</div>
           <div className="cards-grid">
             {inProgress.map((item, i) => {
               const pk =
@@ -74,6 +86,7 @@ export default function LibraryPage({
                   onMarkUnwatched={onMarkUnwatched}
                   ageRating={r.cert}
                   restricted={restr}
+                  imdbRating={getImdb(item)}
                 />
               );
             })}
@@ -84,7 +97,7 @@ export default function LibraryPage({
       {saved.length > 0 && (
         <div className="library-section">
           <div className="library-section-title">
-            {t("library.watchlist", { count: saved.length })}
+            Watchlist ({saved.length})
             {sort !== "manual" && (
               <span
                 style={{
@@ -94,7 +107,7 @@ export default function LibraryPage({
                   marginLeft: 10,
                 }}
               >
-                {t(`library.sort.${sort}`)}
+                {sortLabels[sort]}
               </span>
             )}
           </div>
@@ -112,6 +125,7 @@ export default function LibraryPage({
                   onMarkUnwatched={onMarkUnwatched}
                   ageRating={r.cert}
                   restricted={restr}
+                  imdbRating={getImdb(item)}
                 />
               );
             })}
@@ -121,7 +135,7 @@ export default function LibraryPage({
 
       {history.length > 0 && (
         <div className="library-section">
-          <div className="library-section-title">{t("library.watchHistory")}</div>
+          <div className="library-section-title">Watch History</div>
           <div className="history-rows">
             {history.map((item, i) => {
               const pk =
@@ -163,7 +177,7 @@ export default function LibraryPage({
                             {" · "}
                           </>
                         )}
-                      {new Date(item.watchedAt).toLocaleDateString(i18n.language, {
+                      {new Date(item.watchedAt).toLocaleDateString("en-US", {
                         year: "numeric",
                         month: "short",
                         day: "numeric",
@@ -173,12 +187,12 @@ export default function LibraryPage({
                   <span
                     className={`search-result-type ${item.media_type === "tv" ? "type-tv" : "type-movie"}`}
                   >
-                    {item.media_type === "tv" ? t("common.series") : t("common.movie")}
+                    {item.media_type === "tv" ? "Series" : "Movie"}
                   </span>
                   {onRemoveHistory && (
                     <button
                       className="history-remove-btn"
-                      title={t("library.removeFromHistory")}
+                      title="Remove from history"
                       onClick={(e) => {
                         e.stopPropagation();
                         onRemoveHistory(item);
@@ -197,8 +211,10 @@ export default function LibraryPage({
       {history.length === 0 && saved.length === 0 && (
         <div className="empty-state">
           <EyeIcon />
-          <h3>{t("library.emptyTitle")}</h3>
-          <p>{t("library.emptyText")}</p>
+          <h3>Nothing here yet</h3>
+          <p>
+            Start watching a movie or series and your history will appear here.
+          </p>
         </div>
       )}
     </div>

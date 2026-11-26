@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useTranslation } from "react-i18next";
 import MediaCard from "../components/MediaCard";
 import TrendingCarousel from "../components/TrendingCarousel";
 import { PlayIcon, StarIcon } from "../components/Icons";
 import { imgUrl, tmdbFetch } from "../utils/api";
 import { useRatings, getRatingForItem } from "../utils/useRatings";
+import { useImdbRatings, getImdbRatingForItem } from "../utils/useImdbRatings";
 import { isRestricted } from "../utils/ageRating";
 import { storage } from "../utils/storage";
 import { loadHomeLayout, loadHomeViewMode } from "../utils/homeLayout";
@@ -48,7 +48,6 @@ export default function HomePage({
   history,
   apiKey,
 }) {
-  const { t } = useTranslation();
   const hero = trending[0];
 
   const [recommendedItems, setRecommendedItems] = useState([]);
@@ -73,10 +72,15 @@ export default function HomePage({
   );
 
   const { ratingsMap, ageLimitSetting } = useRatings(allItems);
+  const imdbRatingsMap = useImdbRatings(allItems);
 
   const getRating = useCallback(
     (item) => getRatingForItem(item, ratingsMap),
     [ratingsMap],
+  );
+  const getImdb = useCallback(
+    (item) => getImdbRatingForItem(imdbRatingsMap, item),
+    [imdbRatingsMap],
   );
   const itemRestricted = useCallback(
     (item) =>
@@ -225,17 +229,18 @@ export default function HomePage({
         >
           <div style={{ fontSize: 48 }}>📡</div>
           <div style={{ fontSize: 20, fontWeight: 600, color: "var(--text)" }}>
-            {t("home.offline.title")}
+            No internet connection
           </div>
           <div style={{ fontSize: 14, color: "var(--text3)" }}>
-            {t("home.offline.text")}
+            Trending and search require an internet connection. Your downloads
+            and library still work offline.
           </div>
           <button
             className="btn btn-primary"
             style={{ marginTop: 8 }}
             onClick={onRetry}
           >
-            {t("home.offline.retry")}
+            Retry
           </button>
         </div>
       )}
@@ -257,7 +262,7 @@ export default function HomePage({
           />
           <div className="hero-gradient" />
           <div className="hero-content">
-            <div className="hero-type">{t("home.heroType")}</div>
+            <div className="hero-type">Trending · Movie</div>
             <div className="hero-title">{hero.title || hero.name}</div>
             <div className="hero-meta">
               <span className="hero-rating">
@@ -271,13 +276,13 @@ export default function HomePage({
                 className="btn btn-primary"
                 onClick={() => onSelect(hero)}
               >
-                <PlayIcon /> {t("home.watchNow")}
+                <PlayIcon /> Watch Now
               </button>
               <button
                 className="btn btn-secondary"
                 onClick={() => onSelect(hero)}
               >
-                {t("home.moreInfo")}
+                More Info
               </button>
             </div>
           </div>
@@ -292,7 +297,7 @@ export default function HomePage({
           if (inProgress.length === 0) return null;
           return (
             <div key="continue" className="section">
-              <div className="section-title">{t("home.rows.continue")}</div>
+              <div className="section-title">Continue Watching</div>
               <div className="cards-grid">
                 {inProgress.map((item) => {
                   const pk =
@@ -312,6 +317,7 @@ export default function HomePage({
                       onMarkUnwatched={onMarkUnwatched}
                       ageRating={r.cert}
                       restricted={restr}
+                      imdbRating={getImdb(item)}
                     />
                   );
                 })}
@@ -353,6 +359,7 @@ export default function HomePage({
                       onMarkUnwatched={onMarkUnwatched}
                       ageRating={rd.cert}
                       restricted={rd.restricted}
+                      imdbRating={getImdb(item)}
                     />
                   );
                 })}
@@ -366,7 +373,7 @@ export default function HomePage({
           if (viewMode === "list")
             return renderList(
               "recommended",
-              t("home.rows.recommended"),
+              "Recommended for You",
               null,
               filteredRecommendedItems,
             );
@@ -374,7 +381,7 @@ export default function HomePage({
             <TrendingCarousel
               key="recommended"
               items={filteredRecommendedItems}
-              title={t("home.rows.recommended")}
+              title="Recommended for You"
               onSelect={onSelect}
               ratingsMap={enrichedRatingsMap}
             />
@@ -386,7 +393,7 @@ export default function HomePage({
           if (viewMode === "list")
             return renderList(
               "trendingMovies",
-              t("home.rows.trendingMovies"),
+              "Trending Movies",
               null,
               trendingMovieItems,
             );
@@ -394,7 +401,7 @@ export default function HomePage({
             <TrendingCarousel
               key="trendingMovies"
               items={trendingMovieItems}
-              title={t("home.rows.trendingMovies")}
+              title="Trending Movies"
               onSelect={onSelect}
               ratingsMap={enrichedRatingsMap}
             />
@@ -406,7 +413,7 @@ export default function HomePage({
           if (viewMode === "list")
             return renderList(
               "trendingTV",
-              t("home.rows.trendingTV"),
+              "Trending Series",
               null,
               trendingTVItems,
             );
@@ -414,7 +421,7 @@ export default function HomePage({
             <TrendingCarousel
               key="trendingTV"
               items={trendingTVItems}
-              title={t("home.rows.trendingTV")}
+              title="Trending Series"
               onSelect={onSelect}
               ratingsMap={enrichedRatingsMap}
             />
@@ -424,12 +431,12 @@ export default function HomePage({
         if (id === "topRated") {
           if (topRatedItems.length === 0) return null;
           if (viewMode === "list")
-            return renderList("topRated", t("home.rows.topRated"), null, topRatedItems);
+            return renderList("topRated", "Top Rated", null, topRatedItems);
           return (
             <TrendingCarousel
               key="topRated"
               items={topRatedItems}
-              title={t("home.rows.topRated")}
+              title="Top Rated"
               onSelect={onSelect}
               ratingsMap={enrichedRatingsMap}
             />

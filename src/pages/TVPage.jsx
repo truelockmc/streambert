@@ -7,8 +7,6 @@ import {
   useCallback,
   memo,
 } from "react";
-import { useTranslation, Trans } from "react-i18next";
-import i18n from "../i18n";
 import {
   EPISODE_GROUP_IDS,
   applyEpisodeMapping,
@@ -38,6 +36,7 @@ import {
   CLEAN_USER_AGENT,
   sourceUsesCleanUa,
   getNextNonAsyncSource,
+  fetchImdbId,
 } from "../utils/api";
 import {
   BookmarkIcon,
@@ -149,7 +148,6 @@ function ContextMenu({
   onMarkNotStarted,
   onClose,
 }) {
-  const { t } = useTranslation();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   useEffect(() => {
@@ -199,7 +197,7 @@ function ContextMenu({
             onCloseRef.current();
           }}
         >
-          ⊘ {t("tv.contextMenu.markNotStarted")}
+          ⊘ Mark as Not Started
         </button>
       )}
     </div>
@@ -208,7 +206,6 @@ function ContextMenu({
 
 // Expandable episode description
 function EpisodeDesc({ overview, episodeName }) {
-  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   if (!overview) return <div className="episode-desc" />;
 
@@ -223,7 +220,7 @@ function EpisodeDesc({ overview, episodeName }) {
             setOpen(true);
           }}
         >
-          {t("tv.episodes.more")}
+          More
         </button>
       </div>
 
@@ -244,7 +241,7 @@ function EpisodeDesc({ overview, episodeName }) {
               className="ep-desc-popup-close"
               onClick={() => setOpen(false)}
             >
-              {t("common.close")}
+              Close
             </button>
           </div>
         </div>
@@ -407,8 +404,9 @@ function getDaysUntilRelease(airDate) {
   const target = parseAirDate(airDate);
   if (!target) return "";
   const days = Math.round((target - startOfToday()) / 86400000);
-  if (days <= 0) return i18n.t("tv.episodes.releasingToday");
-  return i18n.t("tv.episodes.daysLeft", { count: days });
+  if (days <= 0) return "Releasing today";
+  if (days === 1) return "1 day left";
+  return `${days} days left`;
 }
 
 export default function TVPage({
@@ -430,7 +428,6 @@ export default function TVPage({
   onGoToDownloads,
   onEpisodeChange,
 }) {
-  const { t } = useTranslation();
   const [details, setDetails] = useState(null);
   const [seasonData, setSeasonData] = useState(null);
   const [failedSeasons, setFailedSeasons] = useState(() => new Set()); // season numbers which give 404 on TMDB
@@ -536,6 +533,7 @@ export default function TVPage({
 
   // Age rating
   const [rating, setRating] = useState({ cert: null, minAge: null });
+  const [imdbRating, setImdbRating] = useState(null);
   const ageLimitSetting = useMemo(() => getAgeLimitSetting(storage), []);
   const ratingCountry = useMemo(() => getRatingCountry(storage), []);
   const restricted = isRestricted(rating.minAge, ageLimitSetting);
@@ -660,6 +658,29 @@ export default function TVPage({
       mounted = false;
     };
   }, [item.id, apiKey, ratingCountry]);
+
+  // IMDb rating
+  useEffect(() => {
+    if (!apiKey) return;
+    let mounted = true;
+    fetchImdbId("tv", item.id, apiKey)
+      .then(async (imdbId) => {
+        if (!mounted || !imdbId) return;
+        const res = await fetch(
+          `https://api.agregarr.org/api/ratings?id=${imdbId}`,
+        );
+        if (!res.ok || !mounted) return;
+        const data = await res.json();
+        const entry = Array.isArray(data)
+          ? data.find((d) => d.imdbId === imdbId)
+          : null;
+        if (entry?.rating && mounted) setImdbRating(entry.rating);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [item.id, apiKey]);
 
   useEffect(() => {
     if (!apiKey || !item.id) return;
@@ -831,7 +852,7 @@ export default function TVPage({
                 setM3u8Url(res.url);
               })
               .catch(() => {
-                if (mounted) setResolveError(t("tv.errors.localPlayerFailed"));
+                if (mounted) setResolveError("Failed to start local player");
               });
           } else {
             resolvedPlayerUrlRef.current = res.url;
@@ -850,12 +871,12 @@ export default function TVPage({
             setResolveError(null);
             setPlayerSource(next);
           } else {
-            setResolveError(res?.error || t("tv.errors.episodeNotFound"));
+            setResolveError(res?.error || "Episode not found on HiAnime");
           }
         }
       })
       .catch((e) => {
-        if (mounted) setResolveError(e.message || t("tv.errors.generic"));
+        if (mounted) setResolveError(e.message || "Error");
       })
       .finally(() => {
         if (mounted) {
@@ -1791,7 +1812,7 @@ export default function TVPage({
                 )}
               </div>
               <div className="detail-info">
-                <div className="detail-type">{t("common.series")}</div>
+                <div className="detail-type">Series</div>
                 <div className="detail-title">{title}</div>
                 <div className="genres">
                   {displayGenres.map((g) => (
@@ -1801,20 +1822,29 @@ export default function TVPage({
                   ))}
                 </div>
                 <div className="detail-meta">
+                  {imdbRating && (
+                    <span className="detail-rating" title="IMDb">
+                      <StarIcon /> {Number(imdbRating).toFixed(1)}
+                      <span style={{ fontSize: "0.75em", opacity: 0.7, marginLeft: 2 }}>IMDb</span>
+                    </span>
+                  )}
                   {displayScore && (
-                    <span className="detail-rating">
+                    <span className="detail-rating" title="TMDB">
                       <StarIcon /> {displayScore}
+                      {!imdbRating && <span style={{ fontSize: "0.75em", opacity: 0.7, marginLeft: 2 }}>TMDB</span>}
                     </span>
                   )}
                   {year && <span>{year}</span>}
                   {displaySeasonCount > 0 && (
                     <span>
-                      {t("tv.seasonCount", { count: displaySeasonCount })}
+                      {displaySeasonCount} Season
+                      {displaySeasonCount !== 1 ? "s" : ""}
                     </span>
                   )}
                   {displayEpisodeCount > 0 && (
                     <span>
-                      {t("tv.episodeCount", { count: displayEpisodeCount })}
+                      {displayEpisodeCount} Episode
+                      {displayEpisodeCount !== 1 ? "s" : ""}
                     </span>
                   )}
                   <span>{status}</span>
@@ -1831,7 +1861,7 @@ export default function TVPage({
                     <span className="age-rating-pill-cert">{rating.cert}</span>
                     {restricted && (
                       <span className="age-rating-pill-label">
-                        {t("tv.ageRestrictedSetting")}
+                        Inappropriate for your age setting
                       </span>
                     )}
                   </div>
@@ -1843,30 +1873,30 @@ export default function TVPage({
                       <button
                         className="btn btn-secondary btn-restricted"
                         disabled
-                        title={t("tv.ageRestrictedRatingSetting")}
+                        title="Inappropriate for your age rating setting"
                       >
-                        🔒 {t("tv.trailer")}
+                        🔒 Trailer
                       </button>
                     ) : (
                       <button
                         className="btn btn-secondary"
                         onClick={() => setShowTrailer(true)}
                       >
-                        <TrailerIcon /> {t("tv.trailer")}
+                        <TrailerIcon /> Trailer
                       </button>
                     ))}
                   <button
                     className="btn btn-secondary"
                     onClick={() => setShowCast(true)}
                   >
-                    <CastIcon /> {t("tv.cast")}
+                    <CastIcon /> Cast
                   </button>
                   <button className="btn btn-secondary" onClick={onSave}>
                     {isSaved ? <BookmarkFillIcon /> : <BookmarkIcon />}
-                    {isSaved ? t("tv.saved") : t("common.save")}
+                    {isSaved ? "Saved" : "Save"}
                   </button>
                   <button className="btn btn-ghost" onClick={onBack}>
-                    <BackIcon /> {t("tv.back")}
+                    <BackIcon /> Back
                   </button>
                 </div>
               </div>
@@ -1884,10 +1914,7 @@ export default function TVPage({
                 }}
               >
                 <span className="tag tag-red">
-                  {t("tv.player.seasonEpisodeShort", {
-                    season: selectedSeason,
-                    episode: selectedEp.episode_number,
-                  })}
+                  Season {selectedSeason} · E{selectedEp.episode_number}
                 </span>
                 <span style={{ fontSize: 14, fontWeight: 500 }}>
                   {selectedEp.name}
@@ -1898,7 +1925,7 @@ export default function TVPage({
                     style={{ marginLeft: "auto" }}
                     onClick={() => onMarkUnwatched?.(currentProgressKey)}
                   >
-                    <WatchedIcon size={14} /> {t("tv.player.watched")}
+                    <WatchedIcon size={14} /> Watched
                   </button>
                 ) : (
                   <button
@@ -1906,7 +1933,7 @@ export default function TVPage({
                     style={{ marginLeft: "auto" }}
                     onClick={() => onMarkWatched?.(currentProgressKey)}
                   >
-                    ✓ {t("tv.player.markWatched")}
+                    ✓ Mark Watched
                   </button>
                 )}
               </div>
@@ -1939,11 +1966,7 @@ export default function TVPage({
                       <>
                         <div className="spinner" />
                         <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                          {t("tv.player.loadingSource", {
-                            source:
-                              PLAYER_SOURCES.find((s) => s.id === playerSource)
-                                ?.label ?? t("tv.player.sourceFallback"),
-                          })}
+                          {`Loading ${PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ?? "source"}…`}
                         </span>
                       </>
                     )}
@@ -1967,13 +1990,13 @@ export default function TVPage({
                   >
                     <span style={{ fontSize: 28 }}>⚠️</span>
                     <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                      {t("tv.errors.episodeNotFound")}
+                      Episode not found on HiAnime
                     </span>
                     <span style={{ fontSize: 12, color: "var(--text3)" }}>
                       {resolveError}
                     </span>
                     <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                      {t("tv.errors.trySourceOrDub")}
+                      Try a different source, or switch sub/dub.
                     </span>
                   </div>
                 )}
@@ -1995,12 +2018,10 @@ export default function TVPage({
                   >
                     <span style={{ fontSize: 28 }}>⚠️</span>
                     <span style={{ fontSize: 14, color: "var(--text2)" }}>
-                      {t("tv.errors.resolveIdFailed", {
-                        idLabel: srcId.idLabel,
-                      })}
+                      Could not resolve the {srcId.idLabel} for this title
                     </span>
                     <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                      {t("tv.errors.errorTrySource", { error: srcId.error })}
+                      {srcId.error}. Try a different source.
                     </span>
                   </div>
                 )}
@@ -2028,7 +2049,7 @@ export default function TVPage({
                         fontWeight: 600,
                       }}
                     >
-                      {t("tv.popout.playing")}
+                      Playing in pop-out window
                     </span>
                     <span
                       style={{
@@ -2038,14 +2059,14 @@ export default function TVPage({
                         maxWidth: 260,
                       }}
                     >
-                      {t("tv.popout.closingReloads")}
+                      Closing the pop-out will reload the player here.
                     </span>
                     <button
                       className="player-overlay-btn"
                       onClick={() => window.electron?.closePipWindow?.()}
                       style={{ marginTop: 4 }}
                     >
-                      {t("tv.popout.closeReturn")}
+                      Close pop-out &amp; return
                     </button>
                   </div>
                 )}
@@ -2094,7 +2115,7 @@ export default function TVPage({
                           marginBottom: "8px",
                         }}
                       >
-                        {t("tv.autoplay.upNext")}
+                        Up Next
                       </div>
 
                       {/* Cover Still */}
@@ -2146,10 +2167,8 @@ export default function TVPage({
                           marginBottom: "4px",
                         }}
                       >
-                        {t("tv.autoplay.seasonEpisode", {
-                          season: selectedSeason,
-                          episode: nextEp?.episode_number,
-                        })}
+                        Season {selectedSeason} · Episode{" "}
+                        {nextEp?.episode_number}
                       </div>
                       <div
                         style={{
@@ -2173,17 +2192,11 @@ export default function TVPage({
                             marginBottom: "20px",
                           }}
                         >
-                          <Trans
-                            i18nKey="tv.autoplay.startingIn"
-                            values={{ seconds: autoplayCountdown }}
-                            components={{
-                              num: (
-                                <span
-                                  style={{ color: "white", fontWeight: "600" }}
-                                />
-                              ),
-                            }}
-                          />
+                          Starting in{" "}
+                          <span style={{ color: "white", fontWeight: "600" }}>
+                            {autoplayCountdown}
+                          </span>
+                          s...
                         </div>
                       ) : (
                         <div style={{ height: "20px", marginBottom: "20px" }} />
@@ -2209,7 +2222,7 @@ export default function TVPage({
                           }}
                           onClick={playNow}
                         >
-                          {t("tv.autoplay.playNow")}
+                          Play Now
                         </button>
                         <button
                           className="btn btn-ghost"
@@ -2221,7 +2234,7 @@ export default function TVPage({
                           }}
                           onClick={cancelAutoplay}
                         >
-                          {t("tv.autoplay.cancel")}
+                          Cancel
                         </button>
                       </div>
                     </div>
@@ -2276,11 +2289,11 @@ export default function TVPage({
                         setMenuPos({ top: rect.bottom + 6, left: rect.left });
                       setShowSourceMenu((v) => !v);
                     }}
-                    title={t("tv.player.changeSource")}
+                    title="Change source"
                   >
                     <SourceIcon />
                     {PLAYER_SOURCES.find((s) => s.id === playerSource)?.label ??
-                      t("tv.player.source")}
+                      "Source"}
                   </button>
                   {/* Sub/Dub toggle: HiAnime, and anime-capable sources (Vidnest) on anime titles */}
                   {(isAsync ||
@@ -2299,9 +2312,9 @@ export default function TVPage({
                         setResolvingUrl(false);
                         setResolveError(null);
                       }}
-                      title={t("tv.player.toggleSubDub")}
+                      title="Toggle Sub/Dub"
                     >
-                      {dubMode === "sub" ? t("tv.player.sub") : t("tv.player.dub")}
+                      {dubMode === "sub" ? "SUB" : "DUB"}
                     </button>
                   )}
                   {/* Blocked ads & trackers button */}
@@ -2311,7 +2324,7 @@ export default function TVPage({
                       setShowSourceMenu(false);
                       setShowBlockedModal(true);
                     }}
-                    title={t("tv.player.blockedAdsTrackers")}
+                    title="Blocked ads & trackers"
                   >
                     <ShieldBlockIcon />
                     {blockedSession > 0 && (
@@ -2339,7 +2352,7 @@ export default function TVPage({
                           : null,
                       );
                     }}
-                    title={pipOpen ? t("tv.player.closePopout") : t("tv.player.popOutPlayer")}
+                    title={pipOpen ? "Close pop-out" : "Pop out player"}
                     disabled={
                       !pipOpen &&
                       (webviewLoading || !!(isAsync && !resolvedPlayerUrl))
@@ -2411,9 +2424,9 @@ export default function TVPage({
                   title={
                     currentEpDownload
                       ? currentEpDownload.status === "downloading"
-                        ? t("tv.player.downloadingViewInDownloads")
-                        : t("tv.player.alreadyDownloadedViewInDownloads")
-                      : t("tv.player.download")
+                        ? "Downloading… - view in Downloads"
+                        : "Already downloaded - view in Downloads"
+                      : "Download"
                   }
                 >
                   {currentEpDownload ? (
@@ -2437,9 +2450,9 @@ export default function TVPage({
                   {!supportsProgress && (
                     <span
                       className="player-no-progress-hint"
-                      title={t("tv.player.noTrackingTitle")}
+                      title="No automatic progress tracking for this source"
                     >
-                      ⚠ {t("tv.player.noTracking")}
+                      ⚠ no tracking
                     </span>
                   )}
                 </button>
@@ -2488,7 +2501,7 @@ export default function TVPage({
                         letterSpacing: 1,
                       }}
                     >
-                      {t("tv.player.skip")}
+                      SKIP
                     </span>
                     <span
                       style={{
@@ -2497,9 +2510,7 @@ export default function TVPage({
                         letterSpacing: 1,
                       }}
                     >
-                      {skipPrompt === "intro"
-                        ? t("tv.player.intro")
-                        : t("tv.player.outro")}
+                      {skipPrompt === "intro" ? "INTRO" : "OUTRO"}
                     </span>
                   </button>
                 )}
@@ -2524,7 +2535,7 @@ export default function TVPage({
                         {/* AniSkip intro/outro markers */}
                         {dur > 0 && skipTimings?.intro && (
                           <div
-                            title={t("tv.player.introMarker")}
+                            title="Intro"
                             style={{
                               position: "absolute",
                               top: 0,
@@ -2539,7 +2550,7 @@ export default function TVPage({
                         )}
                         {dur > 0 && skipTimings?.outro && (
                           <div
-                            title={t("tv.player.outroMarker")}
+                            title="Outro"
                             style={{
                               position: "absolute",
                               top: 0,
@@ -2554,11 +2565,7 @@ export default function TVPage({
                         )}
                       </div>
                       <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                        {epPct > 0
-                          ? t("tv.player.percentWatched", {
-                              percent: epPct.toFixed(0),
-                            })
-                          : ""}
+                        {epPct > 0 ? `${epPct.toFixed(0)}% watched` : ""}
                       </span>
                     </div>
                   ) : null;
@@ -2572,7 +2579,7 @@ export default function TVPage({
                       marginRight: 4,
                     }}
                   >
-                    {t("tv.player.markProgress")}
+                    Mark progress:
                   </span>
                   {[25, 50, 75, 100].map((p) => (
                     <button
@@ -2590,7 +2597,7 @@ export default function TVPage({
           )}
 
           <div className="section">
-            <div className="section-title">{t("tv.episodes.title")}</div>
+            <div className="section-title">Episodes</div>
             {seasons.length > 0 && (
               <div className="season-selector">
                 {seasons.map((s) => {
@@ -2609,7 +2616,7 @@ export default function TVPage({
                           seasonNum: s.season_number,
                         });
                       }}
-                      title={t("tv.episodes.seasonRightClick")}
+                      title="Right-click to mark season as watched/unwatched"
                     >
                       {sw === "all" && (
                         <span className="season-watched-icon">✓</span>
@@ -2618,8 +2625,8 @@ export default function TVPage({
                       {sw === "some50" && <PartialCircleIcon pct={50} />}
                       {sw === "some75" && <PartialCircleIcon pct={75} />}
                       {s.season_number === 0
-                        ? t("tv.episodes.specials")
-                        : t("tv.episodes.season", { number: s.season_number })}
+                        ? "Specials"
+                        : `Season ${s.season_number}`}
                     </button>
                   );
                 })}
@@ -2642,7 +2649,9 @@ export default function TVPage({
               >
                 <span>⚠️</span>
                 <span>
-                  {t("tv.episodes.specialsWarning")}
+                  Specials support varies by provider. If the wrong episode
+                  plays, try switching to a different source. But it can't be
+                  guaranteed that the correct Episode will be available.
                 </span>
               </div>
             )}
@@ -2704,8 +2713,8 @@ export default function TVPage({
           y={epMenu.y}
           isWatched={!!watched?.[epMenu.pk]}
           hasProgress={(progress?.[epMenu.pk] ?? 0) > 0}
-          watchedLabel={t("tv.contextMenu.markWatched")}
-          unwatchedLabel={t("tv.contextMenu.markUnwatched")}
+          watchedLabel="Mark as Watched"
+          unwatchedLabel="Mark as Unwatched"
           onMarkWatched={() => onMarkWatched?.(epMenu.pk)}
           onMarkUnwatched={() => onMarkUnwatched?.(epMenu.pk)}
           onMarkNotStarted={() => {
@@ -2722,8 +2731,8 @@ export default function TVPage({
           x={seasonMenu.x}
           y={seasonMenu.y}
           isWatched={isSeasonWatched(seasonMenu.seasonNum)}
-          watchedLabel={t("tv.contextMenu.markSeasonWatched")}
-          unwatchedLabel={t("tv.contextMenu.markSeasonUnwatched")}
+          watchedLabel="Mark Season as Watched"
+          unwatchedLabel="Mark Season as Unwatched"
           onMarkWatched={() => markSeasonWatched(seasonMenu.seasonNum)}
           onMarkUnwatched={() => markSeasonUnwatched(seasonMenu.seasonNum)}
           onClose={() => setSeasonMenu(null)}
@@ -2779,7 +2788,6 @@ const EpisodeCard = memo(function EpisodeCard({
   onContextMenu,
   onGoToDownloads,
 }) {
-  const { t } = useTranslation();
   const pk = `tv_${itemId}_s${selectedSeason}e${ep.episode_number}`;
   const isPlaying = playing && selectedEpNumber === ep.episode_number;
   const epUnreleased = isUnreleased(ep.air_date);
@@ -2822,17 +2830,17 @@ const EpisodeCard = memo(function EpisodeCard({
         )}
         {restricted ? (
           <div className="episode-restricted-overlay">
-            🔒<span>{t("tv.episodes.inappropriateAge")}</span>
+            🔒<span>Inappropriate for your age</span>
           </div>
         ) : epUnreleased ? (
           <div className="episode-restricted-overlay">
-            🔒<span>{t("tv.episodes.unreleased")}</span>
+            🔒<span>Unreleased</span>
             <span>{getDaysUntilRelease(ep.air_date)}</span>
           </div>
         ) : isPlaying ? (
           <div className="episode-playing-badge">
             <span className="episode-playing-dot" />
-            {t("tv.episodes.playing")}
+            Playing
           </div>
         ) : (
           <div className="episode-thumb-play">
@@ -2852,8 +2860,8 @@ const EpisodeCard = memo(function EpisodeCard({
               className="ep-downloaded-badge"
               title={
                 epDownload.status === "downloading"
-                  ? t("tv.episodes.downloadingClickView")
-                  : t("tv.episodes.downloadedClickView")
+                  ? "Downloading… - click to view in Downloads"
+                  : "Downloaded - click to view in Downloads"
               }
               style={{
                 borderColor:
