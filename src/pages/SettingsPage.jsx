@@ -9,7 +9,11 @@ import {
   isElectron,
   clearAppCaches,
 } from "../utils/storage";
-import { clearTmdbCache } from "../utils/api";
+import {
+  clearTmdbCache,
+  PLAYER_SOURCES,
+  AUDIO_LANGUAGES,
+} from "../utils/api";
 import {
   ACCENT_PRESETS,
   applyAccentColor,
@@ -1964,6 +1968,78 @@ const TMDB_LANGUAGES = [
   { value: "zh-CN", label: "中文 (简体) (zh-CN)" },
   { value: "ar-SA", label: "العربية (ar-SA)" },
 ];
+
+function AudioLanguageSection() {
+  const [lang, setLang] = useState(
+    () => storage.get(STORAGE_KEYS.PREFERRED_AUDIO_LANG) || "",
+  );
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    if (lang) storage.set(STORAGE_KEYS.PREFERRED_AUDIO_LANG, lang);
+    else storage.remove(STORAGE_KEYS.PREFERRED_AUDIO_LANG);
+    // refresh playerSettings prop (audio lang)
+    window.dispatchEvent(new CustomEvent("streambert:player-settings-changed"));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleClearCache = () => {
+    storage.remove(STORAGE_KEYS.AUDIO_LANG_CACHE);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const sources = PLAYER_SOURCES.filter((s) => s.audioLang)
+    .map((s) => `${s.label} (${s.audioLang.toUpperCase()})`)
+    .join(", ");
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">Preferred Audio Language</div>
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--text3)",
+          marginBottom: 16,
+          lineHeight: 1.6,
+        }}
+      >
+        When you press play, the source that offers this dub language is
+        selected automatically ({sources}). If no video loads there within
+        a few seconds, playback falls back to your regular source. For anime,
+        English switches to the dub version. The result is remembered per
+        title, and picking a source by hand always wins.
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <SettingsSelect
+          value={lang}
+          onChange={(v) => setLang(v)}
+          options={AUDIO_LANGUAGES.map((l) => ({
+            value: l.code,
+            label: l.label,
+          }))}
+        />
+        <button className="btn btn-primary" onClick={handleSave}>
+          Save
+        </button>
+        <button className="btn btn-ghost" onClick={handleClearCache}>
+          Re-check all titles
+        </button>
+        {saved && (
+          <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function TmdbLanguageSection() {
   const { t } = useTranslation();
@@ -4017,6 +4093,10 @@ export default function SettingsPage({
               </div>
             )}
           </div>
+
+          <Divider />
+
+          <AudioLanguageSection />
 
           <Divider />
 

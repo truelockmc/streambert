@@ -73,6 +73,7 @@ import {
   GAMEPAD_CLEANUP_JS,
 } from "../utils/playerGamepadScript";
 import { useSourceId } from "../utils/useSourceId";
+import { useAudioLangPreference } from "../utils/useAudioLangPreference";
 import { setPlayerGamepadActive } from "../utils/gamepadPlayerState";
 import HiAnimeLoader from "../components/HiAnimeLoader";
 import { useTranslation } from "react-i18next";
@@ -163,6 +164,24 @@ export default function MoviePage({
     () => isAnimeContent(item, details),
     [item.id, details],
   );
+
+  // Preferred audio (dub) language: auto-pick the matching source, verify a
+  // video loads there, otherwise fall back to the previous source
+  const { notice: audioNotice, markManual: markAudioManual } =
+    useAudioLangPreference({
+      lang: playerSettings?.audioLang ?? null,
+      playing,
+      titleKey: `movie_${item.id}`,
+      playKey: `movie_${item.id}`,
+      type: "movie",
+      isAnime,
+      playerSource,
+      setPlayerSource,
+      dubMode,
+      setDubMode,
+      webviewRef,
+      sourceError: srcId.error,
+    });
 
   // Direct (non-async) player URL. Anime-capable sources (Vidnest) use their
   // anime route (AniList id + episode 1 + sub/dub) when AniList data exists;
@@ -1149,6 +1168,9 @@ export default function MoviePage({
                     : "visible",
               }}
             />
+            {audioNotice && (
+              <div className="player-audio-notice">{audioNotice}</div>
+            )}
             {/* Left-side overlay button group, flex row, no fixed px offsets */}
             <div className="player-overlay-group">
               <button
@@ -1174,6 +1196,7 @@ export default function MoviePage({
                   onClick={() => {
                     const next = dubMode === "sub" ? "dub" : "sub";
                     setDubMode(next);
+                    markAudioManual();
                     storage.set(STORAGE_KEYS.HIANIME_DUB_MODE, next);
                     setM3u8Url(null);
                     setInterceptedSubs([]);
@@ -1252,6 +1275,7 @@ export default function MoviePage({
                       if (src.id === playerSource) return;
                       // Manual selection wins over auto-failover
                       clearFailoverSource(`movie_${item.id}_${dubMode}`);
+                      markAudioManual();
                       setPlayerSource(src.id);
                       storage.set(STORAGE_KEYS.PLAYER_SOURCE, src.id);
                       setM3u8Url(null);

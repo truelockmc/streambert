@@ -916,6 +916,50 @@ function register(getMainWindow, { writeSecretMigration }) {
       return null;
     }
   });
+
+  // ── Is there a playable video in any frame? ───────────────────────────────
+  // Used by the preferred-audio-language check: unlike query-video-progress
+  // this also counts paused videos (autoplay may be blocked), as long as the
+  // media metadata loaded (duration known).
+  ipcMain.handle("query-video-available", async (_, webContentsId) => {
+    try {
+      const { webContents } = require("electron");
+      const wc = webContents.fromId(webContentsId);
+      if (!wc || wc.isDestroyed()) return false;
+
+      const allFrames = [];
+      const collect = (frame) => {
+        allFrames.push(frame);
+        for (const child of frame.frames || []) collect(child);
+      };
+      collect(wc.mainFrame);
+
+      const JS = `
+        (() => {
+          const P = window.meinecloudPlayer;
+          if (P && typeof P.getDuration === 'function') {
+            try {
+              const d = P.getDuration();
+              if (typeof d === 'number' && d > 0 && d !== Infinity) return true;
+            } catch (e) {}
+          }
+          for (const v of document.querySelectorAll('video')) {
+            if (v.readyState >= 1 && v.duration > 0 && v.duration !== Infinity) return true;
+          }
+          return false;
+        })()
+      `;
+
+      for (const frame of allFrames) {
+        try {
+          if (await frame.executeJavaScript(JS)) return true;
+        } catch {}
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  });
 }
 
 // ── Central audio-device-change recovery (macOS HDMI/TV fix) ─────────────────

@@ -4057,3 +4057,19 @@ html[data-win-titlebar][data-maximized] .main {
 .episode-check-item:hover {
     color: var(--text) !important;
 }
+
+/* Preferred audio language status (top-right of the player) */
+.player-audio-notice {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 11;
+    max-width: calc(100% - 24px);
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.72);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    pointer-events: none;
+}

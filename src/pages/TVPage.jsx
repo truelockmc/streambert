@@ -84,6 +84,7 @@ import {
   GAMEPAD_CLEANUP_JS,
 } from "../utils/playerGamepadScript";
 import { useSourceId } from "../utils/useSourceId";
+import { useAudioLangPreference } from "../utils/useAudioLangPreference";
 import { setPlayerGamepadActive } from "../utils/gamepadPlayerState";
 import HiAnimeLoader from "../components/HiAnimeLoader";
 
@@ -518,6 +519,26 @@ export default function TVPage({
     () => isAnimeContent(item, details),
     [item.id, details],
   );
+
+  // Preferred audio (dub) language: auto-pick the matching source, verify a
+  // video loads there, otherwise fall back to the previous source
+  const { notice: audioNotice, markManual: markAudioManual } =
+    useAudioLangPreference({
+      lang: playerSettings?.audioLang ?? null,
+      playing,
+      titleKey: `tv_${item.id}`,
+      playKey: selectedEp
+        ? `tv_${item.id}_s${selectedSeason}_e${selectedEp.episode_number}`
+        : null,
+      type: "tv",
+      isAnime,
+      playerSource,
+      setPlayerSource,
+      dubMode,
+      setDubMode,
+      webviewRef,
+      sourceError: srcId.error,
+    });
 
   const [downloaderFolder, setDownloaderFolder] = useState(
     () => storage.get("downloaderFolder") || "",
@@ -2265,6 +2286,9 @@ export default function TVPage({
                   }}
                   tabIndex={-1}
                 />
+                {audioNotice && (
+                  <div className="player-audio-notice">{audioNotice}</div>
+                )}
                 {/* Left-side overlay button group, flex row, no fixed px offsets */}
                 <div className="player-overlay-group">
                   <button
@@ -2290,6 +2314,7 @@ export default function TVPage({
                       onClick={() => {
                         const next = dubMode === "sub" ? "dub" : "sub";
                         setDubMode(next);
+                        markAudioManual();
                         storage.set(STORAGE_KEYS.HIANIME_DUB_MODE, next);
                         setM3u8Url(null);
                         setInterceptedSubs([]);
@@ -2369,6 +2394,7 @@ export default function TVPage({
                             setShowSourceMenu(false);
                             if (src.id === playerSource) return;
                             // Manual selection wins over auto-failover
+                            markAudioManual();
                             if (selectedEp) {
                               clearFailoverSource(
                                 `tv_${item.id}_s${selectedSeason}_e${selectedEp.episode_number}_${dubMode}`,
